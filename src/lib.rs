@@ -41,9 +41,9 @@
 //! skytable = "0.1.0"
 //! ```
 //! Now open up your `src/main.rs` file and establish a connection to the server:
-//! ```no_run
+//! ```ignore
 //! use skytable::{Connection};
-//! async fn main() {
+//! async fn main() -> std::io::Result<()> {
 //!     let mut con = Connection::new("127.0.0.1", 2003).await.unwrap();
 //! }
 //! ```
@@ -58,7 +58,7 @@
 //! tokio = {version="1.5.0", features=["full"]}
 //! ```
 //! And your `main.rs` should now look like:
-//! ```no_run
+//! ```ignore
 //! use skytable::{Connection, Query, Response, RespCode, DataType};
 //! #[tokio::main]
 //! async fn main() -> std::io::Result<()> {
@@ -67,7 +67,7 @@
 //! ```
 //!
 //! Now let's run a [`Query`]! Add this below the previous line:
-//! ```no_run
+//! ```ignore
 //! let mut query = Query::new();
 //! query.arg("heya");
 //! let res = con.run_simple_query(query).await?;

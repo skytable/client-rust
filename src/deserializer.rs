@@ -302,7 +302,7 @@ fn read_line_and_return_next_line<'a>(pos: &mut usize, buf: &'a [u8]) -> Option<
 
 #[cfg(test)]
 #[test]
-fn test_parser() {
+fn test_deserializer_responseitem() {
     let res = "#2\n*1\n#2\n&1\n+4\nHEY!\n".as_bytes().to_owned();
     assert_eq!(
         parse(&res),
@@ -313,11 +313,17 @@ fn test_parser() {
         parse(&res),
         ClientResult::ResponseItem(DataType::RespCode(RespCode::Okay), res.len())
     );
+}
+
+#[cfg(test)]
+#[test]
+fn test_deserializer_simple_response() {
     let res = "#2\n*1\n#2\n&5\n!1\n1\n!1\n0\n+5\nsayan\n+2\nis\n+4\nbusy\n"
         .as_bytes()
         .to_owned();
+    let ret = parse(&res);
     assert_eq!(
-        parse(&res),
+        ret,
         ClientResult::SimpleResponse(
             DataGroup(vec![
                 DataType::RespCode(RespCode::NotFound),
@@ -329,4 +335,11 @@ fn test_parser() {
             res.len()
         )
     );
+    if let ClientResult::SimpleResponse(ret, _) = ret {
+        for val in ret {
+            let _ = format!("{:?}", val);
+        }
+    } else {
+        panic!("Expected a SimpleResponse with a single datagroup")
+    }
 }

@@ -18,28 +18,12 @@
 //! This module provides methods to deserialize an incoming response packet
 
 use crate::terrapipe::RespCode;
-use std::vec;
 
-#[derive(Debug, PartialEq)]
 /// A response datagroup
 ///
 /// This contains all the elements returned by a certain action. So let's say you did
 /// something like `MGET x y`, then the values of x and y will be in a single datagroup.
-pub struct DataGroup(Vec<DataType>);
-
-impl DataGroup {
-    fn size(&self) -> usize {
-        self.0.len()
-    }
-}
-
-impl IntoIterator for DataGroup {
-    type Item = DataType;
-    type IntoIter = vec::IntoIter<Self::Item>;
-    fn into_iter(self) -> <Self as IntoIterator>::IntoIter {
-        self.0.into_iter()
-    }
-}
+pub type DataGroup = Vec<DataType>;
 
 /// A data type as defined by the Terrapipe protocol
 ///
@@ -225,7 +209,7 @@ pub fn parse(buf: &[u8]) -> ClientResult {
                                 }
                             });
                         }
-                        items.push(DataGroup(actiongroup));
+                        items.push(actiongroup);
                     }
                     _ => return ClientResult::InvalidResponse,
                 }
@@ -242,9 +226,9 @@ pub fn parse(buf: &[u8]) -> ClientResult {
     if buf.get(pos).is_none() {
         if items.len() == action_size {
             if items.len() == 1 {
-                if items[0].size() == 1 {
+                if items[0].len() == 1 {
                     // Single item returned, so we can return this as ClientResult::ResponseItem
-                    ClientResult::ResponseItem(items.swap_remove(0).0.swap_remove(0), pos)
+                    ClientResult::ResponseItem(items.swap_remove(0).swap_remove(0), pos)
                 } else {
                     // More than one time returned, so we can return this as ClientResult::Response
                     ClientResult::SimpleResponse(items.swap_remove(0), pos)
@@ -325,13 +309,13 @@ fn test_deserializer_simple_response() {
     assert_eq!(
         ret,
         ClientResult::SimpleResponse(
-            DataGroup(vec![
+            vec![
                 DataType::RespCode(RespCode::NotFound),
                 DataType::RespCode(RespCode::Okay),
                 DataType::Str("sayan".to_owned()),
                 DataType::Str("is".to_owned()),
                 DataType::Str("busy".to_owned())
-            ]),
+            ],
             res.len()
         )
     );

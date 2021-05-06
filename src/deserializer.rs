@@ -18,6 +18,7 @@
 //! This module provides methods to deserialize an incoming response packet
 
 use crate::terrapipe::RespCode;
+use std::hint::unreachable_unchecked;
 
 #[derive(Debug, PartialEq)]
 /// A response datagroup
@@ -232,22 +233,31 @@ pub fn parse(buf: &[u8]) -> ClientResult {
         }
     }
     if buf.get(pos).is_none() {
-        // Either more data was sent or some data was missing
         if items.len() == action_size {
             if items.len() == 1 {
                 if items[0].size() == 1 {
-                    ClientResult::ResponseItem(items.pop().unwrap().__unpack_0(), pos)
+                    // Single item returned, so we can return this as ClientResult::ResponseItem
+                    ClientResult::ResponseItem(
+                        items
+                            .pop()
+                            .unwrap_or_else(|| unsafe { unreachable_unchecked() })
+                            .__unpack_0(),
+                        pos,
+                    )
                 } else {
+                    // More than one time returned, so we can return this as ClientResult::Response
                     ClientResult::Response(items, pos)
                 }
             } else {
-                // The CLI does not support batch queries
-                unimplemented!();
+                todo!("Pipelined queries aren't implemented yet!")
             }
         } else {
+            // Since the number of items we got is not equal to the action size - not all data was
+            // transferred
             ClientResult::Incomplete
         }
     } else {
+        // Either more data was sent or some data was missing
         ClientResult::InvalidResponse
     }
 }
@@ -301,5 +311,21 @@ fn test_parser() {
     assert_eq!(
         parse(&res),
         ClientResult::ResponseItem(DataType::RespCode(RespCode::Okay), res.len())
+    );
+    let res = "#2\n*1\n#2\n&5\n!1\n1\n!1\n0\n+5\nsayan\n+2\nis\n+4\nbusy\n"
+        .as_bytes()
+        .to_owned();
+    assert_eq!(
+        parse(&res),
+        ClientResult::Response(
+            vec![DataGroup(vec![
+                DataType::RespCode(RespCode::NotFound),
+                DataType::RespCode(RespCode::Okay),
+                DataType::Str("sayan".to_owned()),
+                DataType::Str("is".to_owned()),
+                DataType::Str("busy".to_owned())
+            ])],
+            res.len()
+        )
     );
 }

@@ -1,28 +1,23 @@
 use skytable::connection::Connection;
 use skytable::{DataType, Query, RespCode, Response};
 
-#[ignore]
-#[tokio::test]
-async fn test_basic_flushdb() {
-    // WARNING: You need to have a running database server!
-    let mut con = Connection::new("localhost", 2003).await.unwrap();
+#[cfg(test)]
+async fn flush_db(con: &mut Connection) {
     let mut query = Query::new();
     query.arg("flushdb");
-    match con.run_simple_query(query).await.unwrap() {
-        Response::InvalidResponse => panic!("Server sent an invalid response"),
-        Response::Item(item) => match item {
-            DataType::RespCode(RespCode::Okay) => (),
-            x @ _ => panic!("Server sent an unexpected data type: {:?}", x),
-        },
-        Response::Array(_) => panic!("We didn't expect an array"),
-        Response::ParseError => panic!(
-            "The server sent data but the client failed to parse it into the appropriate data type"
-        ),
-        _ => panic!("The server sent some unknown data type")
-    }
+    let res = con.run_simple_query(query).await.unwrap();
+    assert_eq!(res, Response::Item(DataType::RespCode(RespCode::Okay)))
+}
+
+#[ignore]
+#[tokio::test]
+async fn test_basic_set() {
+    let mut con = Connection::new("localhost", 2003).await.unwrap();
+    flush_db(&mut con).await;
     let mut query = Query::new();
-    query.arg("set");
-    query.arg("x");
-    query.arg("100");
-    assert!(con.run_simple_query(query).await.unwrap() == Response::Item(DataType::RespCode(RespCode::Okay)));
+    query.arg("set").arg("x").arg("100");
+    assert_eq!(
+        con.run_simple_query(query).await.unwrap(),
+        Response::Item(DataType::RespCode(RespCode::Okay))
+    );
 }

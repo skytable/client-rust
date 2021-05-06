@@ -179,7 +179,7 @@ impl Query {
 /// - The `Response::Item` field is just a simple abstraction provided by this client library; Skytable's Terrapipe
 /// protocol (as of 1.0) doesn't discriminate between single and multiple elements returned in a data group, That is
 /// to say if an action like `GET x` returns (and will return) a single element in a datagroup, then it is passed
-/// into this variant; Terrapip 1.0 always sends arrays
+/// into this variant; Terrapipe 1.0 always sends arrays
 #[derive(Debug, PartialEq)]
 #[non_exhaustive]
 pub enum Response {

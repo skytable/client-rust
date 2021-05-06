@@ -54,7 +54,6 @@ impl Connection {
         match query.write_query_to(&mut self.stream).await {
             Ok(_) => (),
             Err(e) => {
-                eprintln!("ERROR: Couldn't write data to socket");
                 return Err(e);
             }
         };

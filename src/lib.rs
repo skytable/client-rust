@@ -186,7 +186,7 @@ pub enum Response {
     /// The server sent an invalid response
     InvalidResponse,
     /// An array of items
-    Array(Vec<DataGroup>),
+    Array(DataGroup),
     /// A single item
     ///
     /// This is a client abstraction for a datagroup that only has one element

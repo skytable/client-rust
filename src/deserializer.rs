@@ -18,7 +18,7 @@
 //! This module provides methods to deserialize an incoming response packet
 
 use crate::terrapipe::RespCode;
-use std::hint::unreachable_unchecked;
+use std::vec;
 
 #[derive(Debug, PartialEq)]
 /// A response datagroup
@@ -31,8 +31,13 @@ impl DataGroup {
     fn size(&self) -> usize {
         self.0.len()
     }
-    fn __unpack_0(mut self) -> DataType {
-        self.0.pop().unwrap()
+}
+
+impl IntoIterator for DataGroup {
+    type Item = DataType;
+    type IntoIter = vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> <Self as IntoIterator>::IntoIter {
+        self.0.into_iter()
     }
 }
 
@@ -70,7 +75,9 @@ pub enum ClientResult {
     /// The response was Invalid
     InvalidResponse,
     /// The response is a valid response and has been parsed into a vector of datagroups
-    Response(Vec<DataGroup>, usize),
+    PipelinedResponse(Vec<DataGroup>, usize),
+    /// The response is a valid response and has been parsed into a datagroup
+    SimpleResponse(DataGroup, usize),
     /// A single element in a datagroup (please note that this is a client abstraction)
     ResponseItem(DataType, usize),
     /// The response was empty, which means that the remote end closed the connection
@@ -237,19 +244,13 @@ pub fn parse(buf: &[u8]) -> ClientResult {
             if items.len() == 1 {
                 if items[0].size() == 1 {
                     // Single item returned, so we can return this as ClientResult::ResponseItem
-                    ClientResult::ResponseItem(
-                        items
-                            .pop()
-                            .unwrap_or_else(|| unsafe { unreachable_unchecked() })
-                            .__unpack_0(),
-                        pos,
-                    )
+                    ClientResult::ResponseItem(items.swap_remove(0).0.swap_remove(0), pos)
                 } else {
                     // More than one time returned, so we can return this as ClientResult::Response
-                    ClientResult::Response(items, pos)
+                    ClientResult::SimpleResponse(items.swap_remove(0), pos)
                 }
             } else {
-                todo!("Pipelined queries aren't implemented yet!")
+                ClientResult::PipelinedResponse(items, pos)
             }
         } else {
             // Since the number of items we got is not equal to the action size - not all data was
@@ -317,14 +318,14 @@ fn test_parser() {
         .to_owned();
     assert_eq!(
         parse(&res),
-        ClientResult::Response(
-            vec![DataGroup(vec![
+        ClientResult::SimpleResponse(
+            DataGroup(vec![
                 DataType::RespCode(RespCode::NotFound),
                 DataType::RespCode(RespCode::Okay),
                 DataType::Str("sayan".to_owned()),
                 DataType::Str("is".to_owned()),
                 DataType::Str("busy".to_owned())
-            ])],
+            ]),
             res.len()
         )
     );

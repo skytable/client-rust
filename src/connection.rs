@@ -16,7 +16,7 @@
 */
 
 //! # Database connections
-//! 
+//!
 //! This crate provides a [`Connection`] object that can be used to connect to a Skytable database instance
 //! and write/read queries/responses to/from it
 
@@ -25,7 +25,7 @@ use crate::{Query, Response};
 use bytes::{Buf, BytesMut};
 pub use std::io::Result as IoResult;
 use std::io::{Error, ErrorKind};
-use tokio::io::{AsyncReadExt};
+use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
 
 /// 4 KB Read Buffer
@@ -68,13 +68,9 @@ impl Connection {
                 ClientResult::Incomplete => {
                     continue;
                 }
-                ClientResult::Response(r, f) => {
+                ClientResult::SimpleResponse(r, f) => {
                     self.buffer.advance(f);
-                    if r.len() != 1 {
-                        break Ok(Response::InvalidResponse);
-                    } else {
-                        break Ok(Response::Array(r));
-                    }
+                    break Ok(Response::Array(r));
                 }
                 ClientResult::ResponseItem(r, f) => {
                     self.buffer.advance(f);
@@ -87,6 +83,9 @@ impl Connection {
                 ClientResult::ParseError => {
                     self.buffer.clear();
                     break Ok(Response::ParseError);
+                }
+                ClientResult::PipelinedResponse(_, _) => {
+                    todo!("Pipelined queries haven't been implemented yet!")
                 }
             }
         }

@@ -38,13 +38,13 @@
 //!
 //! First add this to your `Cargo.toml` file:
 //! ```toml
-//! skytable = "0.2.2"
+//! skytable = "0.2.3"
 //! ```
 //! Now open up your `src/main.rs` file and establish a connection to the server:
 //! ```ignore
 //! use skytable::{Connection};
 //! async fn main() -> std::io::Result<()> {
-//!     let mut con = Connection::new("127.0.0.1", 2003).await.unwrap();
+//!     let mut con = Connection::new("127.0.0.1", 2003).await?;
 //! }
 //! ```
 //!
@@ -58,11 +58,12 @@
 //! tokio = {version="1.5.0", features=["full"]}
 //! ```
 //! And your `main.rs` should now look like:
-//! ```ignore
+//! ```no_run
 //! use skytable::{Connection, Query, Response, RespCode, DataType};
 //! #[tokio::main]
 //! async fn main() -> std::io::Result<()> {
 //!     let mut con = Connection::new("127.0.0.1", 2003).await?;
+//!     Ok(())
 //! }
 //! ```
 //!
@@ -83,7 +84,7 @@
 //! fork and open those pull requests [here](https://github.com/skytable/client-rust)!
 //!
 //! ## License
-//! This client library is distributed under the permissive 
+//! This client library is distributed under the permissive
 //! [Apache-2.0 License](https://github.com/skytable/client-rust/blob/next/LICENSE). Now go build great apps!
 //!
 
@@ -115,6 +116,9 @@ impl Query {
         }
     }
     /// Add an argument to a query
+    ///
+    /// ## Panics
+    /// This method will panic if the passed `arg` is empty
     pub fn arg(&mut self, arg: impl ToString) -> &mut Self {
         let arg = arg.to_string();
         if arg.len() == 0 {
@@ -186,6 +190,9 @@ pub enum Response {
     /// The server sent an invalid response
     InvalidResponse,
     /// An array of items
+    /// 
+    /// The server has responded with an array of items in a single datagroup. This variant wraps around
+    /// `Vec<DataType>`
     Array(DataGroup),
     /// A single item
     ///

@@ -38,7 +38,7 @@
 //!
 //! First add this to your `Cargo.toml` file:
 //! ```toml
-//! skytable = "0.1.0"
+//! skytable = "0.2.2"
 //! ```
 //! Now open up your `src/main.rs` file and establish a connection to the server:
 //! ```ignore

@@ -22,8 +22,7 @@
 /// Response codes returned by the server
 #[derive(Debug, PartialEq)]
 pub enum RespCode {
-    /// `0`: Okay (Empty Response) - use the `ResponseBuilder` for building
-    /// responses that contain data
+    /// `0`: Okay (Empty Response)
     Okay,
     /// `1`: Not Found
     NotFound,
@@ -35,10 +34,9 @@ pub enum RespCode {
     PacketError,
     /// `5`: Server Error
     ServerError,
-    /// `6`: Some other error - the wrapped `String` will be returned in the response body.
-    /// Just a note, this gets quite messy, especially when we're using it for deconding responses
+    /// `6`: Some other Error, which is a string
     ErrorString(String),
-    /// The same as `ErrorString` but without any explicit information
+    /// `6`: The same as [`RespCode::ErrorString`] but without any explicit information
     OtherError,
 }
 

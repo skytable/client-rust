@@ -25,7 +25,7 @@ use crate::{Query, Response};
 use bytes::{Buf, BytesMut};
 pub use std::io::Result as IoResult;
 use std::io::{Error, ErrorKind};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt};
 use tokio::net::TcpStream;
 
 /// 4 KB Read Buffer

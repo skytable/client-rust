@@ -166,7 +166,8 @@ impl Query {
         stream.write(self.get_holding_buffer()).await?;
         // Clear out the holding buffer for running other commands
         {
-            self.data.clear()
+            self.data.clear();
+            self.size_count = 0;
         }
         Ok(())
     }

@@ -44,6 +44,7 @@ pub enum DataType {
 }
 
 #[non_exhaustive]
+#[derive(Debug, PartialEq)]
 enum _DataType {
     Str(Option<String>),
     RespCode(Option<RespCode>),

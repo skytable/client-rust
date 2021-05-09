@@ -31,6 +31,7 @@ use tokio::net::TcpStream;
 /// 4 KB Read Buffer
 const BUF_CAP: usize = 4096;
 
+#[derive(Debug)]
 /// A `Connection` is a wrapper around a`TcpStream` and a read buffer
 pub struct Connection {
     stream: TcpStream,

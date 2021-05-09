@@ -52,17 +52,10 @@ impl Connection {
     /// or invalid and return an appropriate variant of [`Response`] wrapped in [`IoResult`]
     /// for any I/O errors that may occur
     pub async fn run_simple_query(&mut self, mut query: Query) -> IoResult<Response> {
-        match query.write_query_to(&mut self.stream).await {
-            Ok(_) => (),
-            Err(e) => {
-                return Err(e);
-            }
-        };
+        query.write_query_to(&mut self.stream).await?;
+        
         loop {
-            match self.stream.read_buf(&mut self.buffer).await {
-                Ok(_) => (),
-                Err(e) => return Err(e),
-            }
+            self.stream.read_buf(&mut self.buffer).await?;
             match self.try_response().await {
                 ClientResult::Empty => break Err(Error::from(ErrorKind::ConnectionReset)),
                 ClientResult::Incomplete => {

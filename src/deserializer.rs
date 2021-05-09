@@ -217,7 +217,7 @@ pub fn parse(buf: &[u8]) -> ClientResult {
                 continue;
             }
             _ => {
-                // Since the variant '#' would does all the array
+                // Since the variant '#' does all the array
                 // parsing business, we should never reach here unless
                 // the packet is invalid
                 return ClientResult::InvalidResponse;

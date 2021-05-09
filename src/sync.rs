@@ -19,7 +19,7 @@ impl Connection {
         let stream = TcpStream::connect((host, port))?;
         Ok(Connection {
             stream: stream,
-            buffer: vec![0u8; BUF_CAP]
+            buffer: Vec::with_capacity(BUF_CAP)
         })
     }
     /// This function will write a [`Query`] to the stream and read the response from the
@@ -29,7 +29,12 @@ impl Connection {
     pub fn run_simple_query(&mut self, mut query: Query) -> IoResult<Response> {
         query.write_query_sync(&mut self.stream)?;
         loop {
-            let read = self.stream.read(&mut self.buffer)?;
+            let mut buf = [0u8; 1024];
+            let read = self.stream.read(&mut buf)?;
+            if read == 0 {
+                break Err(Error::from(ErrorKind::ConnectionReset));
+            }
+            self.buffer.extend_from_slice(&buf[..read]);
             match self.try_response(read) {
                 ClientResult::Empty => break Err(Error::from(ErrorKind::ConnectionReset)),
                 ClientResult::Incomplete => {

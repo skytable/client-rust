@@ -99,6 +99,7 @@ pub use connection::Connection;
 pub use terrapipe::RespCode;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
+pub mod sync;
 
 #[derive(Debug, PartialEq)]
 /// This struct represents a single simple query as defined by the Terrapipe protocol
@@ -171,6 +172,32 @@ impl Query {
         }
         Ok(())
     }
+    /// Write a query to a given stream
+    fn write_query_sync(&mut self, stream: &mut std::net::TcpStream) -> IoResult<()> {
+        use std::io::Write;
+        // Write the metaline
+        stream.write(b"#2\n*1\n")?;
+        // Add the dataframe layout
+        // The dataframe layout looks like: #<number_of_items_in_datagroup_len_for_sizeline>\n&<number_of_items_in_datagroup>\n
+        let number_of_items_in_datagroup = self.__len().to_string().into_bytes();
+        let number_of_items_in_datagroup_len_for_sizeline = (number_of_items_in_datagroup.len()
+            + 1)
+        .to_string()
+        .into_bytes();
+        // Now write the dataframe layout
+        stream.write(&[b'#'])?;
+        stream.write(&number_of_items_in_datagroup_len_for_sizeline)?;
+        stream.write(&[b'\n', b'&'])?;
+        stream.write(&number_of_items_in_datagroup)?;
+        stream.write(&[b'\n'])?;
+        stream.write(self.get_holding_buffer())?;
+        // Clear out the holding buffer for running other commands
+        {
+            self.data.clear();
+            self.size_count = 0;
+        }
+        Ok(())
+    }
 }
 
 /// # Responses
@@ -191,7 +218,7 @@ pub enum Response {
     /// The server sent an invalid response
     InvalidResponse,
     /// An array of items
-    /// 
+    ///
     /// The server has responded with an array of items in a single datagroup. This variant wraps around
     /// `Vec<DataType>`
     Array(DataGroup),

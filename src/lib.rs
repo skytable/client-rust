@@ -88,18 +88,23 @@
 //! [Apache-2.0 License](https://github.com/skytable/client-rust/blob/next/LICENSE). Now go build great apps!
 //!
 
+#[cfg(feature = "async")]
 pub mod connection;
 mod deserializer;
 mod terrapipe;
-
-use crate::connection::IoResult;
 use crate::deserializer::DataGroup;
 pub use crate::deserializer::DataType;
+#[cfg(feature = "async")]
 pub use connection::Connection;
+pub use std::io::Result as IoResult;
+#[cfg(feature = "sync")]
+pub use sync::Connection;
 pub use terrapipe::RespCode;
-use tokio::io::AsyncWriteExt;
-use tokio::net::TcpStream;
+#[cfg(feature = "sync")]
 pub mod sync;
+
+/// 4 KB Read Buffer
+const BUF_CAP: usize = 4096;
 
 #[derive(Debug, PartialEq)]
 /// This struct represents a single simple query as defined by the Terrapipe protocol
@@ -145,8 +150,10 @@ impl Query {
     fn get_holding_buffer(&self) -> &[u8] {
         &self.data
     }
+    #[cfg(feature = "async")]
     /// Write a query to a given stream
-    async fn write_query_to(&mut self, stream: &mut TcpStream) -> IoResult<()> {
+    async fn write_query_to(&mut self, stream: &mut tokio::net::TcpStream) -> IoResult<()> {
+        use tokio::io::AsyncWriteExt;
         // Write the metaline
         stream.write(b"#2\n*1\n").await?;
         // Add the dataframe layout
@@ -172,6 +179,7 @@ impl Query {
         }
         Ok(())
     }
+    #[cfg(feature = "sync")]
     /// Write a query to a given stream
     fn write_query_sync(&mut self, stream: &mut std::net::TcpStream) -> IoResult<()> {
         use std::io::Write;

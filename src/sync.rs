@@ -4,9 +4,7 @@ use std::io::Read;
 pub use std::io::Result as IoResult;
 use std::io::{Error, ErrorKind};
 use std::net::TcpStream;
-
-/// 4 KB Read Buffer
-const BUF_CAP: usize = 4096;
+use crate::BUF_CAP;
 
 #[derive(Debug)]
 /// A `Connection` is a wrapper around a`TcpStream` and a read buffer

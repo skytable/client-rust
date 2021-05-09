@@ -1,4 +1,4 @@
-use skytable::sync::{Connection};
+use skytable::Connection;
 use skytable::{DataType, Query, Response};
 fn main() {
     let mut query = Query::new(); query.arg("heya");

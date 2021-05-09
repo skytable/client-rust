@@ -1,6 +1,5 @@
 use crate::deserializer::{self, ClientResult};
 use crate::{Query, Response};
-use bytes::{Buf, BytesMut};
 use std::io::Read;
 pub use std::io::Result as IoResult;
 use std::io::{Error, ErrorKind};
@@ -13,16 +12,16 @@ const BUF_CAP: usize = 4096;
 /// A `Connection` is a wrapper around a`TcpStream` and a read buffer
 pub struct Connection {
     stream: TcpStream,
-    buffer: BytesMut,
+    buffer: Vec<u8>,
 }
 
 impl Connection {
     /// Create a new connection to a Skytable instance hosted on `host` and running on `port`
-    pub async fn new(host: &str, port: u16) -> IoResult<Self> {
+    pub fn new(host: &str, port: u16) -> IoResult<Self> {
         let stream = TcpStream::connect((host, port))?;
         Ok(Connection {
             stream: stream,
-            buffer: BytesMut::with_capacity(BUF_CAP),
+            buffer: vec![0u8; BUF_CAP]
         })
     }
     /// This function will write a [`Query`] to the stream and read the response from the
@@ -32,18 +31,18 @@ impl Connection {
     pub fn run_simple_query(&mut self, mut query: Query) -> IoResult<Response> {
         query.write_query_sync(&mut self.stream)?;
         loop {
-            self.stream.read(&mut self.buffer)?;
-            match self.try_response() {
+            let read = self.stream.read(&mut self.buffer)?;
+            match self.try_response(read) {
                 ClientResult::Empty => break Err(Error::from(ErrorKind::ConnectionReset)),
                 ClientResult::Incomplete => {
                     continue;
                 }
-                ClientResult::SimpleResponse(r, f) => {
-                    self.buffer.advance(f);
+                ClientResult::SimpleResponse(r, _) => {
+                    self.buffer.clear();
                     break Ok(Response::Array(r));
                 }
-                ClientResult::ResponseItem(r, f) => {
-                    self.buffer.advance(f);
+                ClientResult::ResponseItem(r, _) => {
+                    self.buffer.clear();
                     break Ok(Response::Item(r));
                 }
                 ClientResult::InvalidResponse => {
@@ -61,11 +60,11 @@ impl Connection {
         }
     }
     /// This function is a subroutine of `run_query` used to parse the response packet
-    fn try_response(&mut self) -> ClientResult {
+    fn try_response(&mut self, read: usize) -> ClientResult {
         if self.buffer.is_empty() {
             // The connection was possibly reset
             return ClientResult::Empty;
         }
-        deserializer::parse(&self.buffer)
+        deserializer::parse(&self.buffer[..read])
     }
 }

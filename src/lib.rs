@@ -196,6 +196,7 @@ impl Query {
             self.data.clear();
             self.size_count = 0;
         }
+        stream.flush()?;
         Ok(())
     }
 }

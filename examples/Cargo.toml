@@ -1,4 +1,5 @@
 [workspace]
 members = [
-    "array-responses"
+    "array-responses",
+    "sync-api"
 ]

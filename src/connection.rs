@@ -20,7 +20,7 @@
 //! This crate provides a [`Connection`] object that can be used to connect to a Skytable database instance
 //! and write/read queries/responses to/from it
 
-use crate::deserializer::{self, ClientResult};
+use crate::deserializer::{ParseError, Parser, RawResponse};
 use crate::{Query, Response};
 use bytes::{Buf, BytesMut};
 pub use std::io::Result as IoResult;
@@ -53,42 +53,38 @@ impl Connection {
     /// for any I/O errors that may occur
     pub async fn run_simple_query(&mut self, mut query: Query) -> IoResult<Response> {
         query.write_query_to(&mut self.stream).await?;
-        
         loop {
             self.stream.read_buf(&mut self.buffer).await?;
-            match self.try_response().await {
-                ClientResult::Empty => break Err(Error::from(ErrorKind::ConnectionReset)),
-                ClientResult::Incomplete => {
-                    continue;
+            println!("Trying this: '{:?}'", String::from_utf8_lossy(&self.buffer[..]));
+            match self.try_response() {
+                Ok((query, forward_by)) => {
+                    self.buffer.advance(forward_by);
+                    match query {
+                        RawResponse::SimpleQuery(s) => return Ok(Response::Item(s)),
+                        RawResponse::PipelinedQuery(_) => {
+                            unimplemented!("Pipelined queries aren't implemented yet")
+                        }
+                    }
                 }
-                ClientResult::SimpleResponse(r, f) => {
-                    self.buffer.advance(f);
-                    break Ok(Response::Array(r));
-                }
-                ClientResult::ResponseItem(r, f) => {
-                    self.buffer.advance(f);
-                    break Ok(Response::Item(r));
-                }
-                ClientResult::InvalidResponse => {
-                    self.buffer.clear();
-                    break Ok(Response::InvalidResponse);
-                }
-                ClientResult::ParseError => {
-                    self.buffer.clear();
-                    break Ok(Response::ParseError);
-                }
-                ClientResult::PipelinedResponse(_, _) => {
-                    todo!("Pipelined queries haven't been implemented yet!")
-                }
+                Err(e) => match e {
+                    ParseError::NotEnough => (),
+                    ParseError::BadPacket | ParseError::UnexpectedByte => {
+                        self.buffer.clear();
+                        return Ok(Response::InvalidResponse)
+                    }
+                    ParseError::DataTypeParseError => return Ok(Response::ParseError),
+                    ParseError::Empty => return Err(Error::from(ErrorKind::ConnectionReset)),
+                    ParseError::UnknownDatatype => unimplemented!(),
+                },
             }
         }
     }
     /// This function is a subroutine of `run_query` used to parse the response packet
-    async fn try_response(&mut self) -> ClientResult {
+    fn try_response(&mut self) -> Result<(RawResponse, usize), ParseError> {
         if self.buffer.is_empty() {
             // The connection was possibly reset
-            return ClientResult::Empty;
+            return Err(ParseError::Empty);
         }
-        deserializer::parse(&self.buffer)
+        Parser::new(&self.buffer).parse()
     }
 }

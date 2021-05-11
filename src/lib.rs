@@ -20,9 +20,9 @@
 //! This library is the official client for the free and open-source NoSQL database
 //! [Skytable](https://github.com/skytable/skytable). First, go ahead and install Skytable by
 //! following the instructions [here](https://docs.skytable.io/getting-started). This library supports
-//! all Skytable versions that work with the [Terrapipe 1.0 Protocol](https://docs.skytable.io/Protocol/terrapipe).
+//! all Skytable versions that work with the [Skyhash 1.0 Protocol](https://docs.skytable.io/protocol/skyhash).
 //! This version of the library was tested with the latest Skytable release
-//! (release [0.5.1](https://github.com/skytable/skytable/releases/v0.5.1)).
+//! (release [0.6](https://github.com/skytable/skytable/releases/v0.6.0)).
 //!
 //! ## Using this library
 //!
@@ -38,7 +38,7 @@
 //!
 //! First add this to your `Cargo.toml` file:
 //! ```toml
-//! skytable = "0.2.3"
+//! skytable = "0.3.0"
 //! ```
 //! Now open up your `src/main.rs` file and establish a connection to the server:
 //! ```ignore
@@ -59,7 +59,7 @@
 //! ```
 //! And your `main.rs` should now look like:
 //! ```no_run
-//! use skytable::{Connection, Query, Response, RespCode, DataType};
+//! use skytable::{Connection, Query, Response, RespCode, Element};
 //! #[tokio::main]
 //! async fn main() -> std::io::Result<()> {
 //!     let mut con = Connection::new("127.0.0.1", 2003).await?;
@@ -72,7 +72,7 @@
 //! let mut query = Query::new();
 //! query.arg("heya");
 //! let res = con.run_simple_query(query).await?;
-//! assert_eq!(res, Response::Item(DataType::Str("HEY!".to_owned())));
+//! assert_eq!(res, Response::Item(Element::String("HEY!".to_owned())));
 //! ```
 //!
 //! Way to go &mdash; you're all set! Now go ahead and run more advanced queries!
@@ -93,10 +93,9 @@ mod deserializer;
 mod terrapipe;
 
 use crate::connection::IoResult;
-use crate::deserializer::DataGroup;
-pub use crate::deserializer::DataType;
 pub use connection::Connection;
 pub use terrapipe::RespCode;
+pub use deserializer::Element;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 
@@ -126,8 +125,8 @@ impl Query {
         }
         self.size_count += 1;
         // A data element will look like:
-        // `#<bytes_in_next_line>\n<data>`
-        self.data.push(b'#');
+        // `+<bytes_in_next_line>\n<data>`
+        self.data.push(b'+');
         let bytes_in_next_line = arg.len().to_string().into_bytes();
         self.data.extend(bytes_in_next_line);
         // add the LF char
@@ -146,21 +145,11 @@ impl Query {
     }
     /// Write a query to a given stream
     async fn write_query_to(&mut self, stream: &mut TcpStream) -> IoResult<()> {
-        // Write the metaline
-        stream.write(b"#2\n*1\n").await?;
-        // Add the dataframe layout
-        // The dataframe layout looks like: #<number_of_items_in_datagroup_len_for_sizeline>\n&<number_of_items_in_datagroup>\n
+        // Write the metaframe
+        stream.write(b"*1\n").await?;
+        // Add the dataframe
         let number_of_items_in_datagroup = self.__len().to_string().into_bytes();
-        let number_of_items_in_datagroup_len_for_sizeline = (number_of_items_in_datagroup.len()
-            + 1)
-        .to_string()
-        .into_bytes();
-        // Now write the dataframe layout
-        stream.write(&[b'#']).await?;
-        stream
-            .write(&number_of_items_in_datagroup_len_for_sizeline)
-            .await?;
-        stream.write(&[b'\n', b'&']).await?;
+        stream.write(&[b'_']).await?;
         stream.write(&number_of_items_in_datagroup).await?;
         stream.write(&[b'\n']).await?;
         stream.write(self.get_holding_buffer()).await?;
@@ -190,15 +179,11 @@ impl Query {
 pub enum Response {
     /// The server sent an invalid response
     InvalidResponse,
-    /// An array of items
-    /// 
-    /// The server has responded with an array of items in a single datagroup. This variant wraps around
-    /// `Vec<DataType>`
-    Array(DataGroup),
     /// A single item
     ///
     /// This is a client abstraction for a datagroup that only has one element
-    Item(DataType),
+    /// This element may be an array, a nested array, a string, or a RespCode
+    Item(Element),
     /// We failed to parse data
     ParseError,
 }

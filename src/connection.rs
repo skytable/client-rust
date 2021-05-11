@@ -26,7 +26,9 @@ use bytes::{Buf, BytesMut};
 pub use std::io::Result as IoResult;
 use std::io::{Error, ErrorKind};
 use tokio::io::AsyncReadExt;
+use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
+use tokio::io::BufWriter;
 
 /// 4 KB Read Buffer
 const BUF_CAP: usize = 4096;
@@ -34,7 +36,7 @@ const BUF_CAP: usize = 4096;
 #[derive(Debug)]
 /// A `Connection` is a wrapper around a`TcpStream` and a read buffer
 pub struct Connection {
-    stream: TcpStream,
+    stream: BufWriter<TcpStream>,
     buffer: BytesMut,
 }
 
@@ -43,7 +45,7 @@ impl Connection {
     pub async fn new(host: &str, port: u16) -> IoResult<Self> {
         let stream = TcpStream::connect((host, port)).await?;
         Ok(Connection {
-            stream: stream,
+            stream: BufWriter::new(stream),
             buffer: BytesMut::with_capacity(BUF_CAP),
         })
     }
@@ -53,9 +55,11 @@ impl Connection {
     /// for any I/O errors that may occur
     pub async fn run_simple_query(&mut self, mut query: Query) -> IoResult<Response> {
         query.write_query_to(&mut self.stream).await?;
+        self.stream.flush().await?;
         loop {
-            self.stream.read_buf(&mut self.buffer).await?;
-            println!("Trying this: '{:?}'", String::from_utf8_lossy(&self.buffer[..]));
+            if 0 == self.stream.read_buf(&mut self.buffer).await? {
+                return Err(Error::from(ErrorKind::ConnectionReset));
+            }
             match self.try_response() {
                 Ok((query, forward_by)) => {
                     self.buffer.advance(forward_by);

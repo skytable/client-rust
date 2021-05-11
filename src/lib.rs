@@ -90,12 +90,12 @@
 
 pub mod connection;
 mod deserializer;
-mod terrapipe;
+mod respcode;
 
 use crate::connection::IoResult;
 pub use connection::Connection;
-pub use terrapipe::RespCode;
 pub use deserializer::Element;
+pub use respcode::RespCode;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 
@@ -144,15 +144,18 @@ impl Query {
         &self.data
     }
     /// Write a query to a given stream
-    async fn write_query_to(&mut self, stream: &mut TcpStream) -> IoResult<()> {
+    async fn write_query_to(
+        &mut self,
+        stream: &mut tokio::io::BufWriter<TcpStream>,
+    ) -> IoResult<()> {
         // Write the metaframe
-        stream.write(b"*1\n").await?;
+        stream.write_all(b"*1\n").await?;
         // Add the dataframe
         let number_of_items_in_datagroup = self.__len().to_string().into_bytes();
-        stream.write(&[b'_']).await?;
-        stream.write(&number_of_items_in_datagroup).await?;
-        stream.write(&[b'\n']).await?;
-        stream.write(self.get_holding_buffer()).await?;
+        stream.write_all(&[b'_']).await?;
+        stream.write_all(&number_of_items_in_datagroup).await?;
+        stream.write_all(&[b'\n']).await?;
+        stream.write_all(self.get_holding_buffer()).await?;
         // Clear out the holding buffer for running other commands
         {
             self.data.clear();
@@ -186,4 +189,19 @@ pub enum Response {
     Item(Element),
     /// We failed to parse data
     ParseError,
+}
+
+#[tokio::test]
+#[ignore]
+async fn basic() {
+    let mut con = Connection::new("127.0.0.1", 2003).await.unwrap();
+    let mut i = 1;
+    loop {
+        println!("Iter: {}", i);
+        let mut query = Query::new();
+        query.arg("heya");
+        let ret = con.run_simple_query(query).await.unwrap();
+        assert_eq!(ret, Response::Item(Element::String("HEY!".to_owned())));
+        i += 1;
+    }
 }

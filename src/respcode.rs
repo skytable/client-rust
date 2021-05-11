@@ -15,9 +15,7 @@
  *
 */
 
-//! # The Terrapipe protocol
-//! This module implements primitives for the Terrapipe protocol
-//!
+//! Response codes
 
 /// Response codes returned by the server
 #[derive(Debug, PartialEq)]

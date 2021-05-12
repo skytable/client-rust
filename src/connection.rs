@@ -77,11 +77,11 @@ impl Connection {
                     ParseError::NotEnough => (),
                     ParseError::BadPacket | ParseError::UnexpectedByte => {
                         self.buffer.clear();
-                        return Ok(Response::InvalidResponse)
+                        return Ok(Response::InvalidResponse);
                     }
                     ParseError::DataTypeParseError => return Ok(Response::ParseError),
                     ParseError::Empty => return Err(Error::from(ErrorKind::ConnectionReset)),
-                    ParseError::UnknownDatatype => unimplemented!(),
+                    ParseError::UnknownDatatype => return Err(Response::UnsupportedDataType),
                 },
             }
         }

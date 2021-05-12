@@ -212,4 +212,6 @@ pub enum Response {
     Item(Element),
     /// We failed to parse data
     ParseError,
+    /// The server sent some data of a type that this client doesn't support
+    UnsupportedDataType,
 }

@@ -86,8 +86,6 @@ use std::io::Result as IoResult;
 #[cfg(feature = "async")]
 pub mod connection;
 #[cfg(feature = "async")]
-pub use connection::Connection;
-#[cfg(feature = "async")]
 pub use connection::Connection as AsyncConnection;
 #[cfg(feature = "async")]
 use tokio::io::AsyncWriteExt;

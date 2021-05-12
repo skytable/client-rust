@@ -81,7 +81,7 @@ impl Connection {
                     }
                     ParseError::DataTypeParseError => return Ok(Response::ParseError),
                     ParseError::Empty => return Err(Error::from(ErrorKind::ConnectionReset)),
-                    ParseError::UnknownDatatype => return Err(Response::UnsupportedDataType),
+                    ParseError::UnknownDatatype => return Ok(Response::UnsupportedDataType),
                 },
             }
         }

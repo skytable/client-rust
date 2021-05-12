@@ -8,6 +8,8 @@ following the instructions [here](https://docs.skytable.io/getting-started).
 
 ## Using this library
 
+> **WARNING**: Please use a release tag; the tree on next is being upgraded to use the [Skyhash Protocol](https://docs.skytable.io/next/protocol/skyhash).
+
 This library only ships with the bare minimum that is required for interacting with Skytable. Once you have
 Skytable installed and running, you're ready to follow this guide!
 

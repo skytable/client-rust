@@ -190,18 +190,3 @@ pub enum Response {
     /// We failed to parse data
     ParseError,
 }
-
-#[tokio::test]
-#[ignore]
-async fn basic() {
-    let mut con = Connection::new("127.0.0.1", 2003).await.unwrap();
-    let mut i = 1;
-    loop {
-        println!("Iter: {}", i);
-        let mut query = Query::new();
-        query.arg("heya");
-        let ret = con.run_simple_query(query).await.unwrap();
-        assert_eq!(ret, Response::Item(Element::String("HEY!".to_owned())));
-        i += 1;
-    }
-}

@@ -91,6 +91,7 @@
 pub mod connection;
 mod deserializer;
 mod respcode;
+pub mod sync;
 
 use crate::connection::IoResult;
 pub use connection::Connection;
@@ -156,6 +157,24 @@ impl Query {
         stream.write_all(&number_of_items_in_datagroup).await?;
         stream.write_all(&[b'\n']).await?;
         stream.write_all(self.get_holding_buffer()).await?;
+        // Clear out the holding buffer for running other commands
+        {
+            self.data.clear();
+            self.size_count = 0;
+        }
+        Ok(())
+    }
+    /// Write a query to a given stream
+    fn write_query_to_sync(&mut self, stream: &mut std::net::TcpStream) -> IoResult<()> {
+        use std::io::Write;
+        // Write the metaframe
+        stream.write_all(b"*1\n")?;
+        // Add the dataframe
+        let number_of_items_in_datagroup = self.__len().to_string().into_bytes();
+        stream.write_all(&[b'_'])?;
+        stream.write_all(&number_of_items_in_datagroup)?;
+        stream.write_all(&[b'\n'])?;
+        stream.write_all(self.get_holding_buffer())?;
         // Clear out the holding buffer for running other commands
         {
             self.data.clear();

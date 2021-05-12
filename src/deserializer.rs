@@ -352,7 +352,7 @@ impl<'a> Parser<'a> {
                     };
                     array.push(ret);
                 } else {
-                    return Err(ParseError::DataTypeParseError);
+                    return Err(ParseError::NotEnough);
                 }
             }
             Ok(array)

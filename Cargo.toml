@@ -17,6 +17,7 @@ keywords = ["skytable", "driver", "client", "database", "nosql"]
 default = ["sync"]
 async = ["bytes", "tokio"]
 sync = []
+dbg = []
 
 [dependencies]
 bytes = {version="1.0.1", optional=true}

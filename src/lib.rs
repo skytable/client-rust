@@ -186,6 +186,16 @@ impl Query {
         }
         Ok(())
     }
+    #[cfg(feature = "dbg")]
+    fn into_raw_query(&self) -> Vec<u8> {
+        let mut v = Vec::with_capacity(self.data.len());
+        v.extend(b"*1\n");
+        v.extend(b"_");
+        v.extend(self.__len().to_string().into_bytes());
+        v.extend(b"\n");
+        v.extend(self.get_holding_buffer());
+        v
+    }
 }
 
 /// # Responses

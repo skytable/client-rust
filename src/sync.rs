@@ -1,5 +1,5 @@
 /*
- * Created on Wed May 05 2021
+ * Created on Wed May 12 2021
  *
  * Copyright (c) 2021 Sayan Nandan <nandansayan@outlook.com>
  *
@@ -22,50 +22,48 @@
 
 use crate::deserializer::{ParseError, Parser, RawResponse};
 use crate::{Query, Response};
-#[cfg(feature = "async")]
-use bytes::{Buf, BytesMut};
 pub use std::io::Result as IoResult;
-use std::io::{Error, ErrorKind};
-#[cfg(feature = "async")]
-use tokio::io::{AsyncReadExt, AsyncWriteExt, BufWriter};
-#[cfg(feature = "async")]
-use tokio::net::TcpStream;
+use std::io::{Error, ErrorKind, Read, Write};
+use std::net::TcpStream;
 
 /// 4 KB Read Buffer
 const BUF_CAP: usize = 4096;
 
 #[derive(Debug)]
-#[cfg(feature = "async")]
 /// A `Connection` is a wrapper around a`TcpStream` and a read buffer
 pub struct Connection {
-    stream: BufWriter<TcpStream>,
-    buffer: BytesMut,
+    stream: TcpStream,
+    buffer: Vec<u8>,
 }
 
-#[cfg(feature = "async")]
 impl Connection {
     /// Create a new connection to a Skytable instance hosted on `host` and running on `port`
-    pub async fn new(host: &str, port: u16) -> IoResult<Self> {
-        let stream = TcpStream::connect((host, port)).await?;
+    pub fn new(host: &str, port: u16) -> IoResult<Self> {
+        let stream = TcpStream::connect((host, port))?;
         Ok(Connection {
-            stream: BufWriter::new(stream),
-            buffer: BytesMut::with_capacity(BUF_CAP),
+            stream: stream,
+            buffer: Vec::with_capacity(BUF_CAP),
         })
     }
     /// This function will write a [`Query`] to the stream and read the response from the
     /// server. It will then determine if the returned response is complete or incomplete
     /// or invalid and return an appropriate variant of [`Response`] wrapped in [`IoResult`]
     /// for any I/O errors that may occur
-    pub async fn run_simple_query(&mut self, mut query: Query) -> IoResult<Response> {
-        query.write_query_to(&mut self.stream).await?;
-        self.stream.flush().await?;
+    pub fn run_simple_query(&mut self, mut query: Query) -> IoResult<Response> {
+        query.write_query_to_sync(&mut self.stream)?;
+        self.stream.flush()?;
         loop {
-            if 0 == self.stream.read_buf(&mut self.buffer).await? {
-                return Err(Error::from(ErrorKind::ConnectionReset));
+            let mut buffer = [0u8; 1024];
+            match self.stream.read(&mut buffer) {
+                Ok(0) => return Err(Error::from(ErrorKind::ConnectionReset)),
+                Ok(read) => {
+                    self.buffer.extend(&buffer[..read]);
+                }
+                Err(e) => return Err(e),
             }
             match self.try_response() {
                 Ok((query, forward_by)) => {
-                    self.buffer.advance(forward_by);
+                    self.buffer.drain(..forward_by);
                     match query {
                         RawResponse::SimpleQuery(s) => return Ok(Response::Item(s)),
                         RawResponse::PipelinedQuery(_) => {
@@ -77,7 +75,7 @@ impl Connection {
                     ParseError::NotEnough => (),
                     ParseError::BadPacket | ParseError::UnexpectedByte => {
                         self.buffer.clear();
-                        return Ok(Response::InvalidResponse)
+                        return Ok(Response::InvalidResponse);
                     }
                     ParseError::DataTypeParseError => return Ok(Response::ParseError),
                     ParseError::Empty => return Err(Error::from(ErrorKind::ConnectionReset)),

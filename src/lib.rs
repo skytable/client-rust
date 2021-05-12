@@ -20,9 +20,9 @@
 //! This library is the official client for the free and open-source NoSQL database
 //! [Skytable](https://github.com/skytable/skytable). First, go ahead and install Skytable by
 //! following the instructions [here](https://docs.skytable.io/getting-started). This library supports
-//! all Skytable versions that work with the [Terrapipe 1.0 Protocol](https://docs.skytable.io/Protocol/terrapipe).
+//! all Skytable versions that work with the [Skyhash 1.0 Protocol](https://docs.skytable.io/protocol/skyhash).
 //! This version of the library was tested with the latest Skytable release
-//! (release [0.5.1](https://github.com/skytable/skytable/releases/v0.5.1)).
+//! (release [0.6](https://github.com/skytable/skytable/releases/v0.6.0)).
 //!
 //! ## Using this library
 //!
@@ -38,32 +38,14 @@
 //!
 //! First add this to your `Cargo.toml` file:
 //! ```toml
-//! skytable = "0.2.3"
+//! skytable = "0.3.0"
 //! ```
-//! Now open up your `src/main.rs` file and establish a connection to the server:
+//! Now open up your `src/main.rs` file and establish a connection to the server while also adding some
+//! imports:
 //! ```ignore
-//! use skytable::{Connection};
-//! async fn main() -> std::io::Result<()> {
-//!     let mut con = Connection::new("127.0.0.1", 2003).await?;
-//! }
-//! ```
-//!
-//! We get an error stating that `main()` cannot be `async`! Now [`Connection`] itself is an `async` connection
-//! and hence needs to `await`. This is when you'll need a runtime like [Tokio](https://tokio.rs). The Skytable
-//! database itself uses Tokio as its asynchronous runtime! So let's add `tokio` to our `Cargo.toml` and also add
-//! the `#[tokio::main]` macro on top of our main function:
-//!
-//! In `Cargo.toml`, add:
-//! ```toml
-//! tokio = {version="1.5.0", features=["full"]}
-//! ```
-//! And your `main.rs` should now look like:
-//! ```no_run
-//! use skytable::{Connection, Query, Response, RespCode, DataType};
-//! #[tokio::main]
-//! async fn main() -> std::io::Result<()> {
-//!     let mut con = Connection::new("127.0.0.1", 2003).await?;
-//!     Ok(())
+//! use skytable::{Connection, Query, Response, Element};
+//! fn main() -> std::io::Result<()> {
+//!     let mut con = Connection::new("127.0.0.1", 2003)?;
 //! }
 //! ```
 //!
@@ -71,11 +53,19 @@
 //! ```ignore
 //! let mut query = Query::new();
 //! query.arg("heya");
-//! let res = con.run_simple_query(query).await?;
-//! assert_eq!(res, Response::Item(DataType::Str("HEY!".to_owned())));
+//! let res = con.run_simple_query(query)?;
+//! assert_eq!(res, Response::Item(Element::String("HEY!".to_owned())));
 //! ```
 //!
 //! Way to go &mdash; you're all set! Now go ahead and run more advanced queries!
+//!
+//! ## Async API
+//! If you need to use an `async` API, just change your import to:
+//! ```toml
+//! skytable = {version = "0.3.0", features=["async"], default-features=false}
+//! ```
+//! You can now establish a connection by using `skytable::AsyncConnection::new()`, adding `.await`s wherever
+//! necessary.
 //!
 //! ## Contributing
 //!
@@ -88,17 +78,29 @@
 //! [Apache-2.0 License](https://github.com/skytable/client-rust/blob/next/LICENSE). Now go build great apps!
 //!
 
-pub mod connection;
 mod deserializer;
-mod terrapipe;
+mod respcode;
 
-use crate::connection::IoResult;
-use crate::deserializer::DataGroup;
-pub use crate::deserializer::DataType;
+use std::io::Result as IoResult;
+// async imports
+#[cfg(feature = "async")]
+pub mod connection;
+#[cfg(feature = "async")]
 pub use connection::Connection;
-pub use terrapipe::RespCode;
+#[cfg(feature = "async")]
+pub use connection::Connection as AsyncConnection;
+#[cfg(feature = "async")]
 use tokio::io::AsyncWriteExt;
+#[cfg(feature = "async")]
 use tokio::net::TcpStream;
+// default imports
+pub use deserializer::Element;
+pub use respcode::RespCode;
+// sync imports
+#[cfg(feature = "sync")]
+pub mod sync;
+#[cfg(feature = "sync")]
+pub use sync::Connection;
 
 #[derive(Debug, PartialEq)]
 /// This struct represents a single simple query as defined by the Terrapipe protocol
@@ -126,8 +128,8 @@ impl Query {
         }
         self.size_count += 1;
         // A data element will look like:
-        // `#<bytes_in_next_line>\n<data>`
-        self.data.push(b'#');
+        // `+<bytes_in_next_line>\n<data>`
+        self.data.push(b'+');
         let bytes_in_next_line = arg.len().to_string().into_bytes();
         self.data.extend(bytes_in_next_line);
         // add the LF char
@@ -144,26 +146,39 @@ impl Query {
     fn get_holding_buffer(&self) -> &[u8] {
         &self.data
     }
+    #[cfg(feature = "async")]
     /// Write a query to a given stream
-    async fn write_query_to(&mut self, stream: &mut TcpStream) -> IoResult<()> {
-        // Write the metaline
-        stream.write(b"#2\n*1\n").await?;
-        // Add the dataframe layout
-        // The dataframe layout looks like: #<number_of_items_in_datagroup_len_for_sizeline>\n&<number_of_items_in_datagroup>\n
+    async fn write_query_to(
+        &mut self,
+        stream: &mut tokio::io::BufWriter<TcpStream>,
+    ) -> IoResult<()> {
+        // Write the metaframe
+        stream.write_all(b"*1\n").await?;
+        // Add the dataframe
         let number_of_items_in_datagroup = self.__len().to_string().into_bytes();
-        let number_of_items_in_datagroup_len_for_sizeline = (number_of_items_in_datagroup.len()
-            + 1)
-        .to_string()
-        .into_bytes();
-        // Now write the dataframe layout
-        stream.write(&[b'#']).await?;
-        stream
-            .write(&number_of_items_in_datagroup_len_for_sizeline)
-            .await?;
-        stream.write(&[b'\n', b'&']).await?;
-        stream.write(&number_of_items_in_datagroup).await?;
-        stream.write(&[b'\n']).await?;
-        stream.write(self.get_holding_buffer()).await?;
+        stream.write_all(&[b'_']).await?;
+        stream.write_all(&number_of_items_in_datagroup).await?;
+        stream.write_all(&[b'\n']).await?;
+        stream.write_all(self.get_holding_buffer()).await?;
+        // Clear out the holding buffer for running other commands
+        {
+            self.data.clear();
+            self.size_count = 0;
+        }
+        Ok(())
+    }
+    #[cfg(feature = "sync")]
+    /// Write a query to a given stream
+    fn write_query_to_sync(&mut self, stream: &mut std::net::TcpStream) -> IoResult<()> {
+        use std::io::Write;
+        // Write the metaframe
+        stream.write_all(b"*1\n")?;
+        // Add the dataframe
+        let number_of_items_in_datagroup = self.__len().to_string().into_bytes();
+        stream.write_all(&[b'_'])?;
+        stream.write_all(&number_of_items_in_datagroup)?;
+        stream.write_all(&[b'\n'])?;
+        stream.write_all(self.get_holding_buffer())?;
         // Clear out the holding buffer for running other commands
         {
             self.data.clear();
@@ -190,15 +205,11 @@ impl Query {
 pub enum Response {
     /// The server sent an invalid response
     InvalidResponse,
-    /// An array of items
-    /// 
-    /// The server has responded with an array of items in a single datagroup. This variant wraps around
-    /// `Vec<DataType>`
-    Array(DataGroup),
     /// A single item
     ///
     /// This is a client abstraction for a datagroup that only has one element
-    Item(DataType),
+    /// This element may be an array, a nested array, a string, or a RespCode
+    Item(Element),
     /// We failed to parse data
     ParseError,
 }

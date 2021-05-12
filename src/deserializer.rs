@@ -1,5 +1,5 @@
 /*
- * Created on Wed May 05 2021
+ * Created on Tue May 11 2021
  *
  * Copyright (c) 2021 Sayan Nandan <nandansayan@outlook.com>
  *
@@ -15,316 +15,407 @@
  *
 */
 
-//! This module provides methods to deserialize an incoming response packet
+//! # The Skyhash Protocol
+//!
+//! ## Introduction
+//! The Skyhash Protocol is a serialization protocol that is used by Skytable for client/server communication.
+//! It works in a query/response action similar to HTTP's request/response action. Skyhash supersedes the Terrapipe
+//! protocol as a more simple, reliable, robust and scalable protocol.
+//!
+//! This module contains the [`Parser`] for the Skyhash protocol and it's enough to just pass a query packet as
+//! a slice of unsigned 8-bit integers and the parser will do everything else. The Skyhash protocol was designed
+//! by Sayan Nandan and this is the first client implementation of the protocol
+//!
 
-use crate::terrapipe::RespCode;
+use crate::RespCode;
+use std::hint::unreachable_unchecked;
 
-/// A response datagroup
+#[derive(Debug)]
+/// # Skyhash Deserializer (Parser)
 ///
-/// This contains all the elements returned by a certain action. So let's say you did
-/// something like `MGET x y`, then the values of x and y will be in a single datagroup.
-pub type DataGroup = Vec<DataType>;
+/// The [`Parser`] object can be used to deserialized a packet serialized by Skyhash which in turn serializes
+/// it into data structures native to the Rust Language (and some Compound Types built on top of them).
+///
+/// ## Evaluation
+///
+/// The parser is pessimistic in most cases and will readily throw out any errors. On non-recusrive types
+/// there is no recursion, but the parser will use implicit recursion for nested arrays. The parser will
+/// happily not report any errors if some part of the next query was passed. This is very much a possibility
+/// and so has been accounted for
+///
+/// ## Important note
+///
+/// All developers willing to modify the deserializer must keep this in mind: the cursor is always Ahead-Of-Position
+/// that is the cursor should always point at the next character that can be read.
+///
+pub(super) struct Parser<'a> {
+    /// The internal cursor position
+    ///
+    /// Do not even think of touching this externally
+    cursor: usize,
+    /// The buffer slice
+    buffer: &'a [u8],
+}
 
-/// A data type as defined by the Terrapipe protocol
-///
-///
-/// Every variant stays in an `Option` for convenience while parsing. It's like we first
-/// create a `Variant(None)` variant. Then we read the data which corresponds to it, and then we
-/// replace `None` with the appropriate object. When we first detect the type, we use this as a way of matching
-/// avoiding duplication by writing another `DataType` enum
 #[derive(Debug, PartialEq)]
 #[non_exhaustive]
-pub enum DataType {
-    /// A string value
-    Str(String),
-    /// A response code (it is kept as `String` for "other error" types)
-    RespCode(RespCode),
-    /// An unsigned 64-bit integer, equivalent to an `u64`
+/// # Data Types
+///
+/// This enum represents the data types supported by the Skyhash Protocol
+pub enum Element {
+    /// Arrays can be nested! Their `<tsymbol>` is `&`
+    Array(Vec<Element>),
+    /// A String value; `<tsymbol>` is `+`
+    String(String),
+    /// An unsigned integer value; `<tsymbol>` is `:`
     UnsignedInt(u64),
+    /// A non-recursive String array; tsymbol: `_`
+    FlatArray(Vec<String>),
+    /// A response code
+    RespCode(RespCode),
 }
 
-#[non_exhaustive]
 #[derive(Debug, PartialEq)]
-enum _DataType {
-    Str(Option<String>),
-    RespCode(Option<RespCode>),
-    UnsignedInt(Option<Result<u64, std::num::ParseIntError>>),
-}
-
-/// Errors that may occur while parsing responses from the server
+/// # Parser Errors
 ///
-/// Every variant, except `Incomplete` has an `usize` field, which is used to advance the
-/// buffer
-#[derive(Debug, PartialEq)]
-pub enum ClientResult {
-    /// The response was Invalid
-    InvalidResponse,
-    /// The response is a valid response and has been parsed into a vector of datagroups
-    PipelinedResponse(Vec<DataGroup>, usize),
-    /// The response is a valid response and has been parsed into a datagroup
-    SimpleResponse(DataGroup, usize),
-    /// A single element in a datagroup (please note that this is a client abstraction)
-    ResponseItem(DataType, usize),
-    /// The response was empty, which means that the remote end closed the connection
+/// Several errors can arise during parsing and this enum accounts for them
+pub enum ParseError {
+    /// Didn't get the number of expected bytes
+    NotEnough,
+    /// The query contains an unexpected byte
+    UnexpectedByte,
+    /// The packet simply contains invalid data
+    ///
+    /// This is rarely returned and only in the special cases where a bad client sends `0` as
+    /// the query count
+    BadPacket,
+    /// A data type was given but the parser failed to serialize it into this type
+    ///
+    /// This can happen not just for elements but can also happen for their sizes ([`Self::parse_into_u64`])
+    DataTypeParseError,
+    /// A data type that the client doesn't know was passed into the query
+    ///
+    /// This is a frequent problem that can arise between different server editions as more data types
+    /// can be added with changing server versions
+    UnknownDatatype,
+    /// The query is empty
+    ///
+    /// The **parser will never return this**, but instead it is provided for convenience with [`dbnet`]
     Empty,
-    /// The response is incomplete
-    Incomplete,
-    /// The server returned data, but we couldn't parse it
-    ParseError,
 }
 
-/// Parse a response packet
-pub fn parse(buf: &[u8]) -> ClientResult {
-    if buf.len() < 6 {
-        // A packet that has less than 6 characters? Nonsense!
-        return ClientResult::Incomplete;
-    }
-    /*
-    We first get the metaframe, which looks something like:
-    ```
-    #<numchars_in_next_line>\n
-    *<num_of_datagroups>\n
-    ```
-    */
-    let mut pos = 0;
-    if buf[pos] != b'#' {
-        return ClientResult::InvalidResponse;
-    } else {
-        pos += 1;
-    }
-    let next_line = match read_line_and_return_next_line(&mut pos, &buf) {
-        Some(line) => line,
-        None => {
-            // This is incomplete
-            return ClientResult::Incomplete;
+#[derive(Debug, PartialEq)]
+/// # Types of Response
+///
+/// A simple response carries the data for one action while a complex response carries data for
+/// multiple actions
+pub enum RawResponse {
+    /// A simple query will just hold one element
+    SimpleQuery(Element),
+    /// A pipelined/batch query will hold multiple elements
+    PipelinedQuery(Vec<Element>),
+}
+
+/// A generic result to indicate parsing errors thorugh the [`ParseError`] enum
+pub type ParseResult<T> = Result<T, ParseError>;
+
+impl<'a> Parser<'a> {
+    /// Initialize a new parser instance
+    pub const fn new(buffer: &'a [u8]) -> Self {
+        Parser {
+            cursor: 0usize,
+            buffer,
         }
-    };
-    pos += 1; // Skip LF
-              // Find out the number of actions that we have to do
-    let mut action_size = 0usize;
-    if next_line[0] == b'*' {
-        let mut line_iter = next_line.into_iter().skip(1).peekable();
-        while let Some(dig) = line_iter.next() {
-            let curdig: usize = match dig.checked_sub(48) {
-                Some(dig) => {
-                    if dig > 9 {
-                        return ClientResult::InvalidResponse;
-                    } else {
-                        dig.into()
-                    }
-                }
-                None => return ClientResult::InvalidResponse,
-            };
-            action_size = (action_size * 10) + curdig;
-        }
-    // This line gives us the number of actions
-    } else {
-        return ClientResult::InvalidResponse;
     }
-    let mut items: Vec<DataGroup> = Vec::with_capacity(action_size);
-    while pos < buf.len() && items.len() <= action_size {
-        match buf[pos] {
-            b'#' => {
-                pos += 1; // Skip '#'
-                let next_line = match read_line_and_return_next_line(&mut pos, &buf) {
-                    Some(line) => line,
-                    None => {
-                        // This is incomplete
-                        return ClientResult::Incomplete;
-                    }
-                }; // Now we have the current line
-                pos += 1; // Skip the newline
-                          // Move the cursor ahead by the number of bytes that we just read
-                          // Let us check the current char
-                match next_line[0] {
-                    b'&' => {
-                        // This is an array
-                        // Now let us parse the array size
-                        let mut current_array_size = 0usize;
-                        let mut linepos = 1; // Skip the '&' character
-                        while linepos < next_line.len() {
-                            let curdg: usize = match next_line[linepos].checked_sub(48) {
-                                Some(dig) => {
-                                    if dig > 9 {
-                                        // If `dig` is greater than 9, then the current
-                                        // UTF-8 char isn't a number
-                                        return ClientResult::InvalidResponse;
-                                    } else {
-                                        dig.into()
-                                    }
-                                }
-                                None => return ClientResult::InvalidResponse,
-                            };
-                            current_array_size = (current_array_size * 10) + curdg; // Increment the size
-                            linepos += 1; // Move the position ahead, since we just read another char
-                        }
-                        // Now we know the array size, good!
-                        let mut actiongroup: Vec<DataType> = Vec::with_capacity(current_array_size);
-                        // Let's loop over to get the elements till the size of this array
-                        while pos < buf.len() && actiongroup.len() < current_array_size {
-                            let mut element_size = 0usize;
-                            let datatype = match buf[pos] {
-                                b'+' => _DataType::Str(None),
-                                b'!' => _DataType::RespCode(None),
-                                b':' => _DataType::UnsignedInt(None),
-                                x @ _ => unimplemented!("Type '{}' not implemented", char::from(x)),
-                            };
-                            pos += 1; // We've got the tsymbol above, so skip it
-                            while pos < buf.len() && buf[pos] != b'\n' {
-                                let curdig: usize = match buf[pos].checked_sub(48) {
-                                    Some(dig) => {
-                                        if dig > 9 {
-                                            // If `dig` is greater than 9, then the current
-                                            // UTF-8 char isn't a number
-                                            return ClientResult::InvalidResponse;
-                                        } else {
-                                            dig.into()
-                                        }
-                                    }
-                                    None => return ClientResult::InvalidResponse,
-                                };
-                                element_size = (element_size * 10) + curdig; // Increment the size
-                                pos += 1; // Move the position ahead, since we just read another char
-                            }
-                            pos += 1;
-                            // We now know the item size
-                            let mut value = String::with_capacity(element_size);
-                            let extracted = match buf.get(pos..pos + element_size) {
-                                Some(s) => s,
-                                None => return ClientResult::Incomplete,
-                            };
-                            pos += element_size; // Move the position ahead
-                            value.push_str(&String::from_utf8_lossy(extracted));
-                            pos += 1; // Skip the newline
-                            actiongroup.push(match datatype {
-                                _DataType::Str(_) => DataType::Str(value),
-                                _DataType::RespCode(_) => {
-                                    DataType::RespCode(RespCode::from_str(&value))
-                                }
-                                _DataType::UnsignedInt(_) => {
-                                    if let Ok(unsigned_int64) = value.parse() {
-                                        DataType::UnsignedInt(unsigned_int64)
-                                    } else {
-                                        return ClientResult::ParseError;
-                                    }
-                                }
-                            });
-                        }
-                        items.push(actiongroup);
-                    }
-                    _ => return ClientResult::InvalidResponse,
-                }
-                continue;
+    /// Read from the current cursor position to `until` number of positions ahead
+    /// This **will forward the cursor itself** if the bytes exist or it will just return a `NotEnough` error
+    fn read_until(&mut self, until: usize) -> ParseResult<&[u8]> {
+        if let Some(b) = self.buffer.get(self.cursor..self.cursor + until) {
+            self.cursor += until;
+            Ok(b)
+        } else {
+            Err(ParseError::NotEnough)
+        }
+    }
+    /// This returns the position at which the line parsing began and the position at which the line parsing
+    /// stopped, in other words, you should be able to do self.buffer[started_at..stopped_at] to get a line
+    /// and do it unchecked. This **will move the internal cursor ahead** and place it **at the `\n` byte**
+    fn read_line(&mut self) -> (usize, usize) {
+        let started_at = self.cursor;
+        let mut stopped_at = self.cursor;
+        while self.cursor < self.buffer.len() {
+            if self.buffer[self.cursor] == b'\n' {
+                // Oh no! Newline reached, time to break the loop
+                // But before that ... we read the newline, so let's advance the cursor
+                self.incr_cursor();
+                break;
             }
-            _ => {
-                // Since the variant '#' does all the array
-                // parsing business, we should never reach here unless
-                // the packet is invalid
-                return ClientResult::InvalidResponse;
-            }
+            // So this isn't an LF, great! Let's forward the stopped_at position
+            stopped_at += 1;
+            self.incr_cursor();
         }
+        (started_at, stopped_at)
     }
-    if buf.get(pos).is_none() {
-        if items.len() == action_size {
-            if items.len() == 1 {
-                if items[0].len() == 1 {
-                    // Single item returned, so we can return this as ClientResult::ResponseItem
-                    ClientResult::ResponseItem(items.swap_remove(0).swap_remove(0), pos)
-                } else {
-                    // More than one time returned, so we can return this as ClientResult::Response
-                    ClientResult::SimpleResponse(items.swap_remove(0), pos)
-                }
+    /// Push the internal cursor ahead by one
+    fn incr_cursor(&mut self) {
+        self.cursor += 1;
+    }
+    /// This function will evaluate if the byte at the current cursor position equals the `ch` argument, i.e
+    /// the expression `*v == ch` is evaluated. However, if no element is present ahead, then the function
+    /// will return `Ok(_this_if_nothing_ahead_)`
+    fn will_cursor_give_char(&self, ch: u8, this_if_nothing_ahead: bool) -> ParseResult<bool> {
+        self.buffer.get(self.cursor).map_or(
+            if this_if_nothing_ahead {
+                Ok(true)
             } else {
-                ClientResult::PipelinedResponse(items, pos)
+                Err(ParseError::NotEnough)
+            },
+            |v| Ok(*v == ch),
+        )
+    }
+    /// Will the current cursor position give a linefeed? This will return `ParseError::NotEnough` if
+    /// the current cursor points at a non-existent index in `self.buffer`
+    fn will_cursor_give_linefeed(&self) -> ParseResult<bool> {
+        self.will_cursor_give_char(b'\n', false)
+    }
+    /// Parse a stream of bytes into [`usize`]
+    fn parse_into_usize(bytes: &[u8]) -> ParseResult<usize> {
+        if bytes.len() == 0 {
+            return Err(ParseError::NotEnough);
+        }
+        let mut byte_iter = bytes.into_iter();
+        let mut item_usize = 0usize;
+        while let Some(dig) = byte_iter.next() {
+            if !dig.is_ascii_digit() {
+                // dig has to be an ASCII digit
+                return Err(ParseError::DataTypeParseError);
+            }
+            // 48 is the ASCII code for 0, and 57 is the ascii code for 9
+            // so if 0 is given, the subtraction should give 0; similarly
+            // if 9 is given, the subtraction should give us 9!
+            let curdig: usize = dig
+                .checked_sub(48)
+                .unwrap_or_else(|| unsafe { unreachable_unchecked() })
+                .into();
+            // The usize can overflow; check that case
+            let product = match item_usize.checked_mul(10) {
+                Some(not_overflowed) => not_overflowed,
+                None => return Err(ParseError::DataTypeParseError),
+            };
+            let sum = match product.checked_add(curdig) {
+                Some(not_overflowed) => not_overflowed,
+                None => return Err(ParseError::DataTypeParseError),
+            };
+            item_usize = sum;
+        }
+        Ok(item_usize)
+    }
+    /// Pasre a stream of bytes into an [`u64`]
+    fn parse_into_u64(bytes: &[u8]) -> ParseResult<u64> {
+        if bytes.len() == 0 {
+            return Err(ParseError::NotEnough);
+        }
+        let mut byte_iter = bytes.into_iter();
+        let mut item_u64 = 0u64;
+        while let Some(dig) = byte_iter.next() {
+            if !dig.is_ascii_digit() {
+                // dig has to be an ASCII digit
+                return Err(ParseError::DataTypeParseError);
+            }
+            // 48 is the ASCII code for 0, and 57 is the ascii code for 9
+            // so if 0 is given, the subtraction should give 0; similarly
+            // if 9 is given, the subtraction should give us 9!
+            let curdig: u64 = dig
+                .checked_sub(48)
+                .unwrap_or_else(|| unsafe { unreachable_unchecked() })
+                .into();
+            // Now the entire u64 can overflow, so let's attempt to check it
+            let product = match item_u64.checked_mul(10) {
+                Some(not_overflowed) => not_overflowed,
+                None => return Err(ParseError::DataTypeParseError),
+            };
+            let sum = match product.checked_add(curdig) {
+                Some(not_overflowed) => not_overflowed,
+                None => return Err(ParseError::DataTypeParseError),
+            };
+            item_u64 = sum;
+        }
+        Ok(item_u64)
+    }
+    /// This will return the number of datagroups present in this query packet
+    ///
+    /// This **will forward the cursor itself**
+    fn parse_metaframe_get_datagroup_count(&mut self) -> ParseResult<usize> {
+        // the smallest query we can have is: *1\n or 3 chars
+        if self.buffer.len() < 3 {
+            return Err(ParseError::NotEnough);
+        }
+        // Now we want to read `*<n>\n`
+        let (start, stop) = self.read_line();
+        if let Some(our_chunk) = self.buffer.get(start..stop) {
+            if our_chunk[0] == b'*' {
+                // Good, this will tell us the number of actions
+                // Let us attempt to read the usize from this point onwards
+                // that is excluding the '*' (so 1..)
+                let ret = Self::parse_into_usize(&our_chunk[1..])?;
+                Ok(ret)
+            } else {
+                Err(ParseError::UnexpectedByte)
             }
         } else {
-            // Since the number of items we got is not equal to the action size - not all data was
-            // transferred
-            ClientResult::Incomplete
+            Err(ParseError::NotEnough)
         }
-    } else {
-        // Either more data was sent or some data was missing
-        ClientResult::InvalidResponse
     }
-}
-/// Read a size line and return the following line
-///
-/// This reads a line that begins with the number, i.e make sure that
-/// the **`#` character is skipped**
-///
-fn read_line_and_return_next_line<'a>(pos: &mut usize, buf: &'a [u8]) -> Option<&'a [u8]> {
-    let mut next_line_size = 0usize;
-    while pos < &mut buf.len() && buf[*pos] != b'\n' {
-        // 48 is the UTF-8 code for '0'
-        let curdig: usize = match buf[*pos].checked_sub(48) {
-            Some(dig) => {
-                if dig > 9 {
-                    // If `dig` is greater than 9, then the current
-                    // UTF-8 char isn't a number
-                    return None;
+    /// Get the next element **without** the tsymbol
+    ///
+    /// This function **does not forward the newline**
+    fn __get_next_element(&mut self) -> ParseResult<&[u8]> {
+        let string_sizeline = self.read_line();
+        if let Some(line) = self.buffer.get(string_sizeline.0..string_sizeline.1) {
+            let string_size = Self::parse_into_usize(line)?;
+            let our_chunk = self.read_until(string_size)?;
+            Ok(our_chunk)
+        } else {
+            Err(ParseError::NotEnough)
+        }
+    }
+    /// The cursor should have passed the `+` tsymbol
+    fn parse_next_string(&mut self) -> ParseResult<String> {
+        let our_string_chunk = self.__get_next_element()?;
+        let our_string = String::from_utf8_lossy(&our_string_chunk).to_string();
+        if self.will_cursor_give_linefeed()? {
+            // there is a lf after the end of the string; great!
+            // let's skip that now
+            self.incr_cursor();
+            // let's return our string
+            Ok(our_string)
+        } else {
+            Err(ParseError::UnexpectedByte)
+        }
+    }
+    /// The cursor should have passed the `:` tsymbol
+    fn parse_next_u64(&mut self) -> ParseResult<u64> {
+        let our_u64_chunk = self.__get_next_element()?;
+        let our_u64 = Self::parse_into_u64(our_u64_chunk)?;
+        if self.will_cursor_give_linefeed()? {
+            // line feed after u64; heck yeah!
+            self.incr_cursor();
+            // return it
+            Ok(our_u64)
+        } else {
+            Err(ParseError::UnexpectedByte)
+        }
+    }
+    fn parse_next_respcode(&mut self) -> ParseResult<RespCode> {
+        let our_respcode_chunk = self.__get_next_element()?;
+        let our_respcode = RespCode::from_str(&String::from_utf8_lossy(our_respcode_chunk));
+        if self.will_cursor_give_linefeed()? {
+            self.incr_cursor();
+            Ok(our_respcode)
+        } else {
+            Err(ParseError::UnexpectedByte)
+        }
+    }
+    /// The cursor should be **at the tsymbol**
+    fn parse_next_element(&mut self) -> ParseResult<Element> {
+        if let Some(tsymbol) = self.buffer.get(self.cursor) {
+            // so we have a tsymbol; nice, let's match it
+            // but advance the cursor before doing that
+            self.incr_cursor();
+            let ret = match *tsymbol {
+                b'+' => Element::String(self.parse_next_string()?),
+                b':' => Element::UnsignedInt(self.parse_next_u64()?),
+                b'&' => Element::Array(self.parse_next_array()?),
+                b'!' => Element::RespCode(self.parse_next_respcode()?),
+                b'_' => Element::FlatArray(self.parse_next_flat_array()?),
+                _ => return Err(ParseError::UnknownDatatype),
+            };
+            Ok(ret)
+        } else {
+            // Not enough bytes to read an element
+            Err(ParseError::NotEnough)
+        }
+    }
+    /// The cursor should have passed the tsymbol
+    fn parse_next_flat_array(&mut self) -> ParseResult<Vec<String>> {
+        let (start, stop) = self.read_line();
+        if let Some(our_size_chunk) = self.buffer.get(start..stop) {
+            let array_size = Self::parse_into_usize(&our_size_chunk)?;
+            let mut array = Vec::with_capacity(array_size);
+            for _ in 0..array_size {
+                if let Some(tsymbol) = self.buffer.get(self.cursor) {
+                    // good, there is a tsymbol; move the cursor ahead
+                    self.incr_cursor();
+                    let ret = match *tsymbol {
+                        b'+' => self.parse_next_string()?,
+                        _ => return Err(ParseError::UnknownDatatype),
+                    };
+                    array.push(ret);
                 } else {
-                    dig.into()
+                    return Err(ParseError::NotEnough);
                 }
             }
-            None => return None,
-        };
-        next_line_size = (next_line_size * 10) + curdig; // Increment the size
-        *pos += 1; // Move the position ahead, since we just read another char
+            Ok(array)
+        } else {
+            Err(ParseError::NotEnough)
+        }
     }
-    *pos += 1; // Skip the newline
-               // We now know the size of the next line
-    let next_line = match buf.get(*pos..*pos + next_line_size) {
-        Some(line) => line,
-        None => {
-            // This is incomplete
-            return None;
+    /// The tsymbol `&` should have been passed!
+    fn parse_next_array(&mut self) -> ParseResult<Vec<Element>> {
+        let (start, stop) = self.read_line();
+        if let Some(our_size_chunk) = self.buffer.get(start..stop) {
+            let array_size = Self::parse_into_usize(our_size_chunk)?;
+            let mut array = Vec::with_capacity(array_size);
+            for _ in 0..array_size {
+                array.push(self.parse_next_element()?);
+            }
+            Ok(array)
+        } else {
+            Err(ParseError::NotEnough)
         }
-    }; // Now we have the current line
-       // Move the cursor ahead by the number of bytes that we just read
-    *pos += next_line_size;
-    Some(next_line)
-}
-
-#[cfg(test)]
-#[test]
-fn test_deserializer_responseitem() {
-    let res = "#2\n*1\n#2\n&1\n+4\nHEY!\n".as_bytes().to_owned();
-    assert_eq!(
-        parse(&res),
-        ClientResult::ResponseItem(DataType::Str("HEY!".to_owned()), res.len())
-    );
-    let res = "#2\n*1\n#2\n&1\n!1\n0\n".as_bytes().to_owned();
-    assert_eq!(
-        parse(&res),
-        ClientResult::ResponseItem(DataType::RespCode(RespCode::Okay), res.len())
-    );
-}
-
-#[cfg(test)]
-#[test]
-fn test_deserializer_simple_response() {
-    let res = "#2\n*1\n#2\n&5\n!1\n1\n!1\n0\n+5\nsayan\n+2\nis\n+4\nbusy\n"
-        .as_bytes()
-        .to_owned();
-    let ret = parse(&res);
-    assert_eq!(
-        ret,
-        ClientResult::SimpleResponse(
-            vec![
-                DataType::RespCode(RespCode::NotFound),
-                DataType::RespCode(RespCode::Okay),
-                DataType::Str("sayan".to_owned()),
-                DataType::Str("is".to_owned()),
-                DataType::Str("busy".to_owned())
-            ],
-            res.len()
-        )
-    );
-    if let ClientResult::SimpleResponse(ret, _) = ret {
-        for val in ret {
-            let _ = format!("{:?}", val);
+    }
+    /// Parse a query and return the [`Query`] and an `usize` indicating the number of bytes that
+    /// can be safely discarded from the buffer. It will otherwise return errors if they are found.
+    ///
+    /// This object will drop `Self`
+    pub fn parse(mut self) -> Result<(RawResponse, usize), ParseError> {
+        let number_of_queries = self.parse_metaframe_get_datagroup_count()?;
+        if number_of_queries == 0 {
+            // how on earth do you expect us to execute 0 queries? waste of bandwidth
+            return Err(ParseError::BadPacket);
         }
-    } else {
-        panic!("Expected a SimpleResponse with a single datagroup")
+        if number_of_queries == 1 {
+            // This is a simple query
+            let single_group = self.parse_next_element()?;
+            // The below line defaults to false if no item is there in the buffer
+            // or it checks if the next time is a \r char; if it is, then it is the beginning
+            // of the next query
+            if self
+                .will_cursor_give_char(b'*', true)
+                .unwrap_or_else(|_| unsafe {
+                    // This will never be the case because we'll always get a result and no error value
+                    // as we've passed true which will yield Ok(true) even if there is no byte ahead
+                    unreachable_unchecked()
+                })
+            {
+                Ok((RawResponse::SimpleQuery(single_group), self.cursor))
+            } else {
+                // the next item isn't the beginning of a query but something else?
+                // that doesn't look right!
+                Err(ParseError::UnexpectedByte)
+            }
+        } else {
+            // This is a pipelined query
+            // We'll first make space for all the actiongroups
+            let mut queries = Vec::with_capacity(number_of_queries);
+            for _ in 0..number_of_queries {
+                queries.push(self.parse_next_element()?);
+            }
+            if self.will_cursor_give_char(b'*', true)? {
+                Ok((RawResponse::PipelinedQuery(queries), self.cursor))
+            } else {
+                Err(ParseError::UnexpectedByte)
+            }
+        }
     }
 }

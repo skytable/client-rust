@@ -187,7 +187,7 @@ impl Query {
         Ok(())
     }
     #[cfg(feature = "dbg")]
-    fn into_raw_query(&self) -> Vec<u8> {
+    pub fn into_raw_query(&self) -> Vec<u8> {
         let mut v = Vec::with_capacity(self.data.len());
         v.extend(b"*1\n");
         v.extend(b"_");

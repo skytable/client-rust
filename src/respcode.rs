@@ -57,3 +57,18 @@ impl RespCode {
         res
     }
 }
+
+impl From<RespCode> for u8 {
+    fn from(rcode: RespCode) -> u8 {
+        use RespCode::*;
+        match rcode {
+            Okay => 0,
+            NotFound => 1,
+            OverwriteError => 2,
+            ActionError => 3,
+            PacketError => 4,
+            ServerError => 5,
+            OtherError | ErrorString(_) => 6,
+        }
+    }
+}

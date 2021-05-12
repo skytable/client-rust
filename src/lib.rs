@@ -40,30 +40,12 @@
 //! ```toml
 //! skytable = "0.3.0"
 //! ```
-//! Now open up your `src/main.rs` file and establish a connection to the server:
+//! Now open up your `src/main.rs` file and establish a connection to the server while also adding some
+//! imports:
 //! ```ignore
-//! use skytable::{Connection};
-//! async fn main() -> std::io::Result<()> {
-//!     let mut con = Connection::new("127.0.0.1", 2003).await?;
-//! }
-//! ```
-//!
-//! We get an error stating that `main()` cannot be `async`! Now [`Connection`] itself is an `async` connection
-//! and hence needs to `await`. This is when you'll need a runtime like [Tokio](https://tokio.rs). The Skytable
-//! database itself uses Tokio as its asynchronous runtime! So let's add `tokio` to our `Cargo.toml` and also add
-//! the `#[tokio::main]` macro on top of our main function:
-//!
-//! In `Cargo.toml`, add:
-//! ```toml
-//! tokio = {version="1.5.0", features=["full"]}
-//! ```
-//! And your `main.rs` should now look like:
-//! ```no_run
-//! use skytable::{Connection, Query, Response, RespCode, Element};
-//! #[tokio::main]
-//! async fn main() -> std::io::Result<()> {
-//!     let mut con = Connection::new("127.0.0.1", 2003).await?;
-//!     Ok(())
+//! use skytable::{Connection, Query, Response, Element};
+//! fn main() -> std::io::Result<()> {
+//!     let mut con = Connection::new("127.0.0.1", 2003)?;
 //! }
 //! ```
 //!
@@ -71,11 +53,19 @@
 //! ```ignore
 //! let mut query = Query::new();
 //! query.arg("heya");
-//! let res = con.run_simple_query(query).await?;
+//! let res = con.run_simple_query(query)?;
 //! assert_eq!(res, Response::Item(Element::String("HEY!".to_owned())));
 //! ```
 //!
 //! Way to go &mdash; you're all set! Now go ahead and run more advanced queries!
+//!
+//! ## Async API
+//! If you need to use an `async` API, just change your import to:
+//! ```toml
+//! skytable = {version = "0.3.0", features=["async"], default-features=false}
+//! ```
+//! You can now establish a connection by using `skytable::AsyncConnection::new()`, adding `.await`s wherever
+//! necessary.
 //!
 //! ## Contributing
 //!
@@ -88,17 +78,29 @@
 //! [Apache-2.0 License](https://github.com/skytable/client-rust/blob/next/LICENSE). Now go build great apps!
 //!
 
-pub mod connection;
 mod deserializer;
 mod respcode;
-pub mod sync;
 
-use crate::connection::IoResult;
+use std::io::Result as IoResult;
+// async imports
+#[cfg(feature = "async")]
+pub mod connection;
+#[cfg(feature = "async")]
 pub use connection::Connection;
+#[cfg(feature = "async")]
+pub use connection::Connection as AsyncConnection;
+#[cfg(feature = "async")]
+use tokio::io::AsyncWriteExt;
+#[cfg(feature = "async")]
+use tokio::net::TcpStream;
+// default imports
 pub use deserializer::Element;
 pub use respcode::RespCode;
-use tokio::io::AsyncWriteExt;
-use tokio::net::TcpStream;
+// sync imports
+#[cfg(feature = "sync")]
+pub mod sync;
+#[cfg(feature = "sync")]
+pub use sync::Connection;
 
 #[derive(Debug, PartialEq)]
 /// This struct represents a single simple query as defined by the Terrapipe protocol
@@ -144,6 +146,7 @@ impl Query {
     fn get_holding_buffer(&self) -> &[u8] {
         &self.data
     }
+    #[cfg(feature = "async")]
     /// Write a query to a given stream
     async fn write_query_to(
         &mut self,
@@ -164,6 +167,7 @@ impl Query {
         }
         Ok(())
     }
+    #[cfg(feature = "sync")]
     /// Write a query to a given stream
     fn write_query_to_sync(&mut self, stream: &mut std::net::TcpStream) -> IoResult<()> {
         use std::io::Write;

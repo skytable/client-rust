@@ -22,24 +22,27 @@
 
 use crate::deserializer::{ParseError, Parser, RawResponse};
 use crate::{Query, Response};
+#[cfg(feature = "async")]
 use bytes::{Buf, BytesMut};
 pub use std::io::Result as IoResult;
 use std::io::{Error, ErrorKind};
-use tokio::io::AsyncReadExt;
-use tokio::io::AsyncWriteExt;
+#[cfg(feature = "async")]
+use tokio::io::{AsyncReadExt, AsyncWriteExt, BufWriter};
+#[cfg(feature = "async")]
 use tokio::net::TcpStream;
-use tokio::io::BufWriter;
 
 /// 4 KB Read Buffer
 const BUF_CAP: usize = 4096;
 
 #[derive(Debug)]
+#[cfg(feature = "async")]
 /// A `Connection` is a wrapper around a`TcpStream` and a read buffer
 pub struct Connection {
     stream: BufWriter<TcpStream>,
     buffer: BytesMut,
 }
 
+#[cfg(feature = "async")]
 impl Connection {
     /// Create a new connection to a Skytable instance hosted on `host` and running on `port`
     pub async fn new(host: &str, port: u16) -> IoResult<Self> {

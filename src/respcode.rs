@@ -19,6 +19,7 @@
 
 /// Response codes returned by the server
 #[derive(Debug, PartialEq)]
+#[non_exhaustive]
 pub enum RespCode {
     /// `0`: Okay (Empty Response)
     Okay,

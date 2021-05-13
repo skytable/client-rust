@@ -62,10 +62,10 @@
 //! ## Async API
 //! If you need to use an `async` API, just change your import to:
 //! ```toml
-//! skytable = {version = "0.3.0", features=["async"], default-features=false}
+//! skytable = { version = "0.3.0", features=["async"], default-features=false }
 //! ```
 //! You can now establish a connection by using `skytable::AsyncConnection::new()`, adding `.await`s wherever
-//! necessary.
+//! necessary. Do note that you'll need a runtime like [Tokio](https://tokio.rs).
 //!
 //! ## Contributing
 //!
@@ -77,15 +77,17 @@
 //! This client library is distributed under the permissive
 //! [Apache-2.0 License](https://github.com/skytable/client-rust/blob/next/LICENSE). Now go build great apps!
 //!
-
+#![cfg_attr(docsrs, feature(doc_cfg))]
 mod deserializer;
 mod respcode;
 
 use std::io::Result as IoResult;
 // async imports
 #[cfg(feature = "async")]
+#[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 pub mod connection;
 #[cfg(feature = "async")]
+#[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 pub use connection::Connection as AsyncConnection;
 #[cfg(feature = "async")]
 use tokio::io::AsyncWriteExt;
@@ -96,8 +98,10 @@ pub use deserializer::Element;
 pub use respcode::RespCode;
 // sync imports
 #[cfg(feature = "sync")]
+#[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
 pub mod sync;
 #[cfg(feature = "sync")]
+#[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
 pub use sync::Connection;
 
 #[derive(Debug, PartialEq)]
@@ -185,6 +189,13 @@ impl Query {
         Ok(())
     }
     #[cfg(feature = "dbg")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "dbg")))]
+    /// Get the raw bytes of a query
+    /// 
+    /// This is a function that is **not intended for daily use** but is for developers working to improve/debug
+    /// or extend the Skyhash protocol. [Skytable](https://github.com/skytable/skytable) itself uses this function
+    /// to generate raw queries. Once you're done passing the arguments to a query, running this function will
+    /// return the raw query that would be written to the stream, serialized using the Skyhash serialization protocol
     pub fn into_raw_query(&self) -> Vec<u8> {
         let mut v = Vec::with_capacity(self.data.len());
         v.extend(b"*1\n");

@@ -36,6 +36,8 @@ pub enum RespCode {
     ErrorString(String),
     /// `6`: The same as [`RespCode::ErrorString`] but without any explicit information
     OtherError,
+    /// `7`: Wrongtype Error
+    Wrongtype,
 }
 
 impl RespCode {
@@ -50,6 +52,7 @@ impl RespCode {
                 4 => PacketError,
                 5 => ServerError,
                 6 => OtherError,
+                7 => Wrongtype,
                 _ => Self::ErrorString(st.to_owned()),
             },
             Err(_) => return ErrorString(st.to_owned()),
@@ -69,6 +72,7 @@ impl From<RespCode> for u8 {
             PacketError => 4,
             ServerError => 5,
             OtherError | ErrorString(_) => 6,
+            Wrongtype => 7,
         }
     }
 }

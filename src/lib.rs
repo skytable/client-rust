@@ -88,7 +88,7 @@ use std::io::Result as IoResult;
 pub mod connection;
 #[cfg(feature = "async")]
 #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
-pub use connection::Connection as AsyncConnection;
+pub use async_con::Connection as AsyncConnection;
 #[cfg(feature = "async")]
 use tokio::io::AsyncWriteExt;
 #[cfg(feature = "async")]
@@ -191,7 +191,7 @@ impl Query {
     #[cfg(feature = "dbg")]
     #[cfg_attr(docsrs, doc(cfg(feature = "dbg")))]
     /// Get the raw bytes of a query
-    /// 
+    ///
     /// This is a function that is **not intended for daily use** but is for developers working to improve/debug
     /// or extend the Skyhash protocol. [Skytable](https://github.com/skytable/skytable) itself uses this function
     /// to generate raw queries. Once you're done passing the arguments to a query, running this function will

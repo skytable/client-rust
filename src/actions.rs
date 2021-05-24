@@ -51,9 +51,9 @@ pub type ActionResult<'s, T> =
 /// A special result that is returned when running actions
 pub type ActionResult<T> = ActionResultInner<T>;
 
-macro_rules! gen_return {
-    ($con:expr, $query:ident, $mtch:pat => $ret:expr) => {
-        let match_closure = |resp: Result<crate::Response, std::io::Error>| match resp {
+macro_rules! gen_match {
+    ($queryret:expr, $mtch:pat, $ret:expr) => {
+        match $queryret {
             Ok($mtch) => $ret,
             Ok(Response::InvalidResponse) => Err(ActionError::InvalidResponse),
             Ok(Response::ParseError) => Err(ActionError::ParseError),
@@ -62,10 +62,17 @@ macro_rules! gen_return {
             Ok(_) => Err(ActionError::UnexpectedDataType),
             Err(e) => Err(ActionError::IoError(e.kind())),
         };
+    };
+}
+
+macro_rules! gen_return {
+    ($con:expr, $query:ident, $mtch:pat => $ret:expr) => {
         #[cfg(feature = "async")]
-        return Box::pin(async move { match_closure($con.run_simple_query($query).await) });
+        return Box::pin(
+            async move { gen_match!($con.run_simple_query(&$query).await, $mtch, $ret) },
+        );
         #[cfg(feature = "sync")]
-        return match_closure($con.run_simple_query(&$query));
+        return gen_match!($con.run_simple_query(&$query), $mtch, $ret);
     };
 }
 

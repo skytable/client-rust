@@ -10,9 +10,9 @@ All changes in this project will be noted in this file.
 * Added `sync` and `async` features with `sync` as a default feature and `async` as an optional feature
 * Queries are now constructed like:
     ```rust
-    let q = Query::new("set").arg("x").arg("100").finish();
+    let q = Query::new("set").arg("x").arg("100");
     ```
-    instead of using `.arg(...)` multiple times
+    instead of using `.arg(...)` multiple times across multiple lines
 
 ## Version 0.2.0
 > Breaking changes

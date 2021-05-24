@@ -76,15 +76,16 @@
 //! This client library is distributed under the permissive
 //! [Apache-2.0 License](https://github.com/skytable/client-rust/blob/next/LICENSE). Now go build great apps!
 //!
+
 #![cfg_attr(docsrs, feature(doc_cfg))]
+pub mod actions;
 mod deserializer;
 mod respcode;
 
 use std::io::Result as IoResult;
 // async imports
 #[cfg(feature = "async")]
-#[cfg_attr(docsrs, doc(cfg(feature = "async")))]
-pub mod connection;
+mod async_con;
 #[cfg(feature = "async")]
 #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 pub use async_con::Connection as AsyncConnection;
@@ -111,7 +112,7 @@ pub use sync::Connection;
 /// ```
 /// use skytable::Query;
 /// fn main() {
-///     let q = Query::new("set").arg("x").arg("100").finish();
+///     let q = Query::new("set").arg("x").arg("100");
 /// }
 /// ```
 /// You can now run this with a [`Connection`] or an [`AsyncConnection`]
@@ -122,20 +123,22 @@ pub struct Query {
 }
 
 impl Query {
-    /// Create an empty query
+    /// Create a new query with an argument
     pub fn new(start: impl ToString) -> Self {
-        let mut q = Query {
+        Self::new_empty().arg(start)
+    }
+    /// Create a new empty query without any arguments
+    pub fn new_empty() -> Self {
+        Query {
             size_count: 0,
             data: Vec::new(),
-        };
-        q.arg(start);
-        q
+        }
     }
     /// Add an argument to a query
     ///
     /// ## Panics
     /// This method will panic if the passed `arg` is empty
-    pub fn arg(&mut self, arg: impl ToString) -> &mut Self {
+    pub fn arg(mut self, arg: impl ToString) -> Self {
         let arg = arg.to_string();
         if arg.len() == 0 {
             panic!("Argument cannot be empty")
@@ -151,9 +154,6 @@ impl Query {
         // Add the data itself, which is `arg`
         self.data.extend(arg.into_bytes());
         self.data.push(b'\n'); // add the LF char
-        self
-    }
-    pub fn finish(self) -> Self {
         self
     }
     /// Number of items in the datagroup

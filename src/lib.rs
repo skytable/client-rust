@@ -115,7 +115,7 @@ pub use sync::Connection;
 ///     let q = Query::new("set").arg("x").arg("100");
 /// }
 /// ```
-/// You can now run this with a [`Connection`] or an [`AsyncConnection`]
+/// You can now run this with a [`Connection`] or an `AsyncConnection`
 ///
 pub struct Query {
     size_count: usize,

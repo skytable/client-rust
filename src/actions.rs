@@ -25,6 +25,7 @@ use core::{future::Future, pin::Pin};
 use std::io::ErrorKind;
 
 /// Errors while running actions
+#[derive(Debug)]
 pub enum ActionError {
     /// The server sent data but we failed to parse it
     ParseError,
@@ -43,9 +44,12 @@ pub enum ActionError {
 
 type ActionResultInner<T> = Result<T, ActionError>;
 #[cfg(feature = "async")]
-type ActionResult<'s, T> = Pin<Box<dyn Future<Output = ActionResultInner<T>> + Send + Sync + 's>>;
+/// A special result that is returned when running actions
+pub type ActionResult<'s, T> =
+    Pin<Box<dyn Future<Output = ActionResultInner<T>> + Send + Sync + 's>>;
 #[cfg(feature = "sync")]
-type ActionResult<T> = ActionResultInner<T>;
+/// A special result that is returned when running actions
+pub type ActionResult<T> = ActionResultInner<T>;
 
 macro_rules! response_error_to_action_result {
     ($mtch_expr:expr) => {
@@ -65,7 +69,7 @@ macro_rules! gen_return {
         #[cfg(feature = "async")]
         return Box::pin(async move { $match_closure($con.run_simple_query($query).await) });
         #[cfg(feature = "sync")]
-        return $match_closure($con.run_simple_query($query));
+        return $match_closure($con.run_simple_query(&$query));
     };
 }
 

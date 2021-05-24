@@ -49,7 +49,7 @@ impl Connection {
     /// server. It will then determine if the returned response is complete or incomplete
     /// or invalid and return an appropriate variant of [`Response`] wrapped in [`IoResult`]
     /// for any I/O errors that may occur
-    pub fn run_simple_query(&mut self, mut query: Query) -> IoResult<Response> {
+    pub fn run_simple_query(&mut self, query: &Query) -> IoResult<Response> {
         query.write_query_to_sync(&mut self.stream)?;
         self.stream.flush()?;
         loop {

@@ -52,7 +52,7 @@
 //! Now let's run a [`Query`]! Add this below the previous line:
 //! ```ignore
 //! let query = Query::new("heya");
-//! let res = con.run_simple_query(query)?;
+//! let res = con.run_simple_query(&query)?;
 //! assert_eq!(res, Response::Item(Element::String("HEY!".to_owned())));
 //! ```
 //!
@@ -78,9 +78,11 @@
 //!
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
-pub mod actions;
+mod actions;
 mod deserializer;
 mod respcode;
+pub use actions::ActionError;
+pub use actions::ActionResult;
 
 use std::io::Result as IoResult;
 // async imports
@@ -165,10 +167,7 @@ impl Query {
     }
     #[cfg(feature = "async")]
     /// Write a query to a given stream
-    async fn write_query_to(
-        &mut self,
-        stream: &mut tokio::io::BufWriter<TcpStream>,
-    ) -> IoResult<()> {
+    async fn write_query_to(&self, stream: &mut tokio::io::BufWriter<TcpStream>) -> IoResult<()> {
         // Write the metaframe
         stream.write_all(b"*1\n").await?;
         // Add the dataframe
@@ -177,16 +176,11 @@ impl Query {
         stream.write_all(&number_of_items_in_datagroup).await?;
         stream.write_all(&[b'\n']).await?;
         stream.write_all(self.get_holding_buffer()).await?;
-        // Clear out the holding buffer for running other commands
-        {
-            self.data.clear();
-            self.size_count = 0;
-        }
         Ok(())
     }
     #[cfg(feature = "sync")]
     /// Write a query to a given stream
-    fn write_query_to_sync(&mut self, stream: &mut std::net::TcpStream) -> IoResult<()> {
+    fn write_query_to_sync(&self, stream: &mut std::net::TcpStream) -> IoResult<()> {
         use std::io::Write;
         // Write the metaframe
         stream.write_all(b"*1\n")?;
@@ -196,11 +190,6 @@ impl Query {
         stream.write_all(&number_of_items_in_datagroup)?;
         stream.write_all(&[b'\n'])?;
         stream.write_all(self.get_holding_buffer())?;
-        // Clear out the holding buffer for running other commands
-        {
-            self.data.clear();
-            self.size_count = 0;
-        }
         Ok(())
     }
     #[cfg(feature = "dbg")]

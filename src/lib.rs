@@ -51,8 +51,7 @@
 //!
 //! Now let's run a [`Query`]! Add this below the previous line:
 //! ```ignore
-//! let mut query = Query::new();
-//! query.arg("heya");
+//! let query = Query::new("heya");
 //! let res = con.run_simple_query(query)?;
 //! assert_eq!(res, Response::Item(Element::String("HEY!".to_owned())));
 //! ```
@@ -105,7 +104,18 @@ pub mod sync;
 pub use sync::Connection;
 
 #[derive(Debug, PartialEq)]
-/// This struct represents a single simple query as defined by the Terrapipe protocol
+/// This struct represents a single simple query as defined by the Skyhash protocol
+///
+/// A simple query is serialized into a flat string array which is nothing but a Skyhash serialized equivalent
+/// of an array of [`String`] items. To construct a query like `SET x 100`, one needs to:
+/// ```
+/// use skytable::Query;
+/// fn main() {
+///     let q = Query::new("set").arg("x").arg("100").finish();
+/// }
+/// ```
+/// You can now run this with a [`Connection`] or an [`AsyncConnection`]
+///
 pub struct Query {
     size_count: usize,
     data: Vec<u8>,
@@ -113,11 +123,13 @@ pub struct Query {
 
 impl Query {
     /// Create an empty query
-    pub fn new() -> Self {
-        Query {
+    pub fn new(start: impl ToString) -> Self {
+        let mut q = Query {
             size_count: 0,
             data: Vec::new(),
-        }
+        };
+        q.arg(start);
+        q
     }
     /// Add an argument to a query
     ///
@@ -139,6 +151,9 @@ impl Query {
         // Add the data itself, which is `arg`
         self.data.extend(arg.into_bytes());
         self.data.push(b'\n'); // add the LF char
+        self
+    }
+    pub fn finish(self) -> Self {
         self
     }
     /// Number of items in the datagroup
@@ -212,22 +227,13 @@ impl Query {
 /// This enum represents responses returned by the server. This can either be an array (or bulk), a single item
 /// or can be a parse error if the server returned some data but it couldn't be parsed into the expected type
 /// or it can be an invalid response in the event the server sent some invalid data.
-///
-/// ## Notes
-/// - This enum is `#[non_exhaustive]` as more types of responses can be added in the future
-/// - The `Response::Item` field is just a simple abstraction provided by this client library; Skytable's Terrapipe
-/// protocol (as of 1.0) doesn't discriminate between single and multiple elements returned in a data group, That is
-/// to say if an action like `GET x` returns (and will return) a single element in a datagroup, then it is passed
-/// into this variant; Terrapipe 1.0 always sends arrays
+/// This enum is `#[non_exhaustive]` as more types of responses can be added in the future.
 #[derive(Debug, PartialEq)]
 #[non_exhaustive]
 pub enum Response {
     /// The server sent an invalid response
     InvalidResponse,
-    /// A single item
-    ///
-    /// This is a client abstraction for a datagroup that only has one element
-    /// This element may be an array, a nested array, a string, or a RespCode
+    /// The server responded with _something_. This can be any of the [`Element`] variants
     Item(Element),
     /// We failed to parse data
     ParseError,

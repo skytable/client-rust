@@ -13,6 +13,7 @@ All changes in this project will be noted in this file.
     let q = Query::new("set").arg("x").arg("100");
     ```
     instead of using `.arg(...)` multiple times across multiple lines
+* `run_simple_query` now takes a reference to a `Query` instead of taking ownership of it
 
 ## Version 0.2.0
 > Breaking changes

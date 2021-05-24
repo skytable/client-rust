@@ -51,25 +51,21 @@ pub type ActionResult<'s, T> =
 /// A special result that is returned when running actions
 pub type ActionResult<T> = ActionResultInner<T>;
 
-macro_rules! response_error_to_action_result {
-    ($mtch_expr:expr) => {
-        match $mtch_expr {
+macro_rules! gen_return {
+    ($con:expr, $query:ident, $mtch:pat => $ret:expr) => {
+        let match_closure = |resp: Result<crate::Response, std::io::Error>| match resp {
+            Ok($mtch) => $ret,
             Ok(Response::InvalidResponse) => Err(ActionError::InvalidResponse),
             Ok(Response::ParseError) => Err(ActionError::ParseError),
             Ok(Response::UnsupportedDataType) => Err(ActionError::UnknownDataType),
             Ok(Response::Item(Element::RespCode(code))) => Err(ActionError::Code(code)),
             Ok(_) => Err(ActionError::UnexpectedDataType),
             Err(e) => Err(ActionError::IoError(e.kind())),
-        }
-    };
-}
-
-macro_rules! gen_return {
-    ($con:expr, $query:ident, $match_closure:ident) => {
+        };
         #[cfg(feature = "async")]
-        return Box::pin(async move { $match_closure($con.run_simple_query($query).await) });
+        return Box::pin(async move { match_closure($con.run_simple_query($query).await) });
         #[cfg(feature = "sync")]
-        return $match_closure($con.run_simple_query(&$query));
+        return match_closure($con.run_simple_query(&$query));
     };
 }
 
@@ -81,11 +77,7 @@ macro_rules! impl_actions {
             /// Get a `key`
             pub fn get<'s>(&'s mut self, key: impl ToString) -> ActionResult<String> {
                 let q = crate::Query::new("get").arg(key.to_string());
-                let match_closure = |resp: _Result| match resp {
-                    Ok(Response::Item(Element::String(st))) => Ok(st),
-                    _ => response_error_to_action_result!(resp),
-                };
-                gen_return!(self, q, match_closure);
+                gen_return!(self, q, Response::Item(Element::String(st)) => Ok(st));
             }
             /// Set a `key` to a `value`
             pub fn set<'s>(
@@ -96,11 +88,7 @@ macro_rules! impl_actions {
                 let q = crate::Query::new("set")
                     .arg(key.to_string())
                     .arg(value.to_string());
-                let match_closure = |resp: _Result| match resp {
-                    Ok(Response::Item(Element::RespCode(RespCode::Okay))) => Ok(()),
-                    _ => response_error_to_action_result!(resp),
-                };
-                gen_return!(self, q, match_closure);
+                gen_return!(self, q, Response::Item(Element::RespCode(RespCode::Okay)) => Ok(()));
             }
         }
     };

@@ -128,7 +128,7 @@ macro_rules! implement_actions {
                 fn $name<'s>(&'s mut self $(, $argname: $argty)*) -> AsyncResult<ActionResult<$ret>> {
                     let q = crate::Query::new(stringify!($name))$(.arg($argname))*;
                     Box::pin(async move {
-                        gen_match!(self.run(q).await, $($($mtch)*, $expect)*)
+                        gen_match!(self.run(q).await, $($($mtch)+, $expect),*)
                     })
                 }
             )*
@@ -178,6 +178,10 @@ implement_actions!(
         Response::Item(Element::Array(array)) => array
     }
     /// Creates a snapshot
+    ///
+    /// This returns a [`SnapshotResult`] containing the result. The reason [`SnapshotResult`] is not
+    /// an error is because `mksnap` might fail simply because an existing snapshot process was in progress
+    /// which is normal behavior and _not an inherent error_
     fn mksnap() -> SnapshotResult {
        Response::Item(Element::RespCode(RespCode::Okay)) => SnapshotResult::Okay,
        Response::Item(Element::RespCode(RespCode::ErrorString(estr))) => SnapshotResult::Error(estr)

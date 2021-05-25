@@ -83,9 +83,10 @@ pub trait AsynchornousConnection: Send + Sync {
     fn run(&mut self, q: Query) -> AsyncResult<std::io::Result<Response>>;
 }
 
-macro_rules! gen_remaining_match {
-    ($ret:expr) => {
+macro_rules! gen_match {
+    ($ret:expr, $($mtch:pat)+, $expect:expr) => {
         match $ret {
+            $(Ok($mtch))|* => Ok($expect),
             Ok(Response::InvalidResponse) => Err(ActionError::InvalidResponse),
             Ok(Response::ParseError) => Err(ActionError::ParseError),
             Ok(Response::UnsupportedDataType) => Err(ActionError::UnknownDataType),
@@ -114,11 +115,7 @@ macro_rules! implement_actions {
                 #[inline]
                 fn $name<'s>(&'s mut self $(, $argname: $argty)*) -> ActionResult<$ret> {
                     let q = crate::Query::new(stringify!($name))$(.arg($argname))*;
-                    let ret = self.run(q);
-                    return match ret {
-                        $(Ok($mtch))|* => Ok($expect),
-                        _ => gen_remaining_match!(ret)
-                    };
+                    gen_match!(self.run(q), $($mtch)*, $expect)
                 }
             )*
         }
@@ -131,11 +128,7 @@ macro_rules! implement_actions {
                 fn $name<'s>(&'s mut self $(, $argname: $argty)*) -> AsyncResult<ActionResult<$ret>> {
                     let q = crate::Query::new(stringify!($name))$(.arg($argname))*;
                     Box::pin(async move {
-                        let ret = self.run(q).await;
-                        return match ret {
-                            $(Ok($mtch))|* => Ok($expect),
-                            _ => gen_remaining_match!(ret)
-                        };
+                        gen_match!(self.run(q).await, $($mtch)*, $expect)
                     })
                 }
             )*

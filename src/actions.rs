@@ -15,10 +15,30 @@
  *
 */
 
-//! Actions
+//! # Actions
 //!
-//! This module contains macros and other methods for running actions (and generating the code for them)
+//! This module contains macros and other methods for running actions. To run actions:
+//! - For the `sync` feature, add this import:
+//!     ```
+//!     use skytable::actions::Actions;
+//!     ```
+//! - For the `async` feature, add this import:
+//!     ```
+//!     use skytable::actions::AsyncActions;
+//!     ```
+//! ## Running actions
+//!
+//! Once you have imported the required traits, you can now run the actions! For example:
+//! ```no_run
+//! use skytable::{actions::Actions, Connection};
+//! fn main() {
+//!     let mut con = Connection::new("127.0.0.1", 2003).unwrap();
+//!     con.set("x", "100").unwrap();
+//!     assert_eq!(con.get("x").unwrap(), "100".to_owned());
+//! }
+//! ```
 
+use crate::types::SnapshotResult;
 use crate::Element;
 use crate::IntoSkyhashAction;
 use crate::IntoSkyhashBytes;
@@ -91,6 +111,7 @@ macro_rules! implement_actions {
         pub trait Actions: SyncConnection {
             $(
                 $(#[$attr])*
+                #[inline]
                 fn $name<'s>(&'s mut self $(, $argname: $argty)*) -> ActionResult<$ret> {
                     let q = crate::Query::new(stringify!($name))$(.arg($argname))*;
                     let ret = self.run(q);
@@ -106,8 +127,9 @@ macro_rules! implement_actions {
         pub trait AsyncActions: AsynchornousConnection {
             $(
                 $(#[$attr])*
+                #[inline]
                 fn $name<'s>(&'s mut self $(, $argname: $argty)*) -> AsyncResult<ActionResult<$ret>> {
-                    let q = crate::Query::new(stringify!($name))$(.arg($argname.to_string()))*;
+                    let q = crate::Query::new(stringify!($name))$(.arg($argname))*;
                     Box::pin(async move {
                         let ret = self.run(q).await;
                         return match ret {
@@ -163,10 +185,16 @@ implement_actions!(
         Response::Item(Element::Array(array)) => array
     }
     /// Creates a snapshot
-    fn mksnap() -> RespCode {
+    fn mksnap() -> SnapshotResult {
         x @ Response::Item(Element::RespCode(RespCode::Okay)) | x @ Response::Item(Element::RespCode(RespCode::ErrorString(_))) => {
             if let Response::Item(Element::RespCode(rc)) = x {
-                rc
+                match rc {
+                    RespCode::Okay => SnapshotResult::Okay,
+                    RespCode::ErrorString(estr) => SnapshotResult::Error(estr),
+                    _ => unsafe {
+                        std::hint::unreachable_unchecked()
+                    }
+                }
             } else {
                 unsafe {
                     std::hint::unreachable_unchecked()

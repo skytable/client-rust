@@ -42,29 +42,44 @@
 //! ```
 //! Now open up your `src/main.rs` file and establish a connection to the server while also adding some
 //! imports:
-//! ```ignore
+//! ```no_run
 //! use skytable::{Connection, Query, Response, Element};
 //! fn main() -> std::io::Result<()> {
 //!     let mut con = Connection::new("127.0.0.1", 2003)?;
+//!     Ok(())
 //! }
 //! ```
 //!
-//! Now let's run a [`Query`]! Add this below the previous line:
-//! ```ignore
-//! let query = Query::new("heya");
-//! let res = con.run_simple_query(&query)?;
-//! assert_eq!(res, Response::Item(Element::String("HEY!".to_owned())));
+//! Now let's run a [`Query`]! Change the previous code to:
+//! ```no_run
+//! use skytable::{Connection, Query, Response, Element};
+//! fn main() -> std::io::Result<()> {
+//!     let mut con = Connection::new("127.0.0.1", 2003)?;
+//!     let query = Query::new("heya");
+//!     let res = con.run_simple_query(&query)?;
+//!     assert_eq!(res, Response::Item(Element::String("HEY!".to_owned())));
+//!     Ok(())
+//! }
 //! ```
 //!
 //! Way to go &mdash; you're all set! Now go ahead and run more advanced queries!
 //!
 //! ## Async API
+//! 
 //! If you need to use an `async` API, just change your import to:
 //! ```toml
-//! skytable = { version = "0.3.0", features=["async"], default-features=false }
+//! skytable = { version = "0.3", features=["async"], default-features=false }
 //! ```
 //! You can now establish a connection by using `skytable::AsyncConnection::new()`, adding `.await`s wherever
-//! necessary. Do note that you'll need a runtime like [Tokio](https://tokio.rs).
+//! necessary. Do note that you'll the [Tokio runtime](https://tokio.rs).
+//! 
+//! ## Using both `sync` and `async` APIs
+//! 
+//! With this client driver, it is possible to use both sync and `async` APIs **at the same time**. To do
+//! this, simply change your import to:
+//! ```toml
+//! skytable { version="0.3", features=["sync", "async"] }
+//! ```
 //!
 //! ## Contributing
 //!
@@ -106,6 +121,24 @@ pub mod sync;
 #[cfg(feature = "sync")]
 #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
 pub use sync::Connection;
+
+#[macro_export]
+/// A macro that can be used to easily create queries with _almost_ variadic properties.
+/// Where you'd normally create queries like this:
+/// ```
+/// use skytable::Query;
+/// let q = Query::new("mset").arg("x").arg("100").arg("y").arg("200");
+/// ```
+/// with this macro, you can just do this:
+/// ```ignore
+/// use skytable::query;
+/// let q = query!("mset", "x", "100", "y", "200");
+/// ```
+macro_rules! query {
+    ($($arg:expr),+) => {
+        crate::Query::new_empty()$(.arg($arg))*
+    };
+}
 
 #[derive(Debug, PartialEq)]
 /// This struct represents a single simple query as defined by the Skyhash protocol

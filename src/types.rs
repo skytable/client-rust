@@ -15,7 +15,21 @@
  *
 */
 
+//! # Types
+//!
+//! This module contains a collection of enumerations and traits that are used for converting multiple
+//! types, either primitve or user-defined, into Skyhash serializable items.
+//!
+//! ## Warnings
+//!
+//! When you implement any of these traits, do know what you're doing! Implementing [`IntoSkyhashBytes`]
+//! is almost always fine, but **do not implement any other traits** by hand!
+//!
+
+/// Anything that implements this trait can be turned into a [`String`]. This trait is implemented
+/// for most primitive types by default using [`std`]'s [`ToString`] trait.
 pub trait IntoSkyhashBytes {
+    /// Turn `Self` into a [`String`]
     fn into_string(&self) -> String;
 }
 
@@ -35,8 +49,12 @@ impl_skyhash_bytes!(
     u8, i8, u16, i16, u32, i32, u64, i64, u128, i128, f32, f64, bool, char, usize, String, &str
 );
 
+#[doc(hidden)]
+/// Anything that implements this trait can directly add itself to the bytes part of a [`Query`] object
 pub trait IntoSkyhashAction {
+    /// Extend the bytes of a `Vec` of bytes
     fn extend_bytes(&self, data: &mut Vec<u8>);
+    /// Returns the number of items `Self` will add to the query
     fn incr_len_by(&self) -> usize;
 }
 
@@ -96,4 +114,12 @@ impl<T: IntoSkyhashBytes, const N: usize> IntoSkyhashAction for &'static [T; N] 
     fn incr_len_by(&self) -> usize {
         N
     }
+}
+
+/// Result of an `mksnap` action
+pub enum SnapshotResult {
+    /// The snapshot was created successfully
+    Okay,
+    /// An error occurred while creating the snapshot
+    Error(String),
 }

@@ -63,17 +63,16 @@ pub trait AsynchornousConnection: Send + Sync {
     fn run(&mut self, q: Query) -> AsyncResult<std::io::Result<Response>>;
 }
 
-macro_rules! gen_match {
-    ($queryret:expr, $mtch:pat, $ret:expr) => {
-        match $queryret {
-            Ok($mtch) => Ok($ret),
+macro_rules! gen_remaining_match {
+    ($ret:expr) => {
+        match $ret {
             Ok(Response::InvalidResponse) => Err(ActionError::InvalidResponse),
             Ok(Response::ParseError) => Err(ActionError::ParseError),
             Ok(Response::UnsupportedDataType) => Err(ActionError::UnknownDataType),
             Ok(Response::Item(Element::RespCode(code))) => Err(ActionError::Code(code)),
             Ok(Response::Item(_)) => Err(ActionError::UnexpectedDataType),
             Err(e) => Err(ActionError::IoError(e.kind())),
-        };
+        }
     };
 }
 
@@ -83,7 +82,7 @@ macro_rules! implement_actions {
             $(#[$attr:meta])+
             fn $name:ident(
                 $($argname:ident: $argty:ty),*) -> $ret:ty {
-                    $mtch:pat => $expect:expr
+                    $($mtch:pat)|+ => $expect:expr
                 }
         )*
     ) => {
@@ -94,7 +93,11 @@ macro_rules! implement_actions {
                 $(#[$attr])*
                 fn $name<'s>(&'s mut self $(, $argname: $argty)*) -> ActionResult<$ret> {
                     let q = crate::Query::new(stringify!($name))$(.arg($argname))*;
-                    gen_match!(self.run(q), $mtch, $expect)
+                    let ret = self.run(q);
+                    return match ret {
+                        $(Ok($mtch))|* => Ok($expect),
+                        _ => gen_remaining_match!(ret)
+                    };
                 }
             )*
         }
@@ -106,7 +109,11 @@ macro_rules! implement_actions {
                 fn $name<'s>(&'s mut self $(, $argname: $argty)*) -> AsyncResult<ActionResult<$ret>> {
                     let q = crate::Query::new(stringify!($name))$(.arg($argname.to_string()))*;
                     Box::pin(async move {
-                        gen_match!(self.run(q).await, $mtch, $expect)
+                        let ret = self.run(q).await;
+                        return match ret {
+                            $(Ok($mtch))|* => Ok($expect),
+                            _ => gen_remaining_match!(ret)
+                        };
                     })
                 }
             )*
@@ -147,6 +154,25 @@ implement_actions!(
     /// Get the length of a key
     fn keylen(key: impl IntoSkyhashBytes) -> usize {
         Response::Item(Element::UnsignedInt(int)) => int as usize
+    }
+    /// Get multiple keys
+    ///
+    /// This returns a vector of [`Element`]s which either contain the values
+    /// as strings or contains `Not Found (Code: 1)` response codes
+    fn mget(keys: impl IntoSkyhashAction) -> Vec<Element> {
+        Response::Item(Element::Array(array)) => array
+    }
+    /// Creates a snapshot
+    fn mksnap() -> RespCode {
+        x @ Response::Item(Element::RespCode(RespCode::Okay)) | x @ Response::Item(Element::RespCode(RespCode::ErrorString(_))) => {
+            if let Response::Item(Element::RespCode(rc)) = x {
+                rc
+            } else {
+                unsafe {
+                    std::hint::unreachable_unchecked()
+                }
+            }
+        }
     }
     /// Set the value of a key
     fn set(key: impl IntoSkyhashBytes, value: impl IntoSkyhashBytes) -> () {

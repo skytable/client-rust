@@ -19,7 +19,10 @@
 //!
 //! This module contains macros and other methods for running actions (and generating the code for them)
 
+use crate::Element;
+use crate::Query;
 use crate::RespCode;
+use crate::Response;
 #[cfg(feature = "async")]
 use core::{future::Future, pin::Pin};
 use std::io::ErrorKind;
@@ -42,66 +45,123 @@ pub enum ActionError {
     Code(RespCode),
 }
 
-type ActionResultInner<T> = Result<T, ActionError>;
 #[cfg(feature = "async")]
+/// A special result that is returned when running actions (async)
+pub type AsyncResult<'s, T> = Pin<Box<dyn Future<Output = T> + Send + Sync + 's>>;
 /// A special result that is returned when running actions
-pub type ActionResult<'s, T> =
-    Pin<Box<dyn Future<Output = ActionResultInner<T>> + Send + Sync + 's>>;
+pub type ActionResult<T> = Result<T, ActionError>;
+
 #[cfg(feature = "sync")]
-/// A special result that is returned when running actions
-pub type ActionResult<T> = ActionResultInner<T>;
+pub trait SyncConnection {
+    fn run(&mut self, q: Query) -> std::io::Result<Response>;
+}
+
+#[cfg(feature = "async")]
+pub trait AsynchornousConnection: Send + Sync {
+    fn run(&mut self, q: Query) -> AsyncResult<std::io::Result<Response>>;
+}
 
 macro_rules! gen_match {
     ($queryret:expr, $mtch:pat, $ret:expr) => {
         match $queryret {
-            Ok($mtch) => $ret,
+            Ok($mtch) => Ok($ret),
             Ok(Response::InvalidResponse) => Err(ActionError::InvalidResponse),
             Ok(Response::ParseError) => Err(ActionError::ParseError),
             Ok(Response::UnsupportedDataType) => Err(ActionError::UnknownDataType),
             Ok(Response::Item(Element::RespCode(code))) => Err(ActionError::Code(code)),
-            Ok(_) => Err(ActionError::UnexpectedDataType),
+            Ok(Response::Item(_)) => Err(ActionError::UnexpectedDataType),
             Err(e) => Err(ActionError::IoError(e.kind())),
         };
     };
 }
 
-macro_rules! gen_return {
-    ($con:expr, $query:ident, $mtch:pat => $ret:expr) => {
-        #[cfg(feature = "async")]
-        return Box::pin(
-            async move { gen_match!($con.run_simple_query(&$query).await, $mtch, $ret) },
-        );
+macro_rules! implement_actions {
+    (
+        $(
+            $(#[$attr:meta])+
+            fn $name:ident(
+                $($argname:ident: $argty:ty),*) -> $ret:ty {
+                    $mtch:pat => $expect:expr
+                }
+        )*
+    ) => {
         #[cfg(feature = "sync")]
-        return gen_match!($con.run_simple_query(&$query), $mtch, $ret);
-    };
-}
-
-macro_rules! impl_actions {
-    ($contype:ty) => {
-        use crate::{Element, Response};
-        type _Result = Result<Response, std::io::Error>;
-        impl $contype {
-            /// Get a `key`
-            pub fn get<'s>(&'s mut self, key: impl ToString) -> ActionResult<String> {
-                let q = crate::Query::new("get").arg(key.to_string());
-                gen_return!(self, q, Response::Item(Element::String(st)) => Ok(st));
-            }
-            /// Set a `key` to a `value`
-            pub fn set<'s>(
-                &'s mut self,
-                key: impl ToString,
-                value: impl ToString,
-            ) -> ActionResult<()> {
-                let q = crate::Query::new("set")
-                    .arg(key.to_string())
-                    .arg(value.to_string());
-                gen_return!(self, q, Response::Item(Element::RespCode(RespCode::Okay)) => Ok(()));
-            }
+        /// Actions that can be run on a sync connection
+        pub trait Actions: SyncConnection {
+            $(
+                $(#[$attr])*
+                fn $name<'s>(&'s mut self $(, $argname: $argty)*) -> ActionResult<$ret> {
+                    let q = crate::Query::new(stringify!($name))$(.arg($argname.to_string()))*;
+                    gen_match!(self.run(q), $mtch, $expect)
+                }
+            )*
+        }
+        #[cfg(feature = "async")]
+        /// Actions that can be run on an async connection
+        pub trait AsyncActions: AsynchornousConnection {
+            $(
+                $(#[$attr])*
+                fn $name<'s>(&'s mut self $(, $argname: $argty)*) -> AsyncResult<ActionResult<$ret>> {
+                    let q = crate::Query::new(stringify!($name))$(.arg($argname.to_string()))*;
+                    Box::pin(async move {
+                        gen_match!(self.run(q).await, $mtch, $expect)
+                    })
+                }
+            )*
         }
     };
 }
 
-#[cfg(all(feature = "sync", not(feature = "async")))]
-impl_actions!(crate::Connection);
-#[cfg(all(feature = "async", not(feature = "sync")))]
-impl_actions!(crate::AsyncConnection);
+#[cfg(feature = "sync")]
+impl<T> Actions for T where T: SyncConnection {}
+#[cfg(feature = "async")]
+impl<T> AsyncActions for T where T: AsynchornousConnection {}
+
+implement_actions!(
+    /// Get the number of keys present in the database
+    fn dbsize() -> usize {
+        Response::Item(Element::UnsignedInt(int)) => int as usize
+    }
+    /// Deletes a single key
+    fn del(key: impl ToString) -> () {
+        Response::Item(Element::UnsignedInt(1)) => {}
+    }
+    /// Checks if a key exists
+    fn exists(key: impl ToString) -> bool {
+        Response::Item(Element::UnsignedInt(int)) => {
+            if int == 0 {
+                false
+            } else if int == 1 {
+                true
+            } else {
+                // this is because we sent one key, so the only two possibilities are 1 and 0
+                return Err(ActionError::InvalidResponse)
+            }
+        }
+    }
+    /// Removes all the keys present in the database
+    fn flushdb() -> () {
+        Response::Item(Element::RespCode(RespCode::Okay)) => {}
+    }
+    /// Get the value of a key
+    fn get(key: impl ToString) -> String {
+        Response::Item(Element::String(st)) => st
+    }
+    /// Get the length of a key
+    fn keylen(key: impl ToString) -> usize {
+        Response::Item(Element::UnsignedInt(int)) => int as usize
+    }
+    /// Set the value of a key
+    fn set(key: impl ToString, value: impl ToString) -> () {
+        Response::Item(Element::RespCode(RespCode::Okay)) => {}
+    }
+    /// Update the value of a key
+    fn update(key: impl ToString, value: impl ToString) -> () {
+        Response::Item(Element::RespCode(RespCode::Okay)) => {}
+    }
+    /// Update or set a key
+    fn uset(key: impl ToString, value: impl ToString) -> () {
+        Response::Item(Element::RespCode(RespCode::Okay)) => {}
+    }
+
+);

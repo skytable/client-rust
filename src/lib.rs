@@ -78,11 +78,9 @@
 //!
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
-mod actions;
+pub mod actions;
 mod deserializer;
 mod respcode;
-pub use actions::ActionError;
-pub use actions::ActionResult;
 
 use std::io::Result as IoResult;
 // async imports

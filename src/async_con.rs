@@ -95,3 +95,10 @@ impl Connection {
         Parser::new(&self.buffer).parse()
     }
 }
+
+#[cfg(feature = "async")]
+impl crate::actions::AsynchornousConnection for crate::async_con::Connection {
+    fn run(&mut self, q: Query) -> crate::actions::AsyncResult<std::io::Result<Response>> {
+        Box::pin(async move { self.run_simple_query(&q).await })
+    }
+}

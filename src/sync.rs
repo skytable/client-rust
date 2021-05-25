@@ -93,3 +93,9 @@ impl Connection {
         Parser::new(&self.buffer).parse()
     }
 }
+
+impl crate::actions::SyncConnection for crate::sync::Connection {
+    fn run(&mut self, q: Query) -> std::result::Result<Response, std::io::Error> {
+        self.run_simple_query(&q)
+    }
+}

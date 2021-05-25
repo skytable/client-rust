@@ -14,6 +14,16 @@ All changes in this project will be noted in this file.
     ```
     instead of using `.arg(...)` multiple times across multiple lines
 * `run_simple_query` now takes a reference to a `Query` instead of taking ownership of it
+* Actions can now be run by importing `skytable::actions::Actions` (or `skytable::actions::AsyncActions` for the `async` API).  
+For example:
+    ```rust
+    use skytable::{Connection, actions::Actions};
+    fn main() {
+        let mut con = Connection::new("127.0.0.1", 2003).unwrap();
+        con.set("x", "100").unwrap();
+        assert_eq!(con.get("x").unwrap(), "100".to_owned());
+    }
+    ```
 
 ## Version 0.2.0
 > Breaking changes

@@ -84,9 +84,9 @@ pub trait AsynchornousConnection: Send + Sync {
 }
 
 macro_rules! gen_match {
-    ($ret:expr, $($mtch:pat)+, $expect:expr) => {
+    ($ret:expr, $($($mtch:pat)+, $expect:expr),*) => {
         match $ret {
-            $(Ok($mtch))|* => Ok($expect),
+            $($(Ok($mtch))|* => Ok($expect),)*
             Ok(Response::InvalidResponse) => Err(ActionError::InvalidResponse),
             Ok(Response::ParseError) => Err(ActionError::ParseError),
             Ok(Response::UnsupportedDataType) => Err(ActionError::UnknownDataType),
@@ -103,7 +103,7 @@ macro_rules! implement_actions {
             $(#[$attr:meta])+
             fn $name:ident(
                 $($argname:ident: $argty:ty),*) -> $ret:ty {
-                    $($mtch:pat)|+ => $expect:expr
+                    $($($mtch:pat)|+ => $expect:expr),*
                 }
         )*
     ) => {
@@ -115,7 +115,7 @@ macro_rules! implement_actions {
                 #[inline]
                 fn $name<'s>(&'s mut self $(, $argname: $argty)*) -> ActionResult<$ret> {
                     let q = crate::Query::new(stringify!($name))$(.arg($argname))*;
-                    gen_match!(self.run(q), $($mtch)*, $expect)
+                    gen_match!(self.run(q), $($($mtch)+, $expect),*)
                 }
             )*
         }
@@ -128,7 +128,7 @@ macro_rules! implement_actions {
                 fn $name<'s>(&'s mut self $(, $argname: $argty)*) -> AsyncResult<ActionResult<$ret>> {
                     let q = crate::Query::new(stringify!($name))$(.arg($argname))*;
                     Box::pin(async move {
-                        gen_match!(self.run(q).await, $($mtch)*, $expect)
+                        gen_match!(self.run(q).await, $($($mtch)*, $expect)*)
                     })
                 }
             )*
@@ -179,21 +179,8 @@ implement_actions!(
     }
     /// Creates a snapshot
     fn mksnap() -> SnapshotResult {
-        x @ Response::Item(Element::RespCode(RespCode::Okay)) | x @ Response::Item(Element::RespCode(RespCode::ErrorString(_))) => {
-            if let Response::Item(Element::RespCode(rc)) = x {
-                match rc {
-                    RespCode::Okay => SnapshotResult::Okay,
-                    RespCode::ErrorString(estr) => SnapshotResult::Error(estr),
-                    _ => unsafe {
-                        std::hint::unreachable_unchecked()
-                    }
-                }
-            } else {
-                unsafe {
-                    std::hint::unreachable_unchecked()
-                }
-            }
-        }
+       Response::Item(Element::RespCode(RespCode::Okay)) => SnapshotResult::Okay,
+       Response::Item(Element::RespCode(RespCode::ErrorString(estr))) => SnapshotResult::Error(estr)
     }
     /// Set the value of a key
     fn set(key: impl IntoSkyhashBytes, value: impl IntoSkyhashBytes) -> () {

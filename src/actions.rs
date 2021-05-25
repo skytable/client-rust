@@ -20,6 +20,8 @@
 //! This module contains macros and other methods for running actions (and generating the code for them)
 
 use crate::Element;
+use crate::IntoSkyhashAction;
+use crate::IntoSkyhashBytes;
 use crate::Query;
 use crate::RespCode;
 use crate::Response;
@@ -91,7 +93,7 @@ macro_rules! implement_actions {
             $(
                 $(#[$attr])*
                 fn $name<'s>(&'s mut self $(, $argname: $argty)*) -> ActionResult<$ret> {
-                    let q = crate::Query::new(stringify!($name))$(.arg($argname.to_string()))*;
+                    let q = crate::Query::new(stringify!($name))$(.arg($argname))*;
                     gen_match!(self.run(q), $mtch, $expect)
                 }
             )*
@@ -122,46 +124,40 @@ implement_actions!(
     fn dbsize() -> usize {
         Response::Item(Element::UnsignedInt(int)) => int as usize
     }
-    /// Deletes a single key
-    fn del(key: impl ToString) -> () {
-        Response::Item(Element::UnsignedInt(1)) => {}
+    /// Deletes a single or a number of keys
+    ///
+    /// This will return the number of keys that were deleted
+    fn del(key: impl IntoSkyhashAction) -> usize {
+        Response::Item(Element::UnsignedInt(int)) => int as usize
     }
-    /// Checks if a key exists
-    fn exists(key: impl ToString) -> bool {
-        Response::Item(Element::UnsignedInt(int)) => {
-            if int == 0 {
-                false
-            } else if int == 1 {
-                true
-            } else {
-                // this is because we sent one key, so the only two possibilities are 1 and 0
-                return Err(ActionError::InvalidResponse)
-            }
-        }
+    /// Checks if a key (or keys) exist(s)
+    ///
+    /// This will return the number of keys that do exist
+    fn exists(key: impl IntoSkyhashAction) -> usize {
+        Response::Item(Element::UnsignedInt(int)) => int as usize
     }
     /// Removes all the keys present in the database
     fn flushdb() -> () {
         Response::Item(Element::RespCode(RespCode::Okay)) => {}
     }
     /// Get the value of a key
-    fn get(key: impl ToString) -> String {
+    fn get(key: impl IntoSkyhashBytes) -> String {
         Response::Item(Element::String(st)) => st
     }
     /// Get the length of a key
-    fn keylen(key: impl ToString) -> usize {
+    fn keylen(key: impl IntoSkyhashBytes) -> usize {
         Response::Item(Element::UnsignedInt(int)) => int as usize
     }
     /// Set the value of a key
-    fn set(key: impl ToString, value: impl ToString) -> () {
+    fn set(key: impl IntoSkyhashBytes, value: impl IntoSkyhashBytes) -> () {
         Response::Item(Element::RespCode(RespCode::Okay)) => {}
     }
     /// Update the value of a key
-    fn update(key: impl ToString, value: impl ToString) -> () {
+    fn update(key: impl IntoSkyhashBytes, value: impl IntoSkyhashBytes) -> () {
         Response::Item(Element::RespCode(RespCode::Okay)) => {}
     }
     /// Update or set a key
-    fn uset(key: impl ToString, value: impl ToString) -> () {
+    fn uset(key: impl IntoSkyhashBytes, value: impl IntoSkyhashBytes) -> () {
         Response::Item(Element::RespCode(RespCode::Okay)) => {}
     }
-
 );

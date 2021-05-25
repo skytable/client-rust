@@ -81,8 +81,11 @@
 pub mod actions;
 mod deserializer;
 mod respcode;
+pub mod types;
 
 use std::io::Result as IoResult;
+use types::IntoSkyhashAction;
+use types::IntoSkyhashBytes;
 // async imports
 #[cfg(feature = "async")]
 mod async_con;
@@ -124,7 +127,7 @@ pub struct Query {
 
 impl Query {
     /// Create a new query with an argument
-    pub fn new(start: impl ToString) -> Self {
+    pub fn new(start: impl IntoSkyhashBytes) -> Self {
         Self::new_empty().arg(start)
     }
     /// Create a new empty query without any arguments
@@ -138,22 +141,9 @@ impl Query {
     ///
     /// ## Panics
     /// This method will panic if the passed `arg` is empty
-    pub fn arg(mut self, arg: impl ToString) -> Self {
-        let arg = arg.to_string();
-        if arg.len() == 0 {
-            panic!("Argument cannot be empty")
-        }
-        self.size_count += 1;
-        // A data element will look like:
-        // `+<bytes_in_next_line>\n<data>`
-        self.data.push(b'+');
-        let bytes_in_next_line = arg.len().to_string().into_bytes();
-        self.data.extend(bytes_in_next_line);
-        // add the LF char
-        self.data.push(b'\n');
-        // Add the data itself, which is `arg`
-        self.data.extend(arg.into_bytes());
-        self.data.push(b'\n'); // add the LF char
+    pub fn arg(mut self, arg: impl IntoSkyhashAction) -> Self {
+        arg.extend_bytes(&mut self.data);
+        self.size_count += arg.incr_len_by();
         self
     }
     /// Number of items in the datagroup

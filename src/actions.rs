@@ -103,7 +103,7 @@ macro_rules! implement_actions {
             $(#[$attr:meta])+
             fn $name:ident(
                 $($argname:ident: $argty:ty),*) -> $ret:ty {
-                    $($($mtch:pat)|+ => $expect:expr),*
+                    $($($mtch:pat)|+ => $expect:expr),+
                 }
         )*
     ) => {
@@ -169,6 +169,12 @@ implement_actions!(
     /// Get the length of a key
     fn keylen(key: impl IntoSkyhashBytes) -> usize {
         Response::Item(Element::UnsignedInt(int)) => int as usize
+    }
+    /// Returns a vector of keys
+    ///
+    /// Do note that the order might be completely meaningless
+    fn lskeys(count: usize) -> Vec<String> {
+        Response::Item(Element::FlatArray(arr)) => arr
     }
     /// Get multiple keys
     ///

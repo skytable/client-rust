@@ -55,7 +55,7 @@
 //! use skytable::{Connection, Query, Response, Element};
 //! fn main() -> std::io::Result<()> {
 //!     let mut con = Connection::new("127.0.0.1", 2003)?;
-//!     let query = Query::new("heya");
+//!     let query = Query::from("heya");
 //!     let res = con.run_simple_query(&query)?;
 //!     assert_eq!(res, Response::Item(Element::String("HEY!".to_owned())));
 //!     Ok(())
@@ -127,7 +127,7 @@ pub use sync::Connection;
 /// Where you'd normally create queries like this:
 /// ```
 /// use skytable::Query;
-/// let q = Query::new("mset").arg("x").arg("100").arg("y").arg("200");
+/// let q = Query::new().arg("mset").arg("x").arg("100").arg("y").arg("200");
 /// ```
 /// with this macro, you can just do this:
 /// ```ignore
@@ -136,7 +136,7 @@ pub use sync::Connection;
 /// ```
 macro_rules! query {
     ($($arg:expr),+) => {
-        crate::Query::new_empty()$(.arg($arg))*
+        crate::Query::new()$(.arg($arg))*
     };
 }
 
@@ -148,23 +148,46 @@ macro_rules! query {
 /// ```
 /// use skytable::Query;
 /// fn main() {
-///     let q = Query::new("set").arg("x").arg("100");
+///     let q = Query::new().arg("set").arg("x").arg("100");
 /// }
 /// ```
-/// You can now run this with a [`Connection`] or an `AsyncConnection`
+/// You can now run this with a [`Connection`] or an `AsyncConnection`. You can also created queries [`From`]
+/// objects that can be turned into actions. For example, these are completely valid constructions:
+/// ```
+/// use skytable::Query;
 ///
+/// let q1 = Query::from(["mget", "x", "y", "z"]);
+/// let q2 = Query::from(vec!["mset", "x", "100", "y", "200", "z", "300"]);
+/// let q3 = Query::from("get").arg("x");
+/// ```
+/// Finally, queries can also be created by taking references. For example:
+/// ```
+/// use skytable::Query;
+/// 
+/// let my_keys = vec!["key1", "key2", "key3"];
+/// let mut q = Query::new();
+/// for key in my_keys {
+///     q.push(key);
+/// }
+/// ```
+/// 
 pub struct Query {
     size_count: usize,
     data: Vec<u8>,
 }
 
-impl Query {
-    /// Create a new query with an argument
-    pub fn new(start: impl IntoSkyhashBytes) -> Self {
-        Self::new_empty().arg(start)
+impl<T> From<T> for Query
+where
+    T: IntoSkyhashAction,
+{
+    fn from(action: T) -> Self {
+        Query::new().arg(action)
     }
-    /// Create a new empty query without any arguments
-    pub fn new_empty() -> Self {
+}
+
+impl Query {
+    /// Create a new empty query with no arguments
+    pub fn new() -> Self {
         Query {
             size_count: 0,
             data: Vec::new(),
@@ -189,7 +212,7 @@ impl Query {
         self.size_count += arg.incr_len_by();
     }
     /// Number of items in the datagroup
-    fn __len(&self) -> usize {
+    pub(crate) fn __len(&self) -> usize {
         self.size_count
     }
     fn get_holding_buffer(&self) -> &[u8] {

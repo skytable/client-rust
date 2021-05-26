@@ -97,6 +97,19 @@ where
     }
 }
 
+impl<T> IntoSkyhashAction for Vec<T>
+where
+    T: IntoSkyhashBytes,
+{
+    fn extend_bytes(&self, mut data: &mut std::vec::Vec<u8>) {
+        self.into_iter()
+            .for_each(|elem| elem.extend_bytes(&mut data));
+    }
+    fn incr_len_by(&self) -> usize {
+        self.len()
+    }
+}
+
 impl<T: IntoSkyhashBytes, const N: usize> IntoSkyhashAction for [T; N] {
     fn extend_bytes(&self, mut data: &mut std::vec::Vec<u8>) {
         self.into_iter()

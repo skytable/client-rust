@@ -49,7 +49,11 @@ impl Connection {
     /// server. It will then determine if the returned response is complete or incomplete
     /// or invalid and return an appropriate variant of [`Response`] wrapped in [`IoResult`]
     /// for any I/O errors that may occur
+    ///
+    /// ## Panics
+    /// This method will panic if the [`Query`] supplied is empty (i.e has no arguments)
     pub fn run_simple_query(&mut self, query: &Query) -> IoResult<Response> {
+        assert!(query.__len() != 0, "A `Query` cannot be of zero length!");
         query.write_query_to_sync(&mut self.stream)?;
         self.stream.flush()?;
         loop {

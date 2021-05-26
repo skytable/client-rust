@@ -125,7 +125,7 @@ macro_rules! implement_actions {
                 #[inline]
                 fn $name<'s>(&'s mut self $(, $argname: $argty)*) -> ActionResult<$ret> {
                     $($block)*
-                    let q = crate::Query::new(stringify!($name))$(.arg($argname))*;
+                    let q = crate::Query::from(stringify!($name))$(.arg($argname))*;
                     gen_match!(self.run(q), $($($mtch)+, $expect),*)
                 }
             )*
@@ -138,7 +138,7 @@ macro_rules! implement_actions {
                 $(#[$attr])*
                 #[inline]
                 fn $name<'s>(&'s mut self $(, $argname: $argty)*) -> AsyncResult<ActionResult<$ret>> {
-                    let q = crate::Query::new(stringify!($name))$(.arg($argname))*;
+                    let q = crate::Query::from(stringify!($name))$(.arg($argname))*;
                     Box::pin(async move {
                         gen_match!(self.run(q).await, $($($mtch)+, $expect),*)
                     })

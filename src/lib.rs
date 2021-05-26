@@ -65,16 +65,16 @@
 //! Way to go &mdash; you're all set! Now go ahead and run more advanced queries!
 //!
 //! ## Async API
-//! 
+//!
 //! If you need to use an `async` API, just change your import to:
 //! ```toml
 //! skytable = { version = "0.3", features=["async"], default-features=false }
 //! ```
 //! You can now establish a connection by using `skytable::AsyncConnection::new()`, adding `.await`s wherever
 //! necessary. Do note that you'll the [Tokio runtime](https://tokio.rs).
-//! 
+//!
 //! ## Using both `sync` and `async` APIs
-//! 
+//!
 //! With this client driver, it is possible to use both sync and `async` APIs **at the same time**. To do
 //! this, simply change your import to:
 //! ```toml
@@ -170,7 +170,8 @@ impl Query {
             data: Vec::new(),
         }
     }
-    /// Add an argument to a query
+    /// Add an argument to a query returning a [`Query`]. This can be used for queries built using the
+    /// builder pattern. If you need to add items, by reference, consider using [`Query::push`]
     ///
     /// ## Panics
     /// This method will panic if the passed `arg` is empty
@@ -180,10 +181,10 @@ impl Query {
         self
     }
     /// Add an argument to a query taking a reference to it
-    /// 
+    ///
     /// This is useful if you are adding queries in a loop than building it using the builder
-    /// pattern
-    pub fn arg_ref(&mut self, arg: impl IntoSkyhashAction) {
+    /// pattern (to use the builder-pattern, use [`Query::arg`])
+    pub fn push(&mut self, arg: impl IntoSkyhashAction) {
         arg.extend_bytes(&mut self.data);
         self.size_count += arg.incr_len_by();
     }

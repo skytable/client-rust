@@ -71,18 +71,21 @@ pub enum ActionError {
 }
 
 #[cfg(feature = "async")]
+#[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 /// A special result that is returned when running actions (async)
 pub type AsyncResult<'s, T> = Pin<Box<dyn Future<Output = T> + Send + Sync + 's>>;
 /// A special result that is returned when running actions
 pub type ActionResult<T> = Result<T, ActionError>;
 
 #[cfg(feature = "sync")]
+#[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
 #[doc(hidden)]
 pub trait SyncSocket {
     fn run(&mut self, q: Query) -> std::io::Result<Response>;
 }
 
 #[cfg(feature = "async")]
+#[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 #[doc(hidden)]
 pub trait AsyncSocket: Send + Sync {
     fn run(&mut self, q: Query) -> AsyncResult<std::io::Result<Response>>;
@@ -114,6 +117,7 @@ macro_rules! implement_actions {
         )*
     ) => {
         #[cfg(feature = "sync")]
+        #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
         /// Actions that can be run on a [`SyncSocket`] connection
         pub trait Actions: SyncSocket {
             $(
@@ -127,6 +131,7 @@ macro_rules! implement_actions {
             )*
         }
         #[cfg(feature = "async")]
+        #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
         /// Actions that can be run on an [`AsyncSocket`] connection
         pub trait AsyncActions: AsyncSocket {
             $(

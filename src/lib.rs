@@ -78,7 +78,7 @@
 //! With this client driver, it is possible to use both sync and `async` APIs **at the same time**. To do
 //! this, simply change your import to:
 //! ```toml
-//! skytable { version="0.3", features=["sync", "async"] }
+//! skytable = { version="0.3", features=["sync", "async"] }
 //! ```
 //!
 //! ## Contributing

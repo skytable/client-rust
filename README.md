@@ -1,6 +1,6 @@
 # Skytable client [![Crates.io](https://img.shields.io/crates/v/skytable?style=flat-square)](https://crates.io/crates/skytable) [![docs.rs](https://img.shields.io/docsrs/skytable?style=flat-square)](https://docs.rs/skytable) [![GitHub release (latest SemVer including pre-releases)](https://img.shields.io/github/v/release/skytable/client-rust?include_prereleases&style=flat-square)](https://github.com/skytable/client-rust/releases)
 
-# Skytable client
+## Introduction
 
 This library is the official client for the free and open-source NoSQL database
 [Skytable](https://github.com/skytable/skytable). First, go ahead and install Skytable by
@@ -63,7 +63,7 @@ necessary. Do note that you'll the [Tokio runtime](https://tokio.rs).
 With this client driver, it is possible to use both sync and `async` APIs **at the same time**. To do
 this, simply change your import to:
 ```toml
-skytable { version="0.3", features=["sync", "async"] }
+skytable = { version="0.3", features=["sync", "async"] }
 ```
 
 ## Contributing

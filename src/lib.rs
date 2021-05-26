@@ -179,6 +179,14 @@ impl Query {
         self.size_count += arg.incr_len_by();
         self
     }
+    /// Add an argument to a query taking a reference to it
+    /// 
+    /// This is useful if you are adding queries in a loop than building it using the builder
+    /// pattern
+    pub fn arg_ref(&mut self, arg: impl IntoSkyhashAction) {
+        arg.extend_bytes(&mut self.data);
+        self.size_count += arg.incr_len_by();
+    }
     /// Number of items in the datagroup
     fn __len(&self) -> usize {
         self.size_count

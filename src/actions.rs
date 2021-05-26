@@ -270,6 +270,9 @@ implement_actions!(
         Response::Item(Element::RespCode(RespCode::Okay)) => {}
     }
     /// Updates or sets all the provided keys and returns the number of keys that were set
+    ///
+    /// ## Panics
+    /// This method will panic if the number of keys is not equal to the number of values
     fn uset(keys: impl IntoSkyhashAction, values: impl IntoSkyhashAction) -> usize {
         {
             assert!(

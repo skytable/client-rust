@@ -8,11 +8,8 @@ All changes in this project will be noted in this file.
 * Added support for Skyhash 1.0
 * Response variants have changed according to the protocol
 * Added `sync` and `async` features with `sync` as a default feature and `async` as an optional feature
-* Queries are now constructed like:
-    ```rust
-    let q = Query::new("set").arg("x").arg("100");
-    ```
-    instead of using `.arg(...)` multiple times across multiple lines
+* Queries constructed using `Query::arg()` now follow the builder pattern
+* Queries can be constructed by taking references using `Query::push`
 * `run_simple_query` now takes a reference to a `Query` instead of taking ownership of it
 * Actions can now be run by importing `skytable::actions::Actions` (or `skytable::actions::AsyncActions` for the `async` API).  
 For example:
@@ -24,6 +21,11 @@ For example:
         assert_eq!(con.get("x").unwrap(), "100".to_owned());
     }
     ```
+* `run_simple_query` (both sync and async) verify whether the query is empty or not. If it is, the function will
+panic. This is a very important check to avoid confusion as the server would return a `PacketError` which might
+create additional confusion
+* `Query` objects can now be constructed with the `From` trait on appropriate types (such as single items or 
+sequences)
 
 
 ## Version 0.2.0

@@ -40,7 +40,7 @@ Now let's run a `Query`! Change the previous code block to:
 use skytable::{Connection, Query, Response, Element};
 fn main() -> std::io::Result<()> {
     let mut con = Connection::new("127.0.0.1", 2003)?;
-    let query = Query::new("heya");
+    let query = Query::from("heya");
     let res = con.run_simple_query(&query)?;
     assert_eq!(res, Response::Item(Element::String("HEY!".to_owned())));
     Ok(())

@@ -30,6 +30,7 @@ use std::net::TcpStream;
 const BUF_CAP: usize = 4096;
 
 #[derive(Debug)]
+#[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
 /// A `Connection` is a wrapper around a`TcpStream` and a read buffer
 pub struct Connection {
     stream: TcpStream,

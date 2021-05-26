@@ -32,6 +32,7 @@ use tokio::net::TcpStream;
 const BUF_CAP: usize = 4096;
 
 #[derive(Debug)]
+#[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 /// An async connection object that wraps around a`TcpStream` and a read buffer
 pub struct Connection {
     stream: BufWriter<TcpStream>,

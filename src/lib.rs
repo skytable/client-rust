@@ -38,7 +38,7 @@
 //!
 //! First add this to your `Cargo.toml` file:
 //! ```toml
-//! skytable = "0.3.0"
+//! skytable = "0.3.0-alpha.2"
 //! ```
 //! Now open up your `src/main.rs` file and establish a connection to the server while also adding some
 //! imports:
@@ -68,7 +68,7 @@
 //!
 //! If you need to use an `async` API, just change your import to:
 //! ```toml
-//! skytable = { version = "0.3.0-alpha.1", features=["async"], default-features=false }
+//! skytable = { version = "0.3.0-alpha.2", features=["async"], default-features=false }
 //! ```
 //! You can now establish a connection by using `skytable::AsyncConnection::new()`, adding `.await`s wherever
 //! necessary. Do note that you'll the [Tokio runtime](https://tokio.rs).
@@ -78,7 +78,7 @@
 //! With this client driver, it is possible to use both sync and `async` APIs **at the same time**. To do
 //! this, simply change your import to:
 //! ```toml
-//! skytable = { version="0.3.0-alpha.1", features=["sync", "async"] }
+//! skytable = { version="0.3.0-alpha.2", features=["sync", "async"] }
 //! ```
 //!
 //! ## Contributing
@@ -163,14 +163,14 @@ macro_rules! query {
 /// Finally, queries can also be created by taking references. For example:
 /// ```
 /// use skytable::Query;
-/// 
+///
 /// let my_keys = vec!["key1", "key2", "key3"];
 /// let mut q = Query::new();
 /// for key in my_keys {
 ///     q.push(key);
 /// }
 /// ```
-/// 
+///
 pub struct Query {
     size_count: usize,
     data: Vec<u8>,
@@ -207,6 +207,9 @@ impl Query {
     ///
     /// This is useful if you are adding queries in a loop than building it using the builder
     /// pattern (to use the builder-pattern, use [`Query::arg`])
+    ///
+    /// ## Panics
+    /// This method will panic if the passed `arg` is empty
     pub fn push(&mut self, arg: impl IntoSkyhashAction) {
         arg.extend_bytes(&mut self.data);
         self.size_count += arg.incr_len_by();

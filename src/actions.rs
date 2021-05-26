@@ -103,6 +103,7 @@ macro_rules! implement_actions {
             $(#[$attr:meta])+
             fn $name:ident(
                 $($argname:ident: $argty:ty),*) -> $ret:ty {
+                    $($block:block)*
                     $($($mtch:pat)|+ => $expect:expr),+
                 }
         )*
@@ -114,6 +115,7 @@ macro_rules! implement_actions {
                 $(#[$attr])*
                 #[inline]
                 fn $name<'s>(&'s mut self $(, $argname: $argty)*) -> ActionResult<$ret> {
+                    $($block)*
                     let q = crate::Query::new(stringify!($name))$(.arg($argname))*;
                     gen_match!(self.run(q), $($($mtch)+, $expect),*)
                 }
@@ -192,16 +194,78 @@ implement_actions!(
        Response::Item(Element::RespCode(RespCode::Okay)) => SnapshotResult::Okay,
        Response::Item(Element::RespCode(RespCode::ErrorString(estr))) => SnapshotResult::Error(estr)
     }
+    /// Sets the value of multiple keys and values and returns the number of keys that were set
+    ///
+    /// ## Panics
+    /// This method will panic if the number of keys and values are not equal
+    fn mset(keys: impl IntoSkyhashAction, values: impl IntoSkyhashAction) -> usize {
+        {
+            assert!(keys.incr_len_by() == values.incr_len_by(), "The number of keys and values for mset must be equal");
+        }
+        Response::Item(Element::UnsignedInt(int)) => int as usize
+    }
+    /// Updates the value of multiple keys and values and returns the number of keys that were updated
+    ///
+    /// ## Panics
+    /// This method will panic if the number of keys and values are not equal
+    fn mupdate(keys: impl IntoSkyhashAction, values: impl IntoSkyhashAction) -> usize {
+        {
+            assert!(keys.incr_len_by() == values.incr_len_by(), "The number of keys and values for mupdate must be equal");
+        }
+        Response::Item(Element::UnsignedInt(int)) => int as usize
+    }
+    /// Deletes all the provided keys if they exist or doesn't do anything at all. This method
+    /// will return true if all the provided keys were deleted, else it will return false
+    fn sdel(keys: impl IntoSkyhashAction) -> bool {
+        Response::Item(Element::RespCode(RespCode::Okay)) => true,
+        Response::Item(Element::RespCode(RespCode::NotFound)) => false
+    }
     /// Set the value of a key
     fn set(key: impl IntoSkyhashBytes, value: impl IntoSkyhashBytes) -> () {
         Response::Item(Element::RespCode(RespCode::Okay)) => {}
+    }
+    /// Sets the value of all the provided keys or does nothing. This method will return true if all the keys
+    /// were set or will return false if none were set
+    ///
+    /// ## Panics
+    /// This method will panic if the number of keys and values are not equal
+    fn sset(keys: impl IntoSkyhashAction, values: impl IntoSkyhashAction) -> bool {
+        {
+            assert!(
+                keys.incr_len_by() == values.incr_len_by(),
+                "The number of keys and values for sset must be equal"
+            );
+        }
+        Response::Item(Element::RespCode(RespCode::Okay)) => true,
+        Response::Item(Element::RespCode(RespCode::OverwriteError)) => false
+    }
+    /// Updates the value of all the provided keys or does nothing. This method will return true if all the keys
+    /// were updated or will return false if none were updated
+    ///
+    /// ## Panics
+    /// This method will panic if the number of keys and values are not equal
+    fn supdate(keys: impl IntoSkyhashAction, values: impl IntoSkyhashAction) -> bool {
+        {
+            assert!(
+                keys.incr_len_by() == values.incr_len_by(),
+                "The number of keys and values for supdate must be equal"
+            );
+        }
+        Response::Item(Element::RespCode(RespCode::Okay)) => true,
+        Response::Item(Element::RespCode(RespCode::NotFound)) => false
     }
     /// Update the value of a key
     fn update(key: impl IntoSkyhashBytes, value: impl IntoSkyhashBytes) -> () {
         Response::Item(Element::RespCode(RespCode::Okay)) => {}
     }
-    /// Update or set a key
-    fn uset(key: impl IntoSkyhashBytes, value: impl IntoSkyhashBytes) -> () {
-        Response::Item(Element::RespCode(RespCode::Okay)) => {}
+    /// Updates or sets all the provided keys and returns the number of keys that were set
+    fn uset(keys: impl IntoSkyhashAction, values: impl IntoSkyhashAction) -> usize {
+        {
+            assert!(
+                keys.incr_len_by() == values.incr_len_by(),
+                "The number of keys and values for uset must be equal"
+            );
+        }
+        Response::Item(Element::UnsignedInt(int)) => int as usize
     }
 );

@@ -50,7 +50,7 @@
 //! }
 //! ```
 //!
-//! Now let's run a [`Query`]! Change the previous code to:
+//! Now let's run a [`Query`]! Change the previous code block to:
 //! ```no_run
 //! use skytable::{Connection, Query, Response, Element};
 //! fn main() -> std::io::Result<()> {

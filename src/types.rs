@@ -117,6 +117,7 @@ impl<T: IntoSkyhashBytes, const N: usize> IntoSkyhashAction for &'static [T; N] 
 }
 
 /// Result of an `mksnap` action
+#[non_exhaustive]
 pub enum SnapshotResult {
     /// The snapshot was created successfully
     Okay,

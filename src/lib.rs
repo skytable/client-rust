@@ -117,7 +117,7 @@ pub use respcode::RespCode;
 // sync imports
 #[cfg(feature = "sync")]
 #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
-pub mod sync;
+mod sync;
 #[cfg(feature = "sync")]
 #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
 pub use sync::Connection;

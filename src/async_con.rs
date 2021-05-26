@@ -36,7 +36,7 @@ const BUF_CAP: usize = 4096;
 
 #[derive(Debug)]
 #[cfg(feature = "async")]
-/// A `Connection` is a wrapper around a`TcpStream` and a read buffer
+/// An async connection object that wraps around a`TcpStream` and a read buffer
 pub struct Connection {
     stream: BufWriter<TcpStream>,
     buffer: BytesMut,
@@ -97,7 +97,7 @@ impl Connection {
 }
 
 #[cfg(feature = "async")]
-impl crate::actions::AsynchornousConnection for crate::async_con::Connection {
+impl crate::actions::AsyncSocket for crate::async_con::Connection {
     fn run(&mut self, q: Query) -> crate::actions::AsyncResult<std::io::Result<Response>> {
         Box::pin(async move { self.run_simple_query(&q).await })
     }

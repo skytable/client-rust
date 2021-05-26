@@ -49,6 +49,9 @@ use crate::Response;
 use core::{future::Future, pin::Pin};
 use std::io::ErrorKind;
 
+pub const ERR_SNAPSHOT_BUSY: &str = "err-snapshot-busy";
+pub const ERR_SNAPSHOT_DISABLED: &str = "err-snapshot-disabled";
+
 /// Errors while running actions
 #[derive(Debug)]
 pub enum ActionError {
@@ -74,19 +77,21 @@ pub type AsyncResult<'s, T> = Pin<Box<dyn Future<Output = T> + Send + Sync + 's>
 pub type ActionResult<T> = Result<T, ActionError>;
 
 #[cfg(feature = "sync")]
-pub trait SyncConnection {
+#[doc(hidden)]
+pub trait SyncSocket {
     fn run(&mut self, q: Query) -> std::io::Result<Response>;
 }
 
 #[cfg(feature = "async")]
-pub trait AsynchornousConnection: Send + Sync {
+#[doc(hidden)]
+pub trait AsyncSocket: Send + Sync {
     fn run(&mut self, q: Query) -> AsyncResult<std::io::Result<Response>>;
 }
 
 macro_rules! gen_match {
-    ($ret:expr, $($($mtch:pat)+, $expect:expr),*) => {
+    ($ret:expr, $($($mtch:pat)+ $(if $exp:expr)*, $expect:expr),*) => {
         match $ret {
-            $($(Ok($mtch))|* => Ok($expect),)*
+            $($(Ok($mtch))|* $(if $exp:expr)* => Ok($expect),)*
             Ok(Response::InvalidResponse) => Err(ActionError::InvalidResponse),
             Ok(Response::ParseError) => Err(ActionError::ParseError),
             Ok(Response::UnsupportedDataType) => Err(ActionError::UnknownDataType),
@@ -109,8 +114,8 @@ macro_rules! implement_actions {
         )*
     ) => {
         #[cfg(feature = "sync")]
-        /// Actions that can be run on a sync connection
-        pub trait Actions: SyncConnection {
+        /// Actions that can be run on a [`SyncSocket`] connection
+        pub trait Actions: SyncSocket {
             $(
                 $(#[$attr])*
                 #[inline]
@@ -122,8 +127,8 @@ macro_rules! implement_actions {
             )*
         }
         #[cfg(feature = "async")]
-        /// Actions that can be run on an async connection
-        pub trait AsyncActions: AsynchornousConnection {
+        /// Actions that can be run on an [`AsyncSocket`] connection
+        pub trait AsyncActions: AsyncSocket {
             $(
                 $(#[$attr])*
                 #[inline]
@@ -139,9 +144,9 @@ macro_rules! implement_actions {
 }
 
 #[cfg(feature = "sync")]
-impl<T> Actions for T where T: SyncConnection {}
+impl<T> Actions for T where T: SyncSocket {}
 #[cfg(feature = "async")]
-impl<T> AsyncActions for T where T: AsynchornousConnection {}
+impl<T> AsyncActions for T where T: AsyncSocket {}
 
 implement_actions!(
     /// Get the number of keys present in the database
@@ -192,7 +197,13 @@ implement_actions!(
     /// which is normal behavior and _not an inherent error_
     fn mksnap() -> SnapshotResult {
        Response::Item(Element::RespCode(RespCode::Okay)) => SnapshotResult::Okay,
-       Response::Item(Element::RespCode(RespCode::ErrorString(estr))) => SnapshotResult::Error(estr)
+       Response::Item(Element::RespCode(RespCode::ErrorString(er))) => {
+           match er.as_str() {
+               ERR_SNAPSHOT_BUSY => SnapshotResult::Busy,
+               ERR_SNAPSHOT_DISABLED => SnapshotResult::Disabled,
+               _ => return Err(ActionError::InvalidResponse)
+           }
+       }
     }
     /// Sets the value of multiple keys and values and returns the number of keys that were set
     ///

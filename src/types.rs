@@ -121,6 +121,8 @@ impl<T: IntoSkyhashBytes, const N: usize> IntoSkyhashAction for &'static [T; N] 
 pub enum SnapshotResult {
     /// The snapshot was created successfully
     Okay,
-    /// An error occurred while creating the snapshot
-    Error(String),
+    /// Periodic snapshots are disabled on the server side
+    Disabled,
+    /// A snapshot is already in progress
+    Busy,
 }

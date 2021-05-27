@@ -130,13 +130,13 @@ pub use sync::Connection;
 /// let q = Query::new().arg("mset").arg("x").arg("100").arg("y").arg("200");
 /// ```
 /// with this macro, you can just do this:
-/// ```ignore
+/// ```
 /// use skytable::query;
 /// let q = query!("mset", "x", "100", "y", "200");
 /// ```
 macro_rules! query {
     ($($arg:expr),+) => {
-        crate::Query::new()$(.arg($arg))*
+        skytable::Query::new()$(.arg($arg))*
     };
 }
 

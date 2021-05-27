@@ -63,6 +63,12 @@
 //! ```
 //!
 //! Way to go &mdash; you're all set! Now go ahead and run more advanced queries!
+//! 
+//! ## Going advanced
+//! 
+//! Now that you know how you can run basic queries, check out the [`actions`] module documentation for learning
+//! to use actions and the [`types`] module documentation for implementing your own Skyhash serializable
+//! types.
 //!
 //! ## Async API
 //!

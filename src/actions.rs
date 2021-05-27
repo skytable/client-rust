@@ -17,7 +17,7 @@
 
 //! # Actions
 //!
-//! This module contains macros and other methods for running actions. To run actions:
+//! This module contains traits for running actions. To run actions:
 //! - For the `sync` feature, add this import:
 //!     ```
 //!     use skytable::actions::Actions;
@@ -50,7 +50,9 @@ use crate::Response;
 use core::{future::Future, pin::Pin};
 use std::io::ErrorKind;
 
+/// The error string returned when the snapshot engine is busy
 pub const ERR_SNAPSHOT_BUSY: &str = "err-snapshot-busy";
+/// The error string returned when periodic snapshots are busy
 pub const ERR_SNAPSHOT_DISABLED: &str = "err-snapshot-disabled";
 
 /// Errors while running actions
@@ -152,26 +154,26 @@ impl<T> AsyncActions for T where T: AsyncSocket {}
 implement_actions!(
     /// Get the number of keys present in the database
     fn dbsize() -> usize {
-        {Query::from("dbsize")}
+        { Query::from("dbsize") }
         Response::Item(Element::UnsignedInt(int)) => int as usize
     }
     /// Deletes a single or a number of keys
     ///
     /// This will return the number of keys that were deleted
-    fn del<T: IntoSkyhashBytes>(key: impl IntoSkyhashAction + 's) -> usize {
-        {Query::from("del").arg(key)}
+    fn del(key: impl IntoSkyhashAction + 's) -> usize {
+        { Query::from("del").arg(key) }
         Response::Item(Element::UnsignedInt(int)) => int as usize
     }
     /// Checks if a key (or keys) exist(s)
     ///
     /// This will return the number of keys that do exist
-    fn exists<T: IntoSkyhashBytes>(key: impl IntoSkyhashAction + 's) -> usize {
-        {Query::from("exists").arg(key)}
+    fn exists(key: impl IntoSkyhashAction + 's) -> usize {
+        { Query::from("exists").arg(key) }
         Response::Item(Element::UnsignedInt(int)) => int as usize
     }
     /// Removes all the keys present in the database
     fn flushdb() -> () {
-        {Query::from("flushdb")}
+        { Query::from("flushdb") }
         Response::Item(Element::RespCode(RespCode::Okay)) => {}
     }
     /// Get the value of a key
@@ -247,7 +249,7 @@ implement_actions!(
     }
     /// Deletes all the provided keys if they exist or doesn't do anything at all. This method
     /// will return true if all the provided keys were deleted, else it will return false
-    fn sdel<T: IntoSkyhashBytes>(keys: impl IntoSkyhashAction + 's) -> bool {
+    fn sdel(keys: impl IntoSkyhashAction + 's) -> bool {
         { Query::from("sdel").arg(keys) }
         Response::Item(Element::RespCode(RespCode::Okay)) => true,
         Response::Item(Element::RespCode(RespCode::NotFound)) => false

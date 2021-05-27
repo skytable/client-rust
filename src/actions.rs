@@ -218,10 +218,14 @@ implement_actions!(
     ///
     /// ## Panics
     /// This method will panic if the number of keys and values are not equal
-    fn mset(keys: impl IntoSkyhashAction + 's, values: impl IntoSkyhashAction + 's) -> usize {
+    fn mset<T: IntoSkyhashBytes + 's , U: IntoSkyhashBytes + 's>
+    (
+        keys: impl IntoIterator<Item = &'s T> + IntoSkyhashAction + 's,
+        values: impl IntoIterator<Item = &'s U> + IntoSkyhashAction + 's
+    ) -> usize {
         {
             assert!(keys.incr_len_by() == values.incr_len_by(), "The number of keys and values for mset must be equal");
-            Query::new()
+            Query::from("mset")._push_alt_iter(keys, values)
         }
         Response::Item(Element::UnsignedInt(int)) => int as usize
     }

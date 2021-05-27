@@ -40,6 +40,7 @@
 
 use crate::types::SnapshotResult;
 use crate::Element;
+use crate::GetIterator;
 use crate::IntoSkyhashAction;
 use crate::IntoSkyhashBytes;
 use crate::Query;
@@ -220,8 +221,8 @@ implement_actions!(
     /// This method will panic if the number of keys and values are not equal
     fn mset<T: IntoSkyhashBytes + 's , U: IntoSkyhashBytes + 's>
     (
-        keys: impl IntoIterator<Item = T> + IntoSkyhashAction + 's,
-        values: impl IntoIterator<Item = U> + IntoSkyhashAction + 's
+        keys: impl GetIterator<T> + 's,
+        values: impl GetIterator<U> + 's
     ) -> usize {
         {
             assert!(keys.incr_len_by() == values.incr_len_by(), "The number of keys and values for mset must be equal");
@@ -235,8 +236,8 @@ implement_actions!(
     /// This method will panic if the number of keys and values are not equal
     fn mupdate<T: IntoSkyhashBytes + 's , U: IntoSkyhashBytes + 's>
     (
-        keys: impl IntoIterator<Item = T> + IntoSkyhashAction + 's,
-        values: impl IntoIterator<Item = U> + IntoSkyhashAction + 's
+        keys: impl GetIterator<T> + 's,
+        values: impl GetIterator<U> + 's
     ) -> usize {
         {
             assert!(keys.incr_len_by() == values.incr_len_by(), "The number of keys and values for mupdate must be equal");
@@ -263,8 +264,8 @@ implement_actions!(
     /// This method will panic if the number of keys and values are not equal
     fn sset<T: IntoSkyhashBytes + 's , U: IntoSkyhashBytes + 's>
     (
-        keys: impl IntoIterator<Item = T> + IntoSkyhashAction + 's,
-        values: impl IntoIterator<Item = U> + IntoSkyhashAction + 's
+        keys: impl GetIterator<T> + 's,
+        values: impl GetIterator<U> + 's
     ) -> bool {
         {
             assert!(
@@ -283,8 +284,8 @@ implement_actions!(
     /// This method will panic if the number of keys and values are not equal
     fn supdate<T: IntoSkyhashBytes + 's , U: IntoSkyhashBytes + 's>
     (
-        keys: impl IntoIterator<Item = T> + IntoSkyhashAction + 's,
-        values: impl IntoIterator<Item = U> + IntoSkyhashAction + 's
+        keys: impl GetIterator<T> + 's,
+        values: impl GetIterator<U> + 's
     ) -> bool {
         {
             assert!(
@@ -307,8 +308,8 @@ implement_actions!(
     /// This method will panic if the number of keys is not equal to the number of values
     fn uset<T: IntoSkyhashBytes + 's , U: IntoSkyhashBytes + 's>
     (
-        keys: impl IntoIterator<Item = T> + IntoSkyhashAction + 's,
-        values: impl IntoIterator<Item = U> + IntoSkyhashAction + 's
+        keys: impl GetIterator<T> + 's,
+        values: impl GetIterator<U> + 's
     ) -> usize {
         {
             assert!(

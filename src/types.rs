@@ -111,8 +111,33 @@ where
     }
 }
 
-
 impl<T> IntoSkyhashAction for Vec<T>
+where
+    T: IntoSkyhashBytes,
+{
+    fn push_into_query(&self, mut data: &mut Query) {
+        self.into_iter()
+            .for_each(|elem| elem.push_into_query(&mut data));
+    }
+    fn incr_len_by(&self) -> usize {
+        self.len()
+    }
+}
+
+impl<T> IntoSkyhashAction for &Vec<T>
+where
+    T: IntoSkyhashBytes,
+{
+    fn push_into_query(&self, mut data: &mut Query) {
+        self.into_iter()
+            .for_each(|elem| elem.push_into_query(&mut data));
+    }
+    fn incr_len_by(&self) -> usize {
+        self.len()
+    }
+}
+
+impl<T> IntoSkyhashAction for &[T]
 where
     T: IntoSkyhashBytes,
 {
@@ -154,4 +179,39 @@ pub enum SnapshotResult {
     Disabled,
     /// A snapshot is already in progress
     Busy,
+}
+
+/// Implement this trait for methods in [`AsyncActions`] or [`Actions`] that need them
+pub trait GetIterator<T: IntoSkyhashBytes>: IntoSkyhashAction {
+    fn get_iter(&self) -> std::slice::Iter<T>;
+}
+
+impl<T: IntoSkyhashBytes, const N: usize> GetIterator<T> for [T; N] {
+    fn get_iter(&self) -> std::slice::Iter<'_, T> {
+        self.into_iter()
+    }
+}
+
+impl<T: IntoSkyhashBytes, const N: usize> GetIterator<T> for &'static [T; N] {
+    fn get_iter(&self) -> std::slice::Iter<'_, T> {
+        self.into_iter()
+    }
+}
+
+impl<T: IntoSkyhashBytes> GetIterator<T> for &[T] {
+    fn get_iter(&self) -> std::slice::Iter<'_, T> {
+        self.iter()
+    }
+}
+
+impl<T: IntoSkyhashBytes> GetIterator<T> for Vec<T> {
+    fn get_iter(&self) -> std::slice::Iter<'_, T> {
+        self.into_iter()
+    }
+}
+
+impl<T: IntoSkyhashBytes> GetIterator<T> for &Vec<T> {
+    fn get_iter(&self) -> std::slice::Iter<'_, T> {
+        self.into_iter()
+    }
 }

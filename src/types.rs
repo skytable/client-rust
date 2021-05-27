@@ -20,16 +20,27 @@
 //! This module contains a collection of enumerations and traits that are used for converting multiple
 //! types, either primitve or user-defined, into Skyhash serializable items.
 //!
-//! ## Warnings
-//!
-//! When you implement any of these traits, do know what you're doing! Implementing [`IntoSkyhashBytes`]
-//! is almost always fine, but **do not implement any other traits** by hand!
-//!
 
 use crate::Query;
 
 /// Anything that implements this trait can be turned into a [`String`]. This trait is implemented
 /// for most primitive types by default using [`std`]'s [`ToString`] trait.
+///
+/// ## Implementing this trait
+///
+/// A trivial example:
+/// ```
+/// use skytable::types::{IntoSkyhashBytes};
+///
+/// struct MyStringWrapper(String);
+///
+/// impl IntoSkyhashBytes for MyStringWrapper {
+///     fn into_string(&self) -> String {
+///         self.0.to_string()
+///     }
+/// }
+/// ```
+///
 pub trait IntoSkyhashBytes: Send + Sync {
     /// Turn `Self` into a [`String`]
     fn into_string(&self) -> String;
@@ -48,11 +59,39 @@ macro_rules! impl_skyhash_bytes {
 }
 
 impl_skyhash_bytes!(
-    u8, i8, u16, i16, u32, i32, u64, i64, u128, i128, f32, f64, bool, char, usize, String, &str,
-    &String
+    u8, i8, u16, i16, u32, i32, u64, i64, u128, i128, f32, f64, bool, char, usize, isize, String,
+    &str, &String
 );
 
 /// Anything that implements this trait can directly add itself to the bytes part of a [`Query`] object
+///
+/// ## Implementing this trait
+///
+/// This trait does **not** need to be implemented manually for some basic objects. Once you implement
+/// [`IntoSkyhashBytes`], it is implemented automatically. This trait will need to be implemented manually
+/// for other objects however. For example:
+/// ```
+/// use skytable::types::IntoSkyhashAction;
+/// use skytable::Query;
+///
+/// struct MyVecWrapper(Vec<String>);
+///
+/// impl IntoSkyhashAction for MyVecWrapper {
+///     fn push_into_query(&self, q: &mut Query) {
+///         self.0.iter().for_each(|element| q.push(element));
+///     }
+///     fn incr_len_by(&self) -> usize {
+///         self.0.len()
+///     }
+/// }
+/// ```
+/// ### Unexpected behavior
+///
+/// As you can see, it is easy enough for someone to miss an element while implementing (maybe not the best example)
+/// [`IntoSkyhashAction::push_into_query()`] and also misguide the client driver about the length in the
+/// implementation for [`IntoSkyhashAction::incr_len_by()`]. This is why you should _stay on the guard_
+/// while implementing it.
+///
 pub trait IntoSkyhashAction: Send + Sync {
     /// Extend the bytes of a `Vec` of bytes
     fn push_into_query(&self, data: &mut Query);
@@ -72,18 +111,6 @@ where
     }
 }
 
-impl<T> IntoSkyhashAction for &[T]
-where
-    T: IntoSkyhashBytes,
-{
-    fn push_into_query(&self, mut data: &mut Query) {
-        self.into_iter()
-            .for_each(|elem| elem.push_into_query(&mut data));
-    }
-    fn incr_len_by(&self) -> usize {
-        self.len()
-    }
-}
 
 impl<T> IntoSkyhashAction for Vec<T>
 where
@@ -104,7 +131,7 @@ impl<T: IntoSkyhashBytes, const N: usize> IntoSkyhashAction for [T; N] {
             .for_each(|elem| elem.push_into_query(&mut data));
     }
     fn incr_len_by(&self) -> usize {
-        N
+        self.len()
     }
 }
 

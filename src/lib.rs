@@ -97,7 +97,6 @@ pub mod actions;
 mod deserializer;
 mod respcode;
 pub mod types;
-
 use std::io::Result as IoResult;
 use types::IntoSkyhashAction;
 use types::IntoSkyhashBytes;
@@ -228,6 +227,24 @@ impl Query {
     /// This method will panic if the passed `arg` is empty
     pub fn push(&mut self, arg: impl IntoSkyhashAction) {
         arg.push_into_query(self);
+    }
+    pub(in crate) fn _push_alt_iter<'a, T: 'a, U: 'a>(
+        mut self,
+        iter_a: impl IntoIterator<Item = &'a T>,
+        iter_b: impl IntoIterator<Item = &'a U>,
+    ) -> Query
+    where
+        T: IntoSkyhashBytes,
+        U: IntoSkyhashBytes,
+    {
+        iter_a
+            .into_iter()
+            .zip(iter_b.into_iter())
+            .for_each(|(a, b)| {
+                self.push(a.into_string());
+                self.push(b.into_string());
+            });
+        self
     }
     /// Number of items in the datagroup
     pub(crate) fn __len(&self) -> usize {

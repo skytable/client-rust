@@ -109,9 +109,9 @@ macro_rules! implement_actions {
     (
         $(
             $(#[$attr:meta])+
-            fn $name:ident(
+            fn $name:ident$(<$($tyargs:ident : $ty:ident $(+$tye:lifetime)*),*>)?(
                 $($argname:ident: $argty:ty),*) -> $ret:ty {
-                    $($block:block)*
+                    $($block:block)?
                     $($($mtch:pat)|+ => $expect:expr),+
                 }
         )*
@@ -123,10 +123,8 @@ macro_rules! implement_actions {
             $(
                 $(#[$attr])*
                 #[inline]
-                fn $name<'s>(&'s mut self $(, $argname: $argty)*) -> ActionResult<$ret> {
-                    $($block)*
-                    let q = crate::Query::from(stringify!($name))$(.arg($argname))*;
-                    gen_match!(self.run(q), $($($mtch)+, $expect),*)
+                fn $name<'s, $($($tyargs: $ty $(+$tye)*, )*)?>(&'s mut self $(, $argname: $argty)*) -> ActionResult<$ret> {
+                    gen_match!(self.run($($block)?), $($($mtch)+, $expect),*)
                 }
             )*
         }
@@ -137,11 +135,8 @@ macro_rules! implement_actions {
             $(
                 $(#[$attr])*
                 #[inline]
-                fn $name<'s>(&'s mut self $(, $argname: $argty)*) -> AsyncResult<ActionResult<$ret>> {
-                    let q = crate::Query::from(stringify!($name))$(.arg($argname))*;
-                    Box::pin(async move {
-                        gen_match!(self.run(q).await, $($($mtch)+, $expect),*)
-                    })
+                fn $name<'s, $($($tyargs: $ty $(+$tye)*, )*)?>(&'s mut self $(, $argname: $argty)*) -> AsyncResult<ActionResult<$ret>> {
+                    Box::pin(async move {gen_match!(self.run($($block)?).await, $($($mtch)+, $expect),*)})
                 }
             )*
         }
@@ -156,43 +151,51 @@ impl<T> AsyncActions for T where T: AsyncSocket {}
 implement_actions!(
     /// Get the number of keys present in the database
     fn dbsize() -> usize {
+        {Query::from("dbsize")}
         Response::Item(Element::UnsignedInt(int)) => int as usize
     }
     /// Deletes a single or a number of keys
     ///
     /// This will return the number of keys that were deleted
-    fn del(key: impl IntoSkyhashAction) -> usize {
+    fn del<T: IntoSkyhashBytes>(key: impl IntoSkyhashAction + 's) -> usize {
+        {Query::from("del").arg(key)}
         Response::Item(Element::UnsignedInt(int)) => int as usize
     }
     /// Checks if a key (or keys) exist(s)
     ///
     /// This will return the number of keys that do exist
-    fn exists(key: impl IntoSkyhashAction) -> usize {
+    fn exists<T: IntoSkyhashBytes>(key: impl IntoSkyhashAction + 's) -> usize {
+        {Query::from("exists").arg(key)}
         Response::Item(Element::UnsignedInt(int)) => int as usize
     }
     /// Removes all the keys present in the database
     fn flushdb() -> () {
+        {Query::from("flushdb")}
         Response::Item(Element::RespCode(RespCode::Okay)) => {}
     }
     /// Get the value of a key
-    fn get(key: impl IntoSkyhashBytes) -> String {
+    fn get(key: impl IntoSkyhashBytes + 's) -> String {
+        { Query::from("get").arg(key)}
         Response::Item(Element::String(st)) => st
     }
     /// Get the length of a key
-    fn keylen(key: impl IntoSkyhashBytes) -> usize {
+    fn keylen(key: impl IntoSkyhashBytes + 's) -> usize {
+        { Query::from("keylen").arg(key)}
         Response::Item(Element::UnsignedInt(int)) => int as usize
     }
     /// Returns a vector of keys
     ///
     /// Do note that the order might be completely meaningless
     fn lskeys(count: usize) -> Vec<String> {
+        { Query::from("lskeys").arg(count)}
         Response::Item(Element::FlatArray(arr)) => arr
     }
     /// Get multiple keys
     ///
     /// This returns a vector of [`Element`]s which either contain the values
     /// as strings or contains `Not Found (Code: 1)` response codes
-    fn mget(keys: impl IntoSkyhashAction) -> Vec<Element> {
+    fn mget(keys: impl IntoSkyhashAction+ 's) -> Vec<Element> {
+        { Query::from("mget").arg(keys)}
         Response::Item(Element::Array(array)) => array
     }
     /// Creates a snapshot
@@ -201,6 +204,7 @@ implement_actions!(
     /// an error is because `mksnap` might fail simply because an existing snapshot process was in progress
     /// which is normal behavior and _not an inherent error_
     fn mksnap() -> SnapshotResult {
+       { Query::from("mksnap")}
        Response::Item(Element::RespCode(RespCode::Okay)) => SnapshotResult::Okay,
        Response::Item(Element::RespCode(RespCode::ErrorString(er))) => {
            match er.as_str() {
@@ -214,9 +218,10 @@ implement_actions!(
     ///
     /// ## Panics
     /// This method will panic if the number of keys and values are not equal
-    fn mset(keys: impl IntoSkyhashAction, values: impl IntoSkyhashAction) -> usize {
+    fn mset(keys: impl IntoSkyhashAction + 's, values: impl IntoSkyhashAction + 's) -> usize {
         {
             assert!(keys.incr_len_by() == values.incr_len_by(), "The number of keys and values for mset must be equal");
+            Query::new()
         }
         Response::Item(Element::UnsignedInt(int)) => int as usize
     }
@@ -224,20 +229,27 @@ implement_actions!(
     ///
     /// ## Panics
     /// This method will panic if the number of keys and values are not equal
-    fn mupdate(keys: impl IntoSkyhashAction, values: impl IntoSkyhashAction) -> usize {
+    fn mupdate<T: IntoSkyhashBytes + 's , U: IntoSkyhashBytes + 's>
+    (
+        keys: impl IntoIterator<Item = &'s T> + IntoSkyhashAction + 's,
+        values: impl IntoIterator<Item = &'s U> + IntoSkyhashAction + 's
+    ) -> usize {
         {
             assert!(keys.incr_len_by() == values.incr_len_by(), "The number of keys and values for mupdate must be equal");
+            Query::from("mset")._push_alt_iter(keys, values)
         }
         Response::Item(Element::UnsignedInt(int)) => int as usize
     }
     /// Deletes all the provided keys if they exist or doesn't do anything at all. This method
     /// will return true if all the provided keys were deleted, else it will return false
-    fn sdel(keys: impl IntoSkyhashAction) -> bool {
+    fn sdel<T: IntoSkyhashBytes>(keys: impl IntoSkyhashAction + 's) -> bool {
+        { Query::from("sdel").arg(keys) }
         Response::Item(Element::RespCode(RespCode::Okay)) => true,
         Response::Item(Element::RespCode(RespCode::NotFound)) => false
     }
     /// Set the value of a key
-    fn set(key: impl IntoSkyhashBytes, value: impl IntoSkyhashBytes) -> () {
+    fn set(key: impl IntoSkyhashBytes + 's, value: impl IntoSkyhashBytes + 's) -> () {
+        { Query::from("set").arg(key).arg(value) }
         Response::Item(Element::RespCode(RespCode::Okay)) => {}
     }
     /// Sets the value of all the provided keys or does nothing. This method will return true if all the keys
@@ -245,12 +257,17 @@ implement_actions!(
     ///
     /// ## Panics
     /// This method will panic if the number of keys and values are not equal
-    fn sset(keys: impl IntoSkyhashAction, values: impl IntoSkyhashAction) -> bool {
+    fn sset<T: IntoSkyhashBytes + 's , U: IntoSkyhashBytes + 's>
+    (
+        keys: impl IntoIterator<Item = &'s T> + IntoSkyhashAction + 's,
+        values: impl IntoIterator<Item = &'s U> + IntoSkyhashAction + 's
+    ) -> bool {
         {
             assert!(
                 keys.incr_len_by() == values.incr_len_by(),
                 "The number of keys and values for sset must be equal"
             );
+            Query::from("sset")._push_alt_iter(keys, values)
         }
         Response::Item(Element::RespCode(RespCode::Okay)) => true,
         Response::Item(Element::RespCode(RespCode::OverwriteError)) => false
@@ -260,30 +277,41 @@ implement_actions!(
     ///
     /// ## Panics
     /// This method will panic if the number of keys and values are not equal
-    fn supdate(keys: impl IntoSkyhashAction, values: impl IntoSkyhashAction) -> bool {
+    fn supdate<T: IntoSkyhashBytes + 's , U: IntoSkyhashBytes + 's>
+    (
+        keys: impl IntoIterator<Item = &'s T> + IntoSkyhashAction + 's,
+        values: impl IntoIterator<Item = &'s U> + IntoSkyhashAction + 's
+    ) -> bool {
         {
             assert!(
                 keys.incr_len_by() == values.incr_len_by(),
                 "The number of keys and values for supdate must be equal"
             );
+            Query::from("supdate")._push_alt_iter(keys, values)
         }
         Response::Item(Element::RespCode(RespCode::Okay)) => true,
         Response::Item(Element::RespCode(RespCode::NotFound)) => false
     }
     /// Update the value of a key
-    fn update(key: impl IntoSkyhashBytes, value: impl IntoSkyhashBytes) -> () {
+    fn update(key: impl IntoSkyhashBytes + 's, value: impl IntoSkyhashBytes + 's) -> () {
+        { Query::from("update").arg(key).arg(value) }
         Response::Item(Element::RespCode(RespCode::Okay)) => {}
     }
     /// Updates or sets all the provided keys and returns the number of keys that were set
     ///
     /// ## Panics
     /// This method will panic if the number of keys is not equal to the number of values
-    fn uset(keys: impl IntoSkyhashAction, values: impl IntoSkyhashAction) -> usize {
+    fn uset<T: IntoSkyhashBytes + 's , U: IntoSkyhashBytes + 's>
+    (
+        keys: impl IntoIterator<Item = &'s T> + IntoSkyhashAction + 's,
+        values: impl IntoIterator<Item = &'s U> + IntoSkyhashAction + 's
+    ) -> usize {
         {
             assert!(
                 keys.incr_len_by() == values.incr_len_by(),
                 "The number of keys and values for uset must be equal"
             );
+            Query::from("uset")._push_alt_iter(keys, values)
         }
         Response::Item(Element::UnsignedInt(int)) => int as usize
     }

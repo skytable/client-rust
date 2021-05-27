@@ -60,7 +60,7 @@ macro_rules! impl_skyhash_bytes {
 
 impl_skyhash_bytes!(
     u8, i8, u16, i16, u32, i32, u64, i64, u128, i128, f32, f64, bool, char, usize, isize, String,
-    &str, &String
+    &str, &String, str
 );
 
 /// Anything that implements this trait can directly add itself to the bytes part of a [`Query`] object

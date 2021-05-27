@@ -230,8 +230,8 @@ impl Query {
     }
     pub(in crate) fn _push_alt_iter<'a, T: 'a, U: 'a>(
         mut self,
-        iter_a: impl IntoIterator<Item = &'a T>,
-        iter_b: impl IntoIterator<Item = &'a U>,
+        iter_a: impl IntoIterator<Item = T>,
+        iter_b: impl IntoIterator<Item = U>,
     ) -> Query
     where
         T: IntoSkyhashBytes,

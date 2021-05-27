@@ -199,9 +199,25 @@ impl Query {
     /// ## Panics
     /// This method will panic if the passed `arg` is empty
     pub fn arg(mut self, arg: impl IntoSkyhashAction) -> Self {
-        arg.extend_bytes(&mut self.data);
-        self.size_count += arg.incr_len_by();
+        arg.push_into_query(&mut self);
         self
+    }
+    pub(in crate) fn _push_arg(&mut self, arg: impl IntoSkyhashBytes) {
+        let arg = arg.into_string();
+        if arg.len() == 0 {
+            panic!("Argument cannot be empty")
+        }
+        // A data element will look like:
+        // `+<bytes_in_next_line>\n<data>`
+        self.data.push(b'+');
+        let bytes_in_next_line = arg.len().to_string().into_bytes();
+        self.data.extend(bytes_in_next_line);
+        // add the LF char
+        self.data.push(b'\n');
+        // Add the data itself, which is `arg`
+        self.data.extend(arg.into_bytes());
+        self.data.push(b'\n'); // add the LF char
+        self.size_count += 1;
     }
     /// Add an argument to a query taking a reference to it
     ///
@@ -211,8 +227,7 @@ impl Query {
     /// ## Panics
     /// This method will panic if the passed `arg` is empty
     pub fn push(&mut self, arg: impl IntoSkyhashAction) {
-        arg.extend_bytes(&mut self.data);
-        self.size_count += arg.incr_len_by();
+        arg.push_into_query(self);
     }
     /// Number of items in the datagroup
     pub(crate) fn __len(&self) -> usize {

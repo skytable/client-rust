@@ -26,9 +26,11 @@
 //! is almost always fine, but **do not implement any other traits** by hand!
 //!
 
+use crate::Query;
+
 /// Anything that implements this trait can be turned into a [`String`]. This trait is implemented
 /// for most primitive types by default using [`std`]'s [`ToString`] trait.
-pub trait IntoSkyhashBytes {
+pub trait IntoSkyhashBytes: Send + Sync {
     /// Turn `Self` into a [`String`]
     fn into_string(&self) -> String;
 }
@@ -50,11 +52,10 @@ impl_skyhash_bytes!(
     &String
 );
 
-#[doc(hidden)]
 /// Anything that implements this trait can directly add itself to the bytes part of a [`Query`] object
-pub trait IntoSkyhashAction {
+pub trait IntoSkyhashAction: Send + Sync {
     /// Extend the bytes of a `Vec` of bytes
-    fn extend_bytes(&self, data: &mut Vec<u8>);
+    fn push_into_query(&self, data: &mut Query);
     /// Returns the number of items `Self` will add to the query
     fn incr_len_by(&self) -> usize;
 }
@@ -63,21 +64,8 @@ impl<T> IntoSkyhashAction for T
 where
     T: IntoSkyhashBytes,
 {
-    fn extend_bytes(&self, data: &mut Vec<u8>) {
-        let arg = self.into_string();
-        if arg.len() == 0 {
-            panic!("Argument cannot be empty")
-        }
-        // A data element will look like:
-        // `+<bytes_in_next_line>\n<data>`
-        data.push(b'+');
-        let bytes_in_next_line = arg.len().to_string().into_bytes();
-        data.extend(bytes_in_next_line);
-        // add the LF char
-        data.push(b'\n');
-        // Add the data itself, which is `arg`
-        data.extend(arg.into_bytes());
-        data.push(b'\n'); // add the LF char
+    fn push_into_query(&self, q: &mut Query) {
+        q._push_arg(self.into_string());
     }
     fn incr_len_by(&self) -> usize {
         1
@@ -88,9 +76,9 @@ impl<T> IntoSkyhashAction for &[T]
 where
     T: IntoSkyhashBytes,
 {
-    fn extend_bytes(&self, mut data: &mut std::vec::Vec<u8>) {
+    fn push_into_query(&self, mut data: &mut Query) {
         self.into_iter()
-            .for_each(|elem| elem.extend_bytes(&mut data));
+            .for_each(|elem| elem.push_into_query(&mut data));
     }
     fn incr_len_by(&self) -> usize {
         self.len()
@@ -101,9 +89,9 @@ impl<T> IntoSkyhashAction for Vec<T>
 where
     T: IntoSkyhashBytes,
 {
-    fn extend_bytes(&self, mut data: &mut std::vec::Vec<u8>) {
+    fn push_into_query(&self, mut data: &mut Query) {
         self.into_iter()
-            .for_each(|elem| elem.extend_bytes(&mut data));
+            .for_each(|elem| elem.push_into_query(&mut data));
     }
     fn incr_len_by(&self) -> usize {
         self.len()
@@ -111,9 +99,9 @@ where
 }
 
 impl<T: IntoSkyhashBytes, const N: usize> IntoSkyhashAction for [T; N] {
-    fn extend_bytes(&self, mut data: &mut std::vec::Vec<u8>) {
+    fn push_into_query(&self, mut data: &mut Query) {
         self.into_iter()
-            .for_each(|elem| elem.extend_bytes(&mut data));
+            .for_each(|elem| elem.push_into_query(&mut data));
     }
     fn incr_len_by(&self) -> usize {
         N
@@ -121,9 +109,9 @@ impl<T: IntoSkyhashBytes, const N: usize> IntoSkyhashAction for [T; N] {
 }
 
 impl<T: IntoSkyhashBytes, const N: usize> IntoSkyhashAction for &'static [T; N] {
-    fn extend_bytes(&self, mut data: &mut std::vec::Vec<u8>) {
+    fn push_into_query(&self, mut data: &mut Query) {
         self.into_iter()
-            .for_each(|elem| elem.extend_bytes(&mut data));
+            .for_each(|elem| elem.push_into_query(&mut data));
     }
     fn incr_len_by(&self) -> usize {
         N

@@ -202,6 +202,7 @@ where
     }
 }
 
+#[cfg(not(feature = "compat-const-gen"))]
 impl<T: IntoSkyhashBytes, const N: usize> IntoSkyhashAction for [T; N] {
     fn push_into_query(&self, mut data: &mut Query) {
         self.iter().for_each(|elem| elem.push_into_query(&mut data));
@@ -211,6 +212,7 @@ impl<T: IntoSkyhashBytes, const N: usize> IntoSkyhashAction for [T; N] {
     }
 }
 
+#[cfg(not(feature = "compat-const-gen"))]
 impl<T: IntoSkyhashBytes, const N: usize> IntoSkyhashAction for &'static [T; N] {
     fn push_into_query(&self, mut data: &mut Query) {
         self.iter().for_each(|elem| elem.push_into_query(&mut data));
@@ -237,12 +239,14 @@ pub trait GetIterator<T: IntoSkyhashBytes>: IntoSkyhashAction {
     fn get_iter(&self) -> std::slice::Iter<T>;
 }
 
+#[cfg(not(feature = "compat-const-gen"))]
 impl<T: IntoSkyhashBytes, const N: usize> GetIterator<T> for [T; N] {
     fn get_iter(&self) -> std::slice::Iter<'_, T> {
         self.iter()
     }
 }
 
+#[cfg(not(feature = "compat-const-gen"))]
 impl<T: IntoSkyhashBytes, const N: usize> GetIterator<T> for &'static [T; N] {
     fn get_iter(&self) -> std::slice::Iter<'_, T> {
         self.iter()

@@ -63,9 +63,9 @@
 //! ```
 //!
 //! Way to go &mdash; you're all set! Now go ahead and run more advanced queries!
-//! 
+//!
 //! ## Going advanced
-//! 
+//!
 //! Now that you know how you can run basic queries, check out the [`actions`] module documentation for learning
 //! to use actions and the [`types`] module documentation for implementing your own Skyhash serializable
 //! types.
@@ -153,9 +153,8 @@ macro_rules! query {
 /// of an array of [`String`] items. To construct a query like `SET x 100`, one needs to:
 /// ```
 /// use skytable::Query;
-/// fn main() {
-///     let q = Query::new().arg("set").arg("x").arg("100");
-/// }
+/// let q = Query::new().arg("set").arg("x").arg("100");
+///
 /// ```
 /// You can now run this with a [`Connection`] or an `AsyncConnection`. You can also created queries [`From`]
 /// objects that can be turned into actions. For example, these are completely valid constructions:
@@ -191,13 +190,16 @@ where
     }
 }
 
+impl Default for Query {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Query {
     /// Create a new empty query with no arguments
     pub fn new() -> Self {
-        Query {
-            size_count: 0,
-            data: Vec::new(),
-        }
+        Query::default()
     }
     /// Add an argument to a query returning a [`Query`]. This can be used for queries built using the
     /// builder pattern. If you need to add items, by reference, consider using [`Query::push`]
@@ -210,7 +212,7 @@ impl Query {
     }
     pub(in crate) fn _push_arg(&mut self, arg: impl IntoSkyhashBytes) {
         let arg = arg.into_string();
-        if arg.len() == 0 {
+        if arg.is_empty() {
             panic!("Argument cannot be empty")
         }
         // A data element will look like:
@@ -292,7 +294,7 @@ impl Query {
     /// or extend the Skyhash protocol. [Skytable](https://github.com/skytable/skytable) itself uses this function
     /// to generate raw queries. Once you're done passing the arguments to a query, running this function will
     /// return the raw query that would be written to the stream, serialized using the Skyhash serialization protocol
-    pub fn into_raw_query(&self) -> Vec<u8> {
+    pub fn into_raw_query(self) -> Vec<u8> {
         let mut v = Vec::with_capacity(self.data.len());
         v.extend(b"*1\n");
         v.extend(b"_");

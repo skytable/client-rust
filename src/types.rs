@@ -20,7 +20,7 @@
 //! This module contains a collection of enumerations and traits that are used for converting multiple
 //! types, either primitve or user-defined, into Skyhash serializable items.
 //!
-//! 
+//!
 //! ## Implementing a Skyhash serializable type
 //! If you have an object that can be turned into a [`String`] or a sequence of [`String`] objects, then
 //! your type can be serialized by Skyhash (this might change in the future with more types being supported).
@@ -29,10 +29,10 @@
 //! use skytable::actions::Actions;
 //! use skytable::types::{IntoSkyhashAction, IntoSkyhashBytes, GetIterator};
 //! use skytable::Query;
-//! 
+//!
 //! /// Our custom element that adds "cool" to the end of every string when serialized
 //! struct CoolString(String);
-//! 
+//!
 //! impl IntoSkyhashBytes for CoolString {
 //!     fn into_string(&self) -> String {
 //!         let mut st = self.0.to_string();
@@ -41,10 +41,10 @@
 //!         st
 //!     }
 //! }
-//! 
+//!
 //! /// Our custom sequence of `CoolString` objects
 //! struct CoolStringCollection(Vec<CoolString>);
-//! 
+//!
 //! impl IntoSkyhashAction for CoolStringCollection {
 //!     fn push_into_query(&self, query: &mut Query) {
 //!         self.0.iter().for_each(|item| query.push(item.into_string()));
@@ -53,15 +53,15 @@
 //!         self.0.len()
 //!     }
 //! }
-//! 
+//!
 //! // And finally implement `GetIterator` for use with some actions that need them
-//! 
+//!
 //! impl GetIterator<CoolString> for CoolStringCollection {
 //!     fn get_iter(&self) -> std::slice::Iter<'_, CoolString> {
 //!         self.0.iter()
 //!     }
 //! }
-//! 
+//!
 //! // You can now directly append your custom element to queries
 //! fn main() {
 //!     let mut q = Query::new();
@@ -171,8 +171,7 @@ where
     T: IntoSkyhashBytes,
 {
     fn push_into_query(&self, mut data: &mut Query) {
-        self.into_iter()
-            .for_each(|elem| elem.push_into_query(&mut data));
+        self.iter().for_each(|elem| elem.push_into_query(&mut data));
     }
     fn incr_len_by(&self) -> usize {
         self.len()
@@ -184,8 +183,7 @@ where
     T: IntoSkyhashBytes,
 {
     fn push_into_query(&self, mut data: &mut Query) {
-        self.into_iter()
-            .for_each(|elem| elem.push_into_query(&mut data));
+        self.iter().for_each(|elem| elem.push_into_query(&mut data));
     }
     fn incr_len_by(&self) -> usize {
         self.len()
@@ -197,8 +195,7 @@ where
     T: IntoSkyhashBytes,
 {
     fn push_into_query(&self, mut data: &mut Query) {
-        self.into_iter()
-            .for_each(|elem| elem.push_into_query(&mut data));
+        self.iter().for_each(|elem| elem.push_into_query(&mut data));
     }
     fn incr_len_by(&self) -> usize {
         self.len()
@@ -207,8 +204,7 @@ where
 
 impl<T: IntoSkyhashBytes, const N: usize> IntoSkyhashAction for [T; N] {
     fn push_into_query(&self, mut data: &mut Query) {
-        self.into_iter()
-            .for_each(|elem| elem.push_into_query(&mut data));
+        self.iter().for_each(|elem| elem.push_into_query(&mut data));
     }
     fn incr_len_by(&self) -> usize {
         self.len()
@@ -217,8 +213,7 @@ impl<T: IntoSkyhashBytes, const N: usize> IntoSkyhashAction for [T; N] {
 
 impl<T: IntoSkyhashBytes, const N: usize> IntoSkyhashAction for &'static [T; N] {
     fn push_into_query(&self, mut data: &mut Query) {
-        self.into_iter()
-            .for_each(|elem| elem.push_into_query(&mut data));
+        self.iter().for_each(|elem| elem.push_into_query(&mut data));
     }
     fn incr_len_by(&self) -> usize {
         N
@@ -244,13 +239,13 @@ pub trait GetIterator<T: IntoSkyhashBytes>: IntoSkyhashAction {
 
 impl<T: IntoSkyhashBytes, const N: usize> GetIterator<T> for [T; N] {
     fn get_iter(&self) -> std::slice::Iter<'_, T> {
-        self.into_iter()
+        self.iter()
     }
 }
 
 impl<T: IntoSkyhashBytes, const N: usize> GetIterator<T> for &'static [T; N] {
     fn get_iter(&self) -> std::slice::Iter<'_, T> {
-        self.into_iter()
+        self.iter()
     }
 }
 
@@ -262,12 +257,12 @@ impl<T: IntoSkyhashBytes> GetIterator<T> for &[T] {
 
 impl<T: IntoSkyhashBytes> GetIterator<T> for Vec<T> {
     fn get_iter(&self) -> std::slice::Iter<'_, T> {
-        self.into_iter()
+        self.iter()
     }
 }
 
 impl<T: IntoSkyhashBytes> GetIterator<T> for &Vec<T> {
     fn get_iter(&self) -> std::slice::Iter<'_, T> {
-        self.into_iter()
+        self.iter()
     }
 }

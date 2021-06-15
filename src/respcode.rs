@@ -42,9 +42,9 @@ pub enum RespCode {
 }
 
 impl RespCode {
-    pub fn from_str(st: &str) -> Self {
+    pub(crate) fn from_str(st: &str) -> Self {
         use RespCode::*;
-        let res = match st.parse::<u8>() {
+        match st.parse::<u8>() {
             Ok(val) => match val {
                 0 => Okay,
                 1 => NotFound,
@@ -56,9 +56,8 @@ impl RespCode {
                 7 => Wrongtype,
                 _ => Self::ErrorString(st.to_owned()),
             },
-            Err(_) => return ErrorString(st.to_owned()),
-        };
-        res
+            Err(_) => ErrorString(st.to_owned()),
+        }
     }
 }
 

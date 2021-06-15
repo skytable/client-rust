@@ -31,11 +31,10 @@
 //! Once you have imported the required traits, you can now run the actions! For example:
 //! ```no_run
 //! use skytable::{actions::Actions, Connection};
-//! fn main() {
-//!     let mut con = Connection::new("127.0.0.1", 2003).unwrap();
-//!     con.set("x", "100").unwrap();
-//!     assert_eq!(con.get("x").unwrap(), "100".to_owned());
-//! }
+//! let mut con = Connection::new("127.0.0.1", 2003).unwrap();
+//! con.set("x", "100").unwrap();
+//! assert_eq!(con.get("x").unwrap(), "100".to_owned());
+//!
 //! ```
 
 use crate::types::SnapshotResult;

@@ -42,7 +42,7 @@ impl Connection {
     pub fn new(host: &str, port: u16) -> IoResult<Self> {
         let stream = TcpStream::connect((host, port))?;
         Ok(Connection {
-            stream: stream,
+            stream,
             buffer: Vec::with_capacity(BUF_CAP),
         })
     }

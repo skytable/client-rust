@@ -1,6 +1,10 @@
 # Changelog
 All changes in this project will be noted in this file.
 
+## Unreleased
+
+- Added backward compatibility for Rust versions < 1.51
+
 ## Version 0.3.0
 > Breaking changes
 

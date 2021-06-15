@@ -16,17 +16,22 @@ Skytable installed and running, you're ready to follow this guide!
 
 We'll start by creating a new binary application and then running actions. Create a new binary application
 by running:
+
 ```shell
 cargo new skyapp
 ```
+
 **Tip**: You can see a full list of the available actions [here](https://docs.skytable.io/actions-overview).
 
 First add this to your `Cargo.toml` file:
+
 ```toml
 skytable = "0.3.0"
 ```
+
 Now open up your `src/main.rs` file and establish a connection to the server while also adding some
 imports:
+
 ```rust
 use skytable::{Connection, Query, Response, Element};
 fn main() -> std::io::Result<()> {
@@ -36,6 +41,7 @@ fn main() -> std::io::Result<()> {
 ```
 
 Now let's run a `Query`! Change the previous code block to:
+
 ```rust
 use skytable::{Connection, Query, Response, Element};
 fn main() -> std::io::Result<()> {
@@ -52,9 +58,11 @@ Way to go &mdash; you're all set! Now go ahead and run more advanced queries!
 ## Async API
 
 If you need to use an `async` API, just change your import to:
+
 ```toml
 skytable = { version = "0.3.0", features=["async"], default-features= false }
 ```
+
 You can now establish a connection by using `skytable::AsyncConnection::new()`, adding `.await`s wherever
 necessary. Do note that you'll the [Tokio runtime](https://tokio.rs).
 
@@ -62,9 +70,16 @@ necessary. Do note that you'll the [Tokio runtime](https://tokio.rs).
 
 With this client driver, it is possible to use both sync and `async` APIs **at the same time**. To do
 this, simply change your import to:
+
 ```toml
 skytable = { version="0.3.0", features=["sync", "async"] }
 ```
+
+## MSRV
+
+The MSRV for this crate is Rust 1.51, however, **older rust versions are supported** by adding the
+following backward compatibility flag in the features declaration for the dependency:
+`compat-const-gen`
 
 ## Contributing
 
@@ -73,5 +88,6 @@ Open-source, and contributions ... &mdash; they're always welcome! For ideas and
 fork and open those pull requests [here](https://github.com/skytable/client-rust)!
 
 ## License
+
 This client library is distributed under the permissive
 [Apache-2.0 License](https://github.com/skytable/client-rust/blob/next/LICENSE). Now go build great apps!

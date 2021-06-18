@@ -192,7 +192,10 @@ where
 
 impl Default for Query {
     fn default() -> Self {
-        Self::new()
+        Query {
+            size_count: 0,
+            data: Vec::new(),
+        }
     }
 }
 
@@ -311,10 +314,11 @@ impl Query {
         let mut len = 0_usize;
         // *1\n_
         len += 4;
-        let dig_count = |cnt: usize| -> usize {
-            let dig_count = (cnt as f32).log(10.0_f32).floor();
-            (dig_count as u64) as usize
+        let dig_count = |dig| -> usize {
+            let dig_count = (dig as f32).log(10.0_f32).floor() + 1_f32;
+            dig_count as usize
         };
+        println!("123456 has {} digits", dig_count(123456));
         // the array size byte count
         len += dig_count(element_lengths.len());
         // the newline
@@ -352,4 +356,13 @@ pub enum Response {
     ParseError,
     /// The server sent some data of a type that this client doesn't support
     UnsupportedDataType,
+}
+
+#[cfg(feature = "dbg")]
+#[test]
+fn my_query() {
+    let q = vec!["set", "x", "100"];
+    let ma_query_len = Query::from(&q).into_raw_query().len();
+    let q_len = Query::array_packet_size_hint(q.iter().map(|v| v.len()).collect::<Vec<usize>>());
+    assert_eq!(ma_query_len, q_len);
 }

@@ -318,7 +318,6 @@ impl Query {
             let dig_count = (dig as f32).log(10.0_f32).floor() + 1_f32;
             dig_count as usize
         };
-        println!("123456 has {} digits", dig_count(123456));
         // the array size byte count
         len += dig_count(element_lengths.len());
         // the newline

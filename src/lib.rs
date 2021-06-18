@@ -192,7 +192,10 @@ where
 
 impl Default for Query {
     fn default() -> Self {
-        Self::new()
+        Query {
+            size_count: 0,
+            data: Vec::new(),
+        }
     }
 }
 
@@ -296,12 +299,43 @@ impl Query {
     /// return the raw query that would be written to the stream, serialized using the Skyhash serialization protocol
     pub fn into_raw_query(self) -> Vec<u8> {
         let mut v = Vec::with_capacity(self.data.len());
-        v.extend(b"*1\n");
-        v.extend(b"_");
+        v.extend(b"*1\n_");
         v.extend(self.__len().to_string().into_bytes());
         v.extend(b"\n");
         v.extend(self.get_holding_buffer());
         v
+    }
+    /// Returns the expected size of a packet for the given lengths of the query
+    /// This is not a _standard feature_ but is intended for developers working
+    /// on Skytable
+    #[cfg(feature = "dbg")]
+    pub fn array_packet_size_hint(element_lengths: impl AsRef<[usize]>) -> usize {
+        let element_lengths = element_lengths.as_ref();
+        let mut len = 0_usize;
+        // *1\n_
+        len += 4;
+        let dig_count = |dig| -> usize {
+            let dig_count = (dig as f32).log(10.0_f32).floor() + 1_f32;
+            dig_count as usize
+        };
+        println!("123456 has {} digits", dig_count(123456));
+        // the array size byte count
+        len += dig_count(element_lengths.len());
+        // the newline
+        len += 1;
+        element_lengths.iter().for_each(|elem| {
+            // the tsymbol
+            len += 1;
+            // the digit length
+            len += dig_count(*elem);
+            // the newline
+            len += 1;
+            // the element's own length
+            len += elem;
+            // the final newline
+            len += 1;
+        });
+        len
     }
 }
 
@@ -322,4 +356,13 @@ pub enum Response {
     ParseError,
     /// The server sent some data of a type that this client doesn't support
     UnsupportedDataType,
+}
+
+#[cfg(feature = "dbg")]
+#[test]
+fn my_query() {
+    let q = vec!["set", "x", "100"];
+    let ma_query_len = Query::from(&q).into_raw_query().len();
+    let q_len = Query::array_packet_size_hint(q.iter().map(|v| v.len()).collect::<Vec<usize>>());
+    assert_eq!(ma_query_len, q_len);
 }

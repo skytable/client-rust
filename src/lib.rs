@@ -115,15 +115,13 @@ mod async_con;
 pub use async_con::Connection as AsyncConnection;
 #[cfg(feature = "async")]
 use tokio::io::AsyncWriteExt;
-#[cfg(feature = "async")]
-use tokio::net::TcpStream;
 // default imports
 pub use deserializer::Element;
 pub use respcode::RespCode;
 // sync imports
 #[cfg(feature = "sync")]
 #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
-mod sync;
+pub mod sync;
 #[cfg(feature = "sync")]
 #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
 pub use sync::Connection;
@@ -264,7 +262,10 @@ impl Query {
     }
     #[cfg(feature = "async")]
     /// Write a query to a given stream
-    async fn write_query_to(&self, stream: &mut tokio::io::BufWriter<TcpStream>) -> IoResult<()> {
+    async fn write_query_to<T>(&self, stream: &mut T) -> IoResult<()>
+    where
+        T: tokio::io::AsyncWrite + Unpin,
+    {
         // Write the metaframe
         stream.write_all(b"*1\n").await?;
         // Add the dataframe
@@ -273,12 +274,15 @@ impl Query {
         stream.write_all(&number_of_items_in_datagroup).await?;
         stream.write_all(&[b'\n']).await?;
         stream.write_all(self.get_holding_buffer()).await?;
+        stream.flush().await?;
         Ok(())
     }
     #[cfg(feature = "sync")]
     /// Write a query to a given stream
-    fn write_query_to_sync(&self, stream: &mut std::net::TcpStream) -> IoResult<()> {
-        use std::io::Write;
+    fn write_query_to_sync<T>(&self, stream: &mut T) -> IoResult<()>
+    where
+        T: std::io::Write,
+    {
         // Write the metaframe
         stream.write_all(b"*1\n")?;
         // Add the dataframe
@@ -287,6 +291,7 @@ impl Query {
         stream.write_all(&number_of_items_in_datagroup)?;
         stream.write_all(&[b'\n'])?;
         stream.write_all(self.get_holding_buffer())?;
+        stream.flush()?;
         Ok(())
     }
     #[cfg(feature = "dbg")]

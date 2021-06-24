@@ -246,6 +246,14 @@ implement_actions!(
         }
         Response::Item(Element::UnsignedInt(int)) => int as usize
     }
+    /// Consumes a key if it exists
+    ///
+    /// This should return either the corresponding values of the provided keys or `Not Found`
+    /// error codes
+    fn pop(keys: impl IntoSkyhashAction + 's) -> Vec<Element> {
+        { Query::from("POP").arg(keys) }
+        Response::Item(Element::Array(arr)) => arr
+    }
     /// Deletes all the provided keys if they exist or doesn't do anything at all. This method
     /// will return true if all the provided keys were deleted, else it will return false
     fn sdel(keys: impl IntoSkyhashAction + 's) -> bool {

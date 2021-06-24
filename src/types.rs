@@ -233,7 +233,7 @@ pub enum SnapshotResult {
     Busy,
 }
 
-/// Implement this trait for methods in [`crate::actions`] that need them. See the
+/// Implement this trait for methods in [`actions`](crate::actions) that need them. See the
 /// [module level documentation](crate::types) for more information
 pub trait GetIterator<T: IntoSkyhashBytes>: IntoSkyhashAction {
     fn get_iter(&self) -> std::slice::Iter<T>;

@@ -15,10 +15,14 @@
  *
 */
 
-//! # Database connections
+//! # Synchronous database connections
 //!
-//! This crate provides a [`Connection`] object that can be used to connect to a Skytable database instance
-//! and write/read queries/responses to/from it
+//! This module provides sync interfaces for database connections. There are two versions:
+//! - The [`Connection`]: a connection to the database over Skyhash/TCP
+//! - The [`TlsConnection`]: a connection to the database over Skyhash/TLS
+//!
+//! All the [actions][crate::actions::Actions] can be used on both the connection types
+//!
 
 use crate::deserializer::{ParseError, Parser, RawResponse};
 use crate::{Query, Response};
@@ -100,7 +104,7 @@ const BUF_CAP: usize = 4096;
 
 #[derive(Debug)]
 #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
-/// A `Connection` is a wrapper around a`TcpStream` and a read buffer
+/// A database connection over Skyhash/TCP
 pub struct Connection {
     stream: TcpStream,
     buffer: Vec<u8>,
@@ -150,14 +154,16 @@ impl From<openssl::error::ErrorStack> for SslError {
 #[derive(Debug)]
 #[cfg(all(feature = "sync", any(feature = "ssl", feature = "sslv")))]
 #[cfg_attr(docsrs, doc(cfg(any(feature = "ssl", feature = "sslv"))))]
-pub struct SslConnection {
+/// A database connection over Skyhash/TLS
+pub struct TlsConnection {
     stream: SslStream<TcpStream>,
     buffer: Vec<u8>,
 }
 
 #[cfg(all(feature = "sync", any(feature = "ssl", feature = "sslv")))]
 #[cfg_attr(docsrs, doc(cfg(any(feature = "ssl", feature = "sslv"))))]
-impl SslConnection {
+impl TlsConnection {
+    /// Pass the `host` and `port` and the path to the CA certificate to use for TLS
     pub fn new(host: &str, port: u16, ssl_certificate: &str) -> Result<Self, SslError> {
         let mut ctx = SslContext::builder(SslMethod::tls_client())?;
         ctx.set_ca_file(ssl_certificate)?;
@@ -174,4 +180,4 @@ impl SslConnection {
 
 #[cfg(all(feature = "sync", any(feature = "ssl", feature = "sslv")))]
 #[cfg_attr(docsrs, doc(cfg(any(feature = "ssl", feature = "sslv"))))]
-impl_sync_methods!(SslConnection);
+impl_sync_methods!(TlsConnection);

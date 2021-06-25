@@ -99,32 +99,28 @@
 //!
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
+
 pub mod actions;
 mod deserializer;
 mod respcode;
 pub mod types;
 use crate::types::GetIterator;
+pub use deserializer::Element;
+pub use respcode::RespCode;
 use std::io::Result as IoResult;
 use types::IntoSkyhashAction;
 use types::IntoSkyhashBytes;
-// async imports
-#[cfg(feature = "async")]
-mod async_con;
-#[cfg(feature = "async")]
-#[cfg_attr(docsrs, doc(cfg(feature = "async")))]
-pub use async_con::Connection as AsyncConnection;
-#[cfg(feature = "async")]
-use tokio::io::AsyncWriteExt;
-// default imports
-pub use deserializer::Element;
-pub use respcode::RespCode;
-// sync imports
-#[cfg(feature = "sync")]
-#[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
-pub mod sync;
-#[cfg(feature = "sync")]
-#[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
-pub use sync::Connection;
+mod util;
+
+cfg_async!(
+    mod async_con;
+    pub use async_con::Connection as AsyncConnection;
+    use tokio::io::AsyncWriteExt;
+);
+cfg_sync!(
+    pub mod sync;
+    pub use sync::Connection;
+);
 
 #[macro_export]
 /// A macro that can be used to easily create queries with _almost_ variadic properties.
@@ -260,87 +256,88 @@ impl Query {
     fn get_holding_buffer(&self) -> &[u8] {
         &self.data
     }
-    #[cfg(feature = "async")]
-    /// Write a query to a given stream
-    async fn write_query_to<T>(&self, stream: &mut T) -> IoResult<()>
-    where
-        T: tokio::io::AsyncWrite + Unpin,
-    {
-        // Write the metaframe
-        stream.write_all(b"*1\n").await?;
-        // Add the dataframe
-        let number_of_items_in_datagroup = self.__len().to_string().into_bytes();
-        stream.write_all(&[b'_']).await?;
-        stream.write_all(&number_of_items_in_datagroup).await?;
-        stream.write_all(&[b'\n']).await?;
-        stream.write_all(self.get_holding_buffer()).await?;
-        stream.flush().await?;
-        Ok(())
-    }
-    #[cfg(feature = "sync")]
-    /// Write a query to a given stream
-    fn write_query_to_sync<T>(&self, stream: &mut T) -> IoResult<()>
-    where
-        T: std::io::Write,
-    {
-        // Write the metaframe
-        stream.write_all(b"*1\n")?;
-        // Add the dataframe
-        let number_of_items_in_datagroup = self.__len().to_string().into_bytes();
-        stream.write_all(&[b'_'])?;
-        stream.write_all(&number_of_items_in_datagroup)?;
-        stream.write_all(&[b'\n'])?;
-        stream.write_all(self.get_holding_buffer())?;
-        stream.flush()?;
-        Ok(())
-    }
-    #[cfg(feature = "dbg")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "dbg")))]
-    /// Get the raw bytes of a query
-    ///
-    /// This is a function that is **not intended for daily use** but is for developers working to improve/debug
-    /// or extend the Skyhash protocol. [Skytable](https://github.com/skytable/skytable) itself uses this function
-    /// to generate raw queries. Once you're done passing the arguments to a query, running this function will
-    /// return the raw query that would be written to the stream, serialized using the Skyhash serialization protocol
-    pub fn into_raw_query(self) -> Vec<u8> {
-        let mut v = Vec::with_capacity(self.data.len());
-        v.extend(b"*1\n_");
-        v.extend(self.__len().to_string().into_bytes());
-        v.extend(b"\n");
-        v.extend(self.get_holding_buffer());
-        v
-    }
-    /// Returns the expected size of a packet for the given lengths of the query
-    /// This is not a _standard feature_ but is intended for developers working
-    /// on Skytable
-    #[cfg(feature = "dbg")]
-    pub fn array_packet_size_hint(element_lengths: impl AsRef<[usize]>) -> usize {
-        let element_lengths = element_lengths.as_ref();
-        let mut len = 0_usize;
-        // *1\n_
-        len += 4;
-        let dig_count = |dig| -> usize {
-            let dig_count = (dig as f32).log(10.0_f32).floor() + 1_f32;
-            dig_count as usize
-        };
-        // the array size byte count
-        len += dig_count(element_lengths.len());
-        // the newline
-        len += 1;
-        element_lengths.iter().for_each(|elem| {
-            // the tsymbol
-            len += 1;
-            // the digit length
-            len += dig_count(*elem);
+    cfg_async!(
+        /// Write a query to a given stream
+        async fn write_query_to<T>(&self, stream: &mut T) -> IoResult<()>
+        where
+            T: tokio::io::AsyncWrite + Unpin,
+        {
+            // Write the metaframe
+            stream.write_all(b"*1\n").await?;
+            // Add the dataframe
+            let number_of_items_in_datagroup = self.__len().to_string().into_bytes();
+            stream.write_all(&[b'_']).await?;
+            stream.write_all(&number_of_items_in_datagroup).await?;
+            stream.write_all(&[b'\n']).await?;
+            stream.write_all(self.get_holding_buffer()).await?;
+            stream.flush().await?;
+            Ok(())
+        }
+    );
+    cfg_sync!(
+        /// Write a query to a given stream
+        fn write_query_to_sync<T>(&self, stream: &mut T) -> IoResult<()>
+        where
+            T: std::io::Write,
+        {
+            // Write the metaframe
+            stream.write_all(b"*1\n")?;
+            // Add the dataframe
+            let number_of_items_in_datagroup = self.__len().to_string().into_bytes();
+            stream.write_all(&[b'_'])?;
+            stream.write_all(&number_of_items_in_datagroup)?;
+            stream.write_all(&[b'\n'])?;
+            stream.write_all(self.get_holding_buffer())?;
+            stream.flush()?;
+            Ok(())
+        }
+    );
+    cfg_dbg!(
+        /// Get the raw bytes of a query
+        ///
+        /// This is a function that is **not intended for daily use** but is for developers working to improve/debug
+        /// or extend the Skyhash protocol. [Skytable](https://github.com/skytable/skytable) itself uses this function
+        /// to generate raw queries. Once you're done passing the arguments to a query, running this function will
+        /// return the raw query that would be written to the stream, serialized using the Skyhash serialization protocol
+        pub fn into_raw_query(self) -> Vec<u8> {
+            let mut v = Vec::with_capacity(self.data.len());
+            v.extend(b"*1\n_");
+            v.extend(self.__len().to_string().into_bytes());
+            v.extend(b"\n");
+            v.extend(self.get_holding_buffer());
+            v
+        }
+        /// Returns the expected size of a packet for the given lengths of the query
+        /// This is not a _standard feature_ but is intended for developers working
+        /// on Skytable
+        pub fn array_packet_size_hint(element_lengths: impl AsRef<[usize]>) -> usize {
+            let element_lengths = element_lengths.as_ref();
+            let mut len = 0_usize;
+            // *1\n_
+            len += 4;
+            let dig_count = |dig| -> usize {
+                let dig_count = (dig as f32).log(10.0_f32).floor() + 1_f32;
+                dig_count as usize
+            };
+            // the array size byte count
+            len += dig_count(element_lengths.len());
             // the newline
             len += 1;
-            // the element's own length
-            len += elem;
-            // the final newline
-            len += 1;
-        });
-        len
-    }
+            element_lengths.iter().for_each(|elem| {
+                // the tsymbol
+                len += 1;
+                // the digit length
+                len += dig_count(*elem);
+                // the newline
+                len += 1;
+                // the element's own length
+                len += elem;
+                // the final newline
+                len += 1;
+            });
+            len
+        }
+    );
 }
 
 /// # Responses
@@ -362,11 +359,13 @@ pub enum Response {
     UnsupportedDataType,
 }
 
-#[cfg(feature = "dbg")]
-#[test]
-fn my_query() {
-    let q = vec!["set", "x", "100"];
-    let ma_query_len = Query::from(&q).into_raw_query().len();
-    let q_len = Query::array_packet_size_hint(q.iter().map(|v| v.len()).collect::<Vec<usize>>());
-    assert_eq!(ma_query_len, q_len);
-}
+cfg_dbg!(
+    #[test]
+    fn my_query() {
+        let q = vec!["set", "x", "100"];
+        let ma_query_len = Query::from(&q).into_raw_query().len();
+        let q_len =
+            Query::array_packet_size_hint(q.iter().map(|v| v.len()).collect::<Vec<usize>>());
+        assert_eq!(ma_query_len, q_len);
+    }
+);

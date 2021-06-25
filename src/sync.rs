@@ -26,8 +26,9 @@
 
 use crate::deserializer::{ParseError, Parser, RawResponse};
 use crate::{Query, Response};
-#[cfg(all(feature = "sync", any(feature = "ssl", feature = "sslv")))]
-use openssl::ssl::{Ssl, SslContext, SslMethod, SslStream};
+crate::cfg_any_ssl!(
+    use openssl::ssl::{Ssl, SslContext, SslMethod, SslStream};
+);
 pub use std::io::Result as IoResult;
 use std::io::{Error, ErrorKind, Read, Write};
 use std::net::TcpStream;
@@ -99,85 +100,77 @@ macro_rules! impl_sync_methods {
     };
 }
 
-/// 4 KB Read Buffer
-const BUF_CAP: usize = 4096;
+crate::cfg_sync!(
+    /// 4 KB Read Buffer
+    const BUF_CAP: usize = 4096;
 
-#[derive(Debug)]
-#[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
-/// A database connection over Skyhash/TCP
-pub struct Connection {
-    stream: TcpStream,
-    buffer: Vec<u8>,
-}
-
-impl Connection {
-    /// Create a new connection to a Skytable instance hosted on `host` and running on `port`
-    pub fn new(host: &str, port: u16) -> IoResult<Self> {
-        let stream = TcpStream::connect((host, port))?;
-        Ok(Connection {
-            stream,
-            buffer: Vec::with_capacity(BUF_CAP),
-        })
+    #[derive(Debug)]
+    /// A database connection over Skyhash/TCP
+    pub struct Connection {
+        stream: TcpStream,
+        buffer: Vec<u8>,
     }
-}
 
-impl_sync_methods!(Connection);
-
-#[cfg(all(feature = "sync", any(feature = "ssl", feature = "sslv")))]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "ssl", feature = "sslv"))))]
-pub enum SslError {
-    IoError(std::io::Error),
-    SslError(openssl::ssl::Error),
-}
-
-#[cfg(all(feature = "sync", any(feature = "ssl", feature = "sslv")))]
-impl From<openssl::ssl::Error> for SslError {
-    fn from(e: openssl::ssl::Error) -> Self {
-        Self::SslError(e)
+    impl Connection {
+        /// Create a new connection to a Skytable instance hosted on `host` and running on `port`
+        pub fn new(host: &str, port: u16) -> IoResult<Self> {
+            let stream = TcpStream::connect((host, port))?;
+            Ok(Connection {
+                stream,
+                buffer: Vec::with_capacity(BUF_CAP),
+            })
+        }
     }
-}
 
-#[cfg(all(feature = "sync", any(feature = "ssl", feature = "sslv")))]
-impl From<std::io::Error> for SslError {
-    fn from(e: std::io::Error) -> Self {
-        Self::IoError(e)
-    }
-}
+    impl_sync_methods!(Connection);
 
-#[cfg(all(feature = "sync", any(feature = "ssl", feature = "sslv")))]
-impl From<openssl::error::ErrorStack> for SslError {
-    fn from(e: openssl::error::ErrorStack) -> Self {
-        Self::SslError(e.into())
-    }
-}
+    crate::cfg_any_ssl!(
+        pub enum SslError {
+            IoError(std::io::Error),
+            SslError(openssl::ssl::Error),
+        }
 
-#[derive(Debug)]
-#[cfg(all(feature = "sync", any(feature = "ssl", feature = "sslv")))]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "ssl", feature = "sslv"))))]
-/// A database connection over Skyhash/TLS
-pub struct TlsConnection {
-    stream: SslStream<TcpStream>,
-    buffer: Vec<u8>,
-}
+        impl From<openssl::ssl::Error> for SslError {
+            fn from(e: openssl::ssl::Error) -> Self {
+                Self::SslError(e)
+            }
+        }
 
-#[cfg(all(feature = "sync", any(feature = "ssl", feature = "sslv")))]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "ssl", feature = "sslv"))))]
-impl TlsConnection {
-    /// Pass the `host` and `port` and the path to the CA certificate to use for TLS
-    pub fn new(host: &str, port: u16, ssl_certificate: &str) -> Result<Self, SslError> {
-        let mut ctx = SslContext::builder(SslMethod::tls_client())?;
-        ctx.set_ca_file(ssl_certificate)?;
-        let ssl = Ssl::new(&ctx.build())?;
-        let stream = TcpStream::connect((host, port))?;
-        let mut stream = SslStream::new(ssl, stream).map_err(|e| SslError::SslError(e.into()))?;
-        stream.connect()?;
-        Ok(Self {
-            stream,
-            buffer: Vec::with_capacity(BUF_CAP),
-        })
-    }
-}
+        impl From<std::io::Error> for SslError {
+            fn from(e: std::io::Error) -> Self {
+                Self::IoError(e)
+            }
+        }
 
-#[cfg(all(feature = "sync", any(feature = "ssl", feature = "sslv")))]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "ssl", feature = "sslv"))))]
-impl_sync_methods!(TlsConnection);
+        impl From<openssl::error::ErrorStack> for SslError {
+            fn from(e: openssl::error::ErrorStack) -> Self {
+                Self::SslError(e.into())
+            }
+        }
+
+        #[derive(Debug)]
+        /// A database connection over Skyhash/TLS
+        pub struct TlsConnection {
+            stream: SslStream<TcpStream>,
+            buffer: Vec<u8>,
+        }
+
+        impl TlsConnection {
+            /// Pass the `host` and `port` and the path to the CA certificate to use for TLS
+            pub fn new(host: &str, port: u16, ssl_certificate: &str) -> Result<Self, SslError> {
+                let mut ctx = SslContext::builder(SslMethod::tls_client())?;
+                ctx.set_ca_file(ssl_certificate)?;
+                let ssl = Ssl::new(&ctx.build())?;
+                let stream = TcpStream::connect((host, port))?;
+                let mut stream = SslStream::new(ssl, stream).map_err(|e| SslError::SslError(e.into()))?;
+                stream.connect()?;
+                Ok(Self {
+                    stream,
+                    buffer: Vec::with_capacity(BUF_CAP),
+                })
+            }
+        }
+
+        impl_sync_methods!(TlsConnection);
+    );
+);

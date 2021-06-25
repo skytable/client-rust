@@ -82,7 +82,7 @@ If you need to use TLS features, this crate will let you do so with OpenSSL.
 ### Using TLS with sync interfaces
 
 ```toml
-skytable = { version="0.4.0", features=["sync","ssl"] }
+skytable = { version="0.4.0-alpha.1", features=["sync","ssl"] }
 ```
 
 You can now use the sync `sync::TlsConnection` object.
@@ -90,7 +90,7 @@ You can now use the sync `sync::TlsConnection` object.
 ### Using TLS with async interfaces
 
 ```toml
-skytable = { version="0.4.0", features=["async","aio-ssl"], default-features=false }
+skytable = { version="0.4.0-alpha.1", features=["async","aio-ssl"], default-features=false }
 ```
 
 You can now use the async `aio::TlsConnection` object.

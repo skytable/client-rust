@@ -31,7 +31,7 @@ use tokio::net::TcpStream;
 /// 4 KB Read Buffer
 const BUF_CAP: usize = 4096;
 
-crate::cfg_async!(
+cfg_async!(
     /// An async connection object that wraps around a`TcpStream` and a read buffer
     pub struct Connection {
         stream: BufWriter<TcpStream>,

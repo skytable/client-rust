@@ -4,7 +4,8 @@ All changes in this project will be noted in this file.
 
 ## Version 0.3.1
 
-- Added backward compatibility for Rust versions < 1.51
+- Added backward compatibility for Rust versions < 1.51 (
+  people who need const-generics just add `const-gen` to their feature list)
 - Added support for the `POP` query type
 
 ## Version 0.3.0

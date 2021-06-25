@@ -18,7 +18,7 @@ default = ["sync"]
 async = ["bytes", "tokio"]
 sync = []
 dbg = []
-compat-const-gen = []
+const-gen = []
 ssl = ["openssl"]
 sslv = ["openssl/vendored"]
 

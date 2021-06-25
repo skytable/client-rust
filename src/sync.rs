@@ -26,7 +26,7 @@
 
 use crate::deserializer::{ParseError, Parser, RawResponse};
 use crate::{Query, Response};
-crate::cfg_any_ssl!(
+cfg_any_ssl!(
     use openssl::ssl::{Ssl, SslContext, SslMethod, SslStream};
 );
 pub use std::io::Result as IoResult;
@@ -100,7 +100,7 @@ macro_rules! impl_sync_methods {
     };
 }
 
-crate::cfg_sync!(
+cfg_sync!(
     /// 4 KB Read Buffer
     const BUF_CAP: usize = 4096;
 
@@ -124,7 +124,7 @@ crate::cfg_sync!(
 
     impl_sync_methods!(Connection);
 
-    crate::cfg_any_ssl!(
+    cfg_any_ssl!(
         pub enum SslError {
             IoError(std::io::Error),
             SslError(openssl::ssl::Error),

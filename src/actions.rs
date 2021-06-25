@@ -45,7 +45,8 @@ use crate::IntoSkyhashBytes;
 use crate::Query;
 use crate::RespCode;
 use crate::Response;
-crate::cfg_async!(
+
+cfg_async!(
     use core::{future::Future, pin::Pin};
 );
 use std::io::ErrorKind;
@@ -73,7 +74,7 @@ pub enum ActionError {
     Code(RespCode),
 }
 
-crate::cfg_async!(
+cfg_async!(
     /// A special result that is returned when running actions (async)
     pub type AsyncResult<'s, T> = Pin<Box<dyn Future<Output = T> + Send + Sync + 's>>;
     #[doc(hidden)]
@@ -86,7 +87,8 @@ crate::cfg_async!(
 /// A special result that is returned when running actions
 pub type ActionResult<T> = Result<T, ActionError>;
 
-crate::cfg_sync!(
+cfg_sync!(
+    #[doc(hidden)]
     pub trait SyncSocket {
         fn run(&mut self, q: Query) -> std::io::Result<Response>;
     }

@@ -77,9 +77,8 @@ skytable = { version="0.3.0", features=["sync", "async"] }
 
 ## MSRV
 
-The MSRV for this crate is Rust 1.51, however, **older rust versions are supported** by adding the
-following backward compatibility flag in the features declaration for the dependency:
-`compat-const-gen`
+The MSRV for this crate is Rust 1.39. Need const generics? Add the `const-gen` feature to your
+dependency!
 
 ## Contributing
 

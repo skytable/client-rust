@@ -99,7 +99,8 @@
 //!
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
-
+#[macro_use]
+mod util;
 pub mod actions;
 mod deserializer;
 mod respcode;
@@ -110,7 +111,6 @@ pub use respcode::RespCode;
 use std::io::Result as IoResult;
 use types::IntoSkyhashAction;
 use types::IntoSkyhashBytes;
-mod util;
 
 cfg_async!(
     mod async_con;

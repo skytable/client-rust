@@ -15,7 +15,6 @@
  *
 */
 
-#[macro_export]
 macro_rules! cfg_any_ssl {
     ($($body:item)*) => {
         $(
@@ -26,7 +25,6 @@ macro_rules! cfg_any_ssl {
     };
 }
 
-#[macro_export]
 macro_rules! cfg_sync {
     ($($body:item)*) => {
         $(
@@ -37,7 +35,6 @@ macro_rules! cfg_sync {
     };
 }
 
-#[macro_export]
 macro_rules! cfg_async {
     ($($body:item)*) => {
         $(
@@ -48,7 +45,6 @@ macro_rules! cfg_async {
     };
 }
 
-#[macro_export]
 macro_rules! cfg_dbg {
     ($($body:item)*) => {
         $(

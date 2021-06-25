@@ -96,13 +96,13 @@
 //! skytable = { version="0.4.0", features=["sync","ssl"] }
 //! ```
 //! You can now use the async `sync::TlsConnection` object.
-//! 
+//!
 //! ### Using TLS with async interfaces
 //! ```toml
 //! skytable = { version="0.4.0", features=["async","aio-ssl"], default-features=false }
 //! ```
 //! You can now use the async `aio::TlsConnection` object.
-//! 
+//!
 //! ### _Packed TLS_ setup
 //!
 //! If you want to pack OpenSSL with your crate, then for sync add `sslv` instead of `ssl` or
@@ -396,6 +396,7 @@ cfg_dbg!(
 pub mod error {
     //! Errors
     cfg_ssl_any!(
+        use std::fmt;
         /// Errors that may occur while initiating an [async TLS connection](crate::aio::TlsConnection)
         /// or a [sync TLS connection](crate::sync::TlsConnection)
         pub enum SslError {
@@ -420,6 +421,15 @@ pub mod error {
         impl From<openssl::error::ErrorStack> for SslError {
             fn from(e: openssl::error::ErrorStack) -> Self {
                 Self::SslError(e.into())
+            }
+        }
+
+        impl fmt::Display for SslError {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+                match self {
+                    Self::IoError(e) => write!(f, "{}", e),
+                    Self::SslError(e) => write!(f, "{}", e),
+                }
             }
         }
     );

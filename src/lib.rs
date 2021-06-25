@@ -38,7 +38,7 @@
 //!
 //! First add this to your `Cargo.toml` file:
 //! ```toml
-//! skytable = "0.3.0"
+//! skytable = "0.4.0"
 //! ```
 //! Now open up your `src/main.rs` file and establish a connection to the server while also adding some
 //! imports:
@@ -74,7 +74,7 @@
 //!
 //! If you need to use an `async` API, just change your import to:
 //! ```toml
-//! skytable = { version = "0.3.0", features=["async"], default-features=false }
+//! skytable = { version = "0.4.0", features=["async"], default-features=false }
 //! ```
 //! You can now establish a connection by using `skytable::AsyncConnection::new()`, adding `.await`s wherever
 //! necessary. Do note that you'll the [Tokio runtime](https://tokio.rs).
@@ -84,8 +84,31 @@
 //! With this client driver, it is possible to use both sync and `async` APIs **at the same time**. To do
 //! this, simply change your import to:
 //! ```toml
-//! skytable = { version="0.3.0", features=["sync", "async"] }
+//! skytable = { version="0.4.0", features=["sync", "async"] }
 //! ```
+//!
+//! ## TLS
+//!
+//! If you need to use TLS features, this crate will let you do so with OpenSSL.
+//!
+//! ### Using TLS with sync interfaces
+//! ```toml
+//! skytable = { version="0.4.0", features=["sync","ssl"] }
+//! ```
+//! You can now use the async `sync::TlsConnection` object.
+//! 
+//! ### Using TLS with async interfaces
+//! ```toml
+//! skytable = { version="0.4.0", features=["async","aio-ssl"], default-features=false }
+//! ```
+//! You can now use the async `aio::TlsConnection` object.
+//! 
+//! ### _Packed TLS_ setup
+//!
+//! If you want to pack OpenSSL with your crate, then for sync add `sslv` instead of `ssl` or
+//! add `aio-sslv` instead of `aio-ssl` for async. Adding this will statically link OpenSSL
+//! to your crate. Do note that you'll need a C compiler, GNU Make and Perl to compile OpenSSL
+//! and statically link against it.
 //!
 //! ## Contributing
 //!
@@ -99,34 +122,28 @@
 //!
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#[macro_use]
+mod util;
 pub mod actions;
 mod deserializer;
 mod respcode;
 pub mod types;
 use crate::types::GetIterator;
-use std::io::Result as IoResult;
-use types::IntoSkyhashAction;
-use types::IntoSkyhashBytes;
-// async imports
-#[cfg(feature = "async")]
-mod async_con;
-#[cfg(feature = "async")]
-#[cfg_attr(docsrs, doc(cfg(feature = "async")))]
-pub use async_con::Connection as AsyncConnection;
-#[cfg(feature = "async")]
-use tokio::io::AsyncWriteExt;
-#[cfg(feature = "async")]
-use tokio::net::TcpStream;
-// default imports
 pub use deserializer::Element;
 pub use respcode::RespCode;
-// sync imports
-#[cfg(feature = "sync")]
-#[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
-mod sync;
-#[cfg(feature = "sync")]
-#[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
-pub use sync::Connection;
+pub(crate) use std::io::Result as IoResult;
+use types::IntoSkyhashAction;
+use types::IntoSkyhashBytes;
+
+cfg_async!(
+    pub mod aio;
+    pub use aio::Connection as AsyncConnection;
+    use tokio::io::AsyncWriteExt;
+);
+cfg_sync!(
+    pub mod sync;
+    pub use sync::Connection;
+);
 
 #[macro_export]
 /// A macro that can be used to easily create queries with _almost_ variadic properties.
@@ -214,7 +231,7 @@ impl Query {
         self
     }
     pub(in crate) fn _push_arg(&mut self, arg: impl IntoSkyhashBytes) {
-        let arg = arg.into_string();
+        let arg = arg.as_string();
         if arg.is_empty() {
             panic!("Argument cannot be empty")
         }
@@ -250,8 +267,8 @@ impl Query {
         U: IntoSkyhashBytes,
     {
         v1.get_iter().zip(v2.get_iter()).for_each(|(a, b)| {
-            self.push(a.into_string());
-            self.push(b.into_string());
+            self.push(a.as_string());
+            self.push(b.as_string());
         });
         self
     }
@@ -262,80 +279,88 @@ impl Query {
     fn get_holding_buffer(&self) -> &[u8] {
         &self.data
     }
-    #[cfg(feature = "async")]
-    /// Write a query to a given stream
-    async fn write_query_to(&self, stream: &mut tokio::io::BufWriter<TcpStream>) -> IoResult<()> {
-        // Write the metaframe
-        stream.write_all(b"*1\n").await?;
-        // Add the dataframe
-        let number_of_items_in_datagroup = self.__len().to_string().into_bytes();
-        stream.write_all(&[b'_']).await?;
-        stream.write_all(&number_of_items_in_datagroup).await?;
-        stream.write_all(&[b'\n']).await?;
-        stream.write_all(self.get_holding_buffer()).await?;
-        Ok(())
-    }
-    #[cfg(feature = "sync")]
-    /// Write a query to a given stream
-    fn write_query_to_sync(&self, stream: &mut std::net::TcpStream) -> IoResult<()> {
-        use std::io::Write;
-        // Write the metaframe
-        stream.write_all(b"*1\n")?;
-        // Add the dataframe
-        let number_of_items_in_datagroup = self.__len().to_string().into_bytes();
-        stream.write_all(&[b'_'])?;
-        stream.write_all(&number_of_items_in_datagroup)?;
-        stream.write_all(&[b'\n'])?;
-        stream.write_all(self.get_holding_buffer())?;
-        Ok(())
-    }
-    #[cfg(feature = "dbg")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "dbg")))]
-    /// Get the raw bytes of a query
-    ///
-    /// This is a function that is **not intended for daily use** but is for developers working to improve/debug
-    /// or extend the Skyhash protocol. [Skytable](https://github.com/skytable/skytable) itself uses this function
-    /// to generate raw queries. Once you're done passing the arguments to a query, running this function will
-    /// return the raw query that would be written to the stream, serialized using the Skyhash serialization protocol
-    pub fn into_raw_query(self) -> Vec<u8> {
-        let mut v = Vec::with_capacity(self.data.len());
-        v.extend(b"*1\n_");
-        v.extend(self.__len().to_string().into_bytes());
-        v.extend(b"\n");
-        v.extend(self.get_holding_buffer());
-        v
-    }
-    /// Returns the expected size of a packet for the given lengths of the query
-    /// This is not a _standard feature_ but is intended for developers working
-    /// on Skytable
-    #[cfg(feature = "dbg")]
-    pub fn array_packet_size_hint(element_lengths: impl AsRef<[usize]>) -> usize {
-        let element_lengths = element_lengths.as_ref();
-        let mut len = 0_usize;
-        // *1\n_
-        len += 4;
-        let dig_count = |dig| -> usize {
-            let dig_count = (dig as f32).log(10.0_f32).floor() + 1_f32;
-            dig_count as usize
-        };
-        // the array size byte count
-        len += dig_count(element_lengths.len());
-        // the newline
-        len += 1;
-        element_lengths.iter().for_each(|elem| {
-            // the tsymbol
-            len += 1;
-            // the digit length
-            len += dig_count(*elem);
+    cfg_async!(
+        /// Write a query to a given stream
+        async fn write_query_to<T>(&self, stream: &mut T) -> IoResult<()>
+        where
+            T: tokio::io::AsyncWrite + Unpin,
+        {
+            // Write the metaframe
+            stream.write_all(b"*1\n").await?;
+            // Add the dataframe
+            let number_of_items_in_datagroup = self.__len().to_string().into_bytes();
+            stream.write_all(&[b'_']).await?;
+            stream.write_all(&number_of_items_in_datagroup).await?;
+            stream.write_all(&[b'\n']).await?;
+            stream.write_all(self.get_holding_buffer()).await?;
+            stream.flush().await?;
+            Ok(())
+        }
+    );
+    cfg_sync!(
+        /// Write a query to a given stream
+        fn write_query_to_sync<T>(&self, stream: &mut T) -> IoResult<()>
+        where
+            T: std::io::Write,
+        {
+            // Write the metaframe
+            stream.write_all(b"*1\n")?;
+            // Add the dataframe
+            let number_of_items_in_datagroup = self.__len().to_string().into_bytes();
+            stream.write_all(&[b'_'])?;
+            stream.write_all(&number_of_items_in_datagroup)?;
+            stream.write_all(&[b'\n'])?;
+            stream.write_all(self.get_holding_buffer())?;
+            stream.flush()?;
+            Ok(())
+        }
+    );
+    cfg_dbg!(
+        /// Get the raw bytes of a query
+        ///
+        /// This is a function that is **not intended for daily use** but is for developers working to improve/debug
+        /// or extend the Skyhash protocol. [Skytable](https://github.com/skytable/skytable) itself uses this function
+        /// to generate raw queries. Once you're done passing the arguments to a query, running this function will
+        /// return the raw query that would be written to the stream, serialized using the Skyhash serialization protocol
+        pub fn into_raw_query(self) -> Vec<u8> {
+            let mut v = Vec::with_capacity(self.data.len());
+            v.extend(b"*1\n_");
+            v.extend(self.__len().to_string().into_bytes());
+            v.extend(b"\n");
+            v.extend(self.get_holding_buffer());
+            v
+        }
+        /// Returns the expected size of a packet for the given lengths of the query
+        /// This is not a _standard feature_ but is intended for developers working
+        /// on Skytable
+        pub fn array_packet_size_hint(element_lengths: impl AsRef<[usize]>) -> usize {
+            let element_lengths = element_lengths.as_ref();
+            let mut len = 0_usize;
+            // *1\n_
+            len += 4;
+            let dig_count = |dig| -> usize {
+                let dig_count = (dig as f32).log(10.0_f32).floor() + 1_f32;
+                dig_count as usize
+            };
+            // the array size byte count
+            len += dig_count(element_lengths.len());
             // the newline
             len += 1;
-            // the element's own length
-            len += elem;
-            // the final newline
-            len += 1;
-        });
-        len
-    }
+            element_lengths.iter().for_each(|elem| {
+                // the tsymbol
+                len += 1;
+                // the digit length
+                len += dig_count(*elem);
+                // the newline
+                len += 1;
+                // the element's own length
+                len += elem;
+                // the final newline
+                len += 1;
+            });
+            len
+        }
+    );
 }
 
 /// # Responses
@@ -357,11 +382,45 @@ pub enum Response {
     UnsupportedDataType,
 }
 
-#[cfg(feature = "dbg")]
-#[test]
-fn my_query() {
-    let q = vec!["set", "x", "100"];
-    let ma_query_len = Query::from(&q).into_raw_query().len();
-    let q_len = Query::array_packet_size_hint(q.iter().map(|v| v.len()).collect::<Vec<usize>>());
-    assert_eq!(ma_query_len, q_len);
+cfg_dbg!(
+    #[test]
+    fn my_query() {
+        let q = vec!["set", "x", "100"];
+        let ma_query_len = Query::from(&q).into_raw_query().len();
+        let q_len =
+            Query::array_packet_size_hint(q.iter().map(|v| v.len()).collect::<Vec<usize>>());
+        assert_eq!(ma_query_len, q_len);
+    }
+);
+
+pub mod error {
+    //! Errors
+    cfg_ssl_any!(
+        /// Errors that may occur while initiating an [async TLS connection](crate::aio::TlsConnection)
+        /// or a [sync TLS connection](crate::sync::TlsConnection)
+        pub enum SslError {
+            /// An [I/O Error](std::io::Error) occurred
+            IoError(std::io::Error),
+            /// An [SSL Error](openssl::error::Error) occurred
+            SslError(openssl::ssl::Error),
+        }
+
+        impl From<openssl::ssl::Error> for SslError {
+            fn from(e: openssl::ssl::Error) -> Self {
+                Self::SslError(e)
+            }
+        }
+
+        impl From<std::io::Error> for SslError {
+            fn from(e: std::io::Error) -> Self {
+                Self::IoError(e)
+            }
+        }
+
+        impl From<openssl::error::ErrorStack> for SslError {
+            fn from(e: openssl::error::ErrorStack) -> Self {
+                Self::SslError(e.into())
+            }
+        }
+    );
 }

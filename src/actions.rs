@@ -45,8 +45,10 @@ use crate::IntoSkyhashBytes;
 use crate::Query;
 use crate::RespCode;
 use crate::Response;
-#[cfg(feature = "async")]
-use core::{future::Future, pin::Pin};
+
+cfg_async!(
+    use core::{future::Future, pin::Pin};
+);
 use std::io::ErrorKind;
 
 /// The error string returned when the snapshot engine is busy
@@ -72,26 +74,26 @@ pub enum ActionError {
     Code(RespCode),
 }
 
-#[cfg(feature = "async")]
-#[cfg_attr(docsrs, doc(cfg(feature = "async")))]
-/// A special result that is returned when running actions (async)
-pub type AsyncResult<'s, T> = Pin<Box<dyn Future<Output = T> + Send + Sync + 's>>;
+cfg_async!(
+    /// A special result that is returned when running actions (async)
+    pub type AsyncResult<'s, T> = Pin<Box<dyn Future<Output = T> + Send + Sync + 's>>;
+    #[doc(hidden)]
+    pub trait AsyncSocket: Send + Sync {
+        fn run(&mut self, q: Query) -> AsyncResult<std::io::Result<Response>>;
+    }
+    impl<T> AsyncActions for T where T: AsyncSocket {}
+);
+
 /// A special result that is returned when running actions
 pub type ActionResult<T> = Result<T, ActionError>;
 
-#[cfg(feature = "sync")]
-#[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
-#[doc(hidden)]
-pub trait SyncSocket {
-    fn run(&mut self, q: Query) -> std::io::Result<Response>;
-}
-
-#[cfg(feature = "async")]
-#[cfg_attr(docsrs, doc(cfg(feature = "async")))]
-#[doc(hidden)]
-pub trait AsyncSocket: Send + Sync {
-    fn run(&mut self, q: Query) -> AsyncResult<std::io::Result<Response>>;
-}
+cfg_sync!(
+    #[doc(hidden)]
+    pub trait SyncSocket {
+        fn run(&mut self, q: Query) -> std::io::Result<Response>;
+    }
+    impl<T> Actions for T where T: SyncSocket {}
+);
 
 macro_rules! gen_match {
     ($ret:expr, $($($mtch:pat)+ $(if $exp:expr)*, $expect:expr),*) => {
@@ -144,11 +146,6 @@ macro_rules! implement_actions {
         }
     };
 }
-
-#[cfg(feature = "sync")]
-impl<T> Actions for T where T: SyncSocket {}
-#[cfg(feature = "async")]
-impl<T> AsyncActions for T where T: AsyncSocket {}
 
 implement_actions!(
     /// Get the number of keys present in the database

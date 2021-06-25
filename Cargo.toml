@@ -1,6 +1,6 @@
 [package]
 name = "skytable"
-version = "0.3.0"
+version = "0.3.1-alpha.1"
 authors = ["Sayan Nandan <nandansayan@outlook.com>"]
 edition = "2018"
 readme = "README.md"
@@ -18,12 +18,17 @@ default = ["sync"]
 async = ["bytes", "tokio"]
 sync = []
 dbg = []
-compat-const-gen = []
+const-gen = []
+ssl = ["openssl"]
+sslv = ["openssl/vendored"]
+aio-ssl = ["tokio-openssl", "openssl"]
+aio-sslv = ["tokio-openssl", "openssl/vendored"]
 
 [dependencies]
-bytes = {version="1.0.1", optional=true}
-tokio = {version = "1.5.0", features = ["net", "io-util", "io-std"], optional=true}
-
+bytes = { version="1.0.1", optional=true }
+tokio = { version="1.5.0", features=["net", "io-util", "io-std"], optional=true }
+openssl = { version="0.10.35", optional=true }
+tokio-openssl = { version="0.6.1", optional=true }
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]

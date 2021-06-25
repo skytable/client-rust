@@ -34,7 +34,7 @@
 //! struct CoolString(String);
 //!
 //! impl IntoSkyhashBytes for CoolString {
-//!     fn into_string(&self) -> String {
+//!     fn as_string(&self) -> String {
 //!         let mut st = self.0.to_string();
 //!         // add cool
 //!         st.push_str("cool");
@@ -47,7 +47,7 @@
 //!
 //! impl IntoSkyhashAction for CoolStringCollection {
 //!     fn push_into_query(&self, query: &mut Query) {
-//!         self.0.iter().for_each(|item| query.push(item.into_string()));
+//!         self.0.iter().for_each(|item| query.push(item.as_string()));
 //!     }
 //!     fn incr_len_by(&self) -> usize {
 //!         self.0.len()
@@ -63,17 +63,17 @@
 //! }
 //!
 //! // You can now directly append your custom element to queries
-//! fn main() {
-//!     let mut q = Query::new();
-//!     let cool = CoolString(String::from("sayan is "));
-//!     q.push(cool);
-//!     let other_cools = CoolStringCollection(vec![
-//!             CoolString("ferris is ".to_owned()),
-//!             CoolString("llvm is ".to_owned())
-//!     ]);
-//!     q.push(other_cools);
-//!     assert_eq!(q, Query::from(vec!["sayan is cool", "ferris is cool", "llvm is cool"]));
-//! }
+//!
+//! let mut q = Query::new();
+//! let cool = CoolString(String::from("sayan is "));
+//! q.push(cool);
+//! let other_cools = CoolStringCollection(vec![
+//!     CoolString("ferris is ".to_owned()),
+//!     CoolString("llvm is ".to_owned())
+//! ]);
+//! q.push(other_cools);
+//! assert_eq!(q, Query::from(vec!["sayan is cool", "ferris is cool", "llvm is cool"]));
+//!
 //! ```
 
 use crate::Query;
@@ -90,7 +90,7 @@ use crate::Query;
 /// struct MyStringWrapper(String);
 ///
 /// impl IntoSkyhashBytes for MyStringWrapper {
-///     fn into_string(&self) -> String {
+///     fn as_string(&self) -> String {
 ///         self.0.to_string()
 ///     }
 /// }
@@ -98,14 +98,14 @@ use crate::Query;
 ///
 pub trait IntoSkyhashBytes: Send + Sync {
     /// Turn `Self` into a [`String`]
-    fn into_string(&self) -> String;
+    fn as_string(&self) -> String;
 }
 
 macro_rules! impl_skyhash_bytes {
     ($($ty:ty),*) => {
         $(
             impl IntoSkyhashBytes for $ty {
-                fn into_string(&self) -> String {
+                fn as_string(&self) -> String {
                     self.to_string()
                 }
             }
@@ -159,7 +159,7 @@ where
     T: IntoSkyhashBytes,
 {
     fn push_into_query(&self, q: &mut Query) {
-        q._push_arg(self.into_string());
+        q._push_arg(self.as_string());
     }
     fn incr_len_by(&self) -> usize {
         1
@@ -202,7 +202,7 @@ where
     }
 }
 
-#[cfg(not(feature = "compat-const-gen"))]
+#[cfg(feature = "const-gen")]
 impl<T: IntoSkyhashBytes, const N: usize> IntoSkyhashAction for [T; N] {
     fn push_into_query(&self, mut data: &mut Query) {
         self.iter().for_each(|elem| elem.push_into_query(&mut data));
@@ -212,7 +212,7 @@ impl<T: IntoSkyhashBytes, const N: usize> IntoSkyhashAction for [T; N] {
     }
 }
 
-#[cfg(not(feature = "compat-const-gen"))]
+#[cfg(feature = "const-gen")]
 impl<T: IntoSkyhashBytes, const N: usize> IntoSkyhashAction for &'static [T; N] {
     fn push_into_query(&self, mut data: &mut Query) {
         self.iter().for_each(|elem| elem.push_into_query(&mut data));
@@ -233,20 +233,20 @@ pub enum SnapshotResult {
     Busy,
 }
 
-/// Implement this trait for methods in [`crate::actions`] that need them. See the
+/// Implement this trait for methods in [`actions`](crate::actions) that need them. See the
 /// [module level documentation](crate::types) for more information
 pub trait GetIterator<T: IntoSkyhashBytes>: IntoSkyhashAction {
     fn get_iter(&self) -> std::slice::Iter<T>;
 }
 
-#[cfg(not(feature = "compat-const-gen"))]
+#[cfg(feature = "const-gen")]
 impl<T: IntoSkyhashBytes, const N: usize> GetIterator<T> for [T; N] {
     fn get_iter(&self) -> std::slice::Iter<'_, T> {
         self.iter()
     }
 }
 
-#[cfg(not(feature = "compat-const-gen"))]
+#[cfg(feature = "const-gen")]
 impl<T: IntoSkyhashBytes, const N: usize> GetIterator<T> for &'static [T; N] {
     fn get_iter(&self) -> std::slice::Iter<'_, T> {
         self.iter()

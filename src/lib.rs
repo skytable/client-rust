@@ -38,7 +38,7 @@
 //!
 //! First add this to your `Cargo.toml` file:
 //! ```toml
-//! skytable = "0.3.0"
+//! skytable = "0.4.0"
 //! ```
 //! Now open up your `src/main.rs` file and establish a connection to the server while also adding some
 //! imports:
@@ -74,7 +74,7 @@
 //!
 //! If you need to use an `async` API, just change your import to:
 //! ```toml
-//! skytable = { version = "0.3.0", features=["async"], default-features=false }
+//! skytable = { version = "0.4.0", features=["async"], default-features=false }
 //! ```
 //! You can now establish a connection by using `skytable::AsyncConnection::new()`, adding `.await`s wherever
 //! necessary. Do note that you'll the [Tokio runtime](https://tokio.rs).
@@ -84,8 +84,31 @@
 //! With this client driver, it is possible to use both sync and `async` APIs **at the same time**. To do
 //! this, simply change your import to:
 //! ```toml
-//! skytable = { version="0.3.0", features=["sync", "async"] }
+//! skytable = { version="0.4.0", features=["sync", "async"] }
 //! ```
+//!
+//! ## TLS
+//!
+//! If you need to use TLS features, this crate will let you do so with OpenSSL.
+//!
+//! ### Using TLS with sync interfaces
+//! ```toml
+//! skytable = { version="0.4.0", features=["sync","ssl"] }
+//! ```
+//! You can now use the async `sync::TlsConnection` object.
+//! 
+//! ### Using TLS with async interfaces
+//! ```toml
+//! skytable = { version="0.4.0", features=["async","aio-ssl"], default-features=false }
+//! ```
+//! You can now use the async `aio::TlsConnection` object.
+//! 
+//! ### _Packed TLS_ setup
+//!
+//! If you want to pack OpenSSL with your crate, then for sync add `sslv` instead of `ssl` or
+//! add `aio-sslv` instead of `aio-ssl` for async. Adding this will statically link OpenSSL
+//! to your crate. Do note that you'll need a C compiler, GNU Make and Perl to compile OpenSSL
+//! and statically link against it.
 //!
 //! ## Contributing
 //!
@@ -108,13 +131,13 @@ pub mod types;
 use crate::types::GetIterator;
 pub use deserializer::Element;
 pub use respcode::RespCode;
-use std::io::Result as IoResult;
+pub(crate) use std::io::Result as IoResult;
 use types::IntoSkyhashAction;
 use types::IntoSkyhashBytes;
 
 cfg_async!(
-    mod async_con;
-    pub use async_con::Connection as AsyncConnection;
+    pub mod aio;
+    pub use aio::Connection as AsyncConnection;
     use tokio::io::AsyncWriteExt;
 );
 cfg_sync!(
@@ -208,7 +231,7 @@ impl Query {
         self
     }
     pub(in crate) fn _push_arg(&mut self, arg: impl IntoSkyhashBytes) {
-        let arg = arg.into_string();
+        let arg = arg.as_string();
         if arg.is_empty() {
             panic!("Argument cannot be empty")
         }
@@ -244,8 +267,8 @@ impl Query {
         U: IntoSkyhashBytes,
     {
         v1.get_iter().zip(v2.get_iter()).for_each(|(a, b)| {
-            self.push(a.into_string());
-            self.push(b.into_string());
+            self.push(a.as_string());
+            self.push(b.as_string());
         });
         self
     }
@@ -369,3 +392,35 @@ cfg_dbg!(
         assert_eq!(ma_query_len, q_len);
     }
 );
+
+pub mod error {
+    //! Errors
+    cfg_ssl_any!(
+        /// Errors that may occur while initiating an [async TLS connection](crate::aio::TlsConnection)
+        /// or a [sync TLS connection](crate::sync::TlsConnection)
+        pub enum SslError {
+            /// An [I/O Error](std::io::Error) occurred
+            IoError(std::io::Error),
+            /// An [SSL Error](openssl::error::Error) occurred
+            SslError(openssl::ssl::Error),
+        }
+
+        impl From<openssl::ssl::Error> for SslError {
+            fn from(e: openssl::ssl::Error) -> Self {
+                Self::SslError(e)
+            }
+        }
+
+        impl From<std::io::Error> for SslError {
+            fn from(e: std::io::Error) -> Self {
+                Self::IoError(e)
+            }
+        }
+
+        impl From<openssl::error::ErrorStack> for SslError {
+            fn from(e: openssl::error::ErrorStack) -> Self {
+                Self::SslError(e.into())
+            }
+        }
+    );
+}

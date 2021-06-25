@@ -1,5 +1,5 @@
 /*
- * Created on Wed May 12 2021
+ * Created on Wed May 05 2021
  *
  * Copyright (c) 2021 Sayan Nandan <nandansayan@outlook.com>
  *
@@ -15,22 +15,27 @@
  *
 */
 
-//! # Synchronous database connections
+//! # Asynchronous database connections
 //!
 //! This module provides sync interfaces for database connections. There are two versions:
 //! - The [`Connection`]: a connection to the database over Skyhash/TCP
 //! - The [`TlsConnection`]: a connection to the database over Skyhash/TLS
 //!
-//! All the [actions][crate::actions::Actions] can be used on both the connection types
+//! All the [async actions][crate::actions::AsyncActions] can be used on both the connection types
 //!
 
 use crate::deserializer::{ParseError, Parser, RawResponse};
 use crate::IoResult;
 use crate::{Query, Response};
-use std::io::{Error, ErrorKind, Read, Write};
-use std::net::TcpStream;
+use bytes::{Buf, BytesMut};
+use std::io::{Error, ErrorKind};
+use tokio::io::{AsyncReadExt, AsyncWriteExt, BufWriter};
+use tokio::net::TcpStream;
 
-macro_rules! impl_sync_methods {
+/// 4 KB Read Buffer
+const BUF_CAP: usize = 4096;
+
+macro_rules! impl_async_methods {
     ($ty:ty) => {
         impl $ty {
             /// This function will write a [`Query`] to the stream and read the response from the
@@ -40,23 +45,17 @@ macro_rules! impl_sync_methods {
             ///
             /// ## Panics
             /// This method will panic if the [`Query`] supplied is empty (i.e has no arguments)
-            /// This function is a subroutine of `run_query` used to parse the response packet
-            pub fn run_simple_query(&mut self, query: &Query) -> IoResult<Response> {
+            pub async fn run_simple_query(&mut self, query: &Query) -> IoResult<Response> {
                 assert!(query.__len() != 0, "A `Query` cannot be of zero length!");
-                query.write_query_to_sync(&mut self.stream)?;
-                self.stream.flush()?;
+                query.write_query_to(&mut self.stream).await?;
+                self.stream.flush().await?;
                 loop {
-                    let mut buffer = [0u8; 1024];
-                    match self.stream.read(&mut buffer) {
-                        Ok(0) => return Err(Error::from(ErrorKind::ConnectionReset)),
-                        Ok(read) => {
-                            self.buffer.extend(&buffer[..read]);
-                        }
-                        Err(e) => return Err(e),
+                    if 0usize == self.stream.read_buf(&mut self.buffer).await? {
+                        return Err(Error::from(ErrorKind::ConnectionReset));
                     }
                     match self.try_response() {
                         Ok((query, forward_by)) => {
-                            self.buffer.drain(..forward_by);
+                            self.buffer.advance(forward_by);
                             match query {
                                 RawResponse::SimpleQuery(s) => return Ok(Response::Item(s)),
                                 RawResponse::PipelinedQuery(_) => {
@@ -81,6 +80,7 @@ macro_rules! impl_sync_methods {
                     }
                 }
             }
+            /// This function is a subroutine of `run_query` used to parse the response packet
             fn try_response(&mut self) -> Result<(RawResponse, usize), ParseError> {
                 if self.buffer.is_empty() {
                     // The connection was possibly reset
@@ -89,64 +89,60 @@ macro_rules! impl_sync_methods {
                 Parser::new(&self.buffer).parse()
             }
         }
-        impl crate::actions::SyncSocket for $ty {
-            fn run(&mut self, q: Query) -> std::result::Result<Response, std::io::Error> {
-                self.run_simple_query(&q)
+        impl crate::actions::AsyncSocket for $ty {
+            fn run(&mut self, q: Query) -> crate::actions::AsyncResult<std::io::Result<Response>> {
+                Box::pin(async move { self.run_simple_query(&q).await })
             }
         }
     };
 }
 
-cfg_sync!(
-    /// 4 KB Read Buffer
-    const BUF_CAP: usize = 4096;
-
-    #[derive(Debug)]
-    /// A database connection over Skyhash/TCP
+cfg_async!(
+    /// An asynchronous database connection over Skyhash/TCP
     pub struct Connection {
-        stream: TcpStream,
-        buffer: Vec<u8>,
+        stream: BufWriter<TcpStream>,
+        buffer: BytesMut,
     }
 
     impl Connection {
         /// Create a new connection to a Skytable instance hosted on `host` and running on `port`
-        pub fn new(host: &str, port: u16) -> IoResult<Self> {
-            let stream = TcpStream::connect((host, port))?;
+        pub async fn new(host: &str, port: u16) -> IoResult<Self> {
+            let stream = TcpStream::connect((host, port)).await?;
             Ok(Connection {
-                stream,
-                buffer: Vec::with_capacity(BUF_CAP),
+                stream: BufWriter::new(stream),
+                buffer: BytesMut::with_capacity(BUF_CAP),
             })
         }
     }
+    impl_async_methods!(Connection);
 
-    impl_sync_methods!(Connection);
-
-    cfg_sync_ssl_any!(
-        use openssl::ssl::{Ssl, SslContext, SslMethod, SslStream};
+    cfg_async_ssl_any!(
+        use tokio_openssl::SslStream;
+        use openssl::ssl::{SslContext, SslMethod, Ssl};
+        use core::pin::Pin;
         use crate::error::SslError;
-        #[derive(Debug)]
-        /// A database connection over Skyhash/TLS
+
+        /// An asynchronous database connection over Skyhash/TLS
         pub struct TlsConnection {
             stream: SslStream<TcpStream>,
-            buffer: Vec<u8>,
+            buffer: BytesMut
         }
 
         impl TlsConnection {
             /// Pass the `host` and `port` and the path to the CA certificate to use for TLS
-            pub fn new(host: &str, port: u16, ssl_certificate: &str) -> Result<Self, SslError> {
+            pub async fn new(host: &str, port: u16, sslcert: &str) -> Result<Self, SslError> {
                 let mut ctx = SslContext::builder(SslMethod::tls_client())?;
-                ctx.set_ca_file(ssl_certificate)?;
+                ctx.set_ca_file(sslcert)?;
                 let ssl = Ssl::new(&ctx.build())?;
-                let stream = TcpStream::connect((host, port))?;
-                let mut stream = SslStream::new(ssl, stream).map_err(|e| SslError::SslError(e.into()))?;
-                stream.connect()?;
+                let stream = TcpStream::connect((host, port)).await?;
+                let mut stream = SslStream::new(ssl, stream)?;
+                Pin::new(&mut stream).connect().await?;
                 Ok(Self {
                     stream,
-                    buffer: Vec::with_capacity(BUF_CAP),
+                    buffer: BytesMut::with_capacity(BUF_CAP),
                 })
             }
         }
-
-        impl_sync_methods!(TlsConnection);
+        impl_async_methods!(TlsConnection);
     );
 );

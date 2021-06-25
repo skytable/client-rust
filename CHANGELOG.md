@@ -2,11 +2,19 @@
 
 All changes in this project will be noted in this file.
 
-## Version 0.3.1
+## Version 0.4.0
+
+> Breaking changes
 
 - Added backward compatibility for Rust versions < 1.51 (
   people who need const-generics just add `const-gen` to their feature list)
 - Added support for the `POP` query type
+- `into_string` is now called `as_string` to follow naming conventions (trait `IntoSkyhashBytes`)
+- New SSL features:
+  - `ssl`: For sync TLS
+  - `sslv`: For sync TLS (vendored)
+  - `aio-ssl`: For async TLS
+  - `aio-sslv`: For async TLS (vendored)
 
 ## Version 0.3.0
 

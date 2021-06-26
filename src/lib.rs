@@ -399,6 +399,7 @@ pub mod error {
         use std::fmt;
         /// Errors that may occur while initiating an [async TLS connection](crate::aio::TlsConnection)
         /// or a [sync TLS connection](crate::sync::TlsConnection)
+        #[derive(Debug)]
         pub enum SslError {
             /// An [I/O Error](std::io::Error) occurred
             IoError(std::io::Error),

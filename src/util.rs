@@ -15,6 +15,8 @@
  *
 */
 
+#![allow(unused_macros)] // This is done just to avoid unnecessary complications
+
 macro_rules! cfg_sync_ssl_any {
     ($($body:item)*) => {
         $(
@@ -34,7 +36,6 @@ macro_rules! cfg_ssl_any {
         )*
     };
 }
-
 
 macro_rules! cfg_async_ssl_any {
     ($($body:item)*) => {

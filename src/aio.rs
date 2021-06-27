@@ -115,34 +115,34 @@ cfg_async!(
         }
     }
     impl_async_methods!(Connection);
+);
 
-    cfg_async_ssl_any!(
-        use tokio_openssl::SslStream;
-        use openssl::ssl::{SslContext, SslMethod, Ssl};
-        use core::pin::Pin;
-        use crate::error::SslError;
+cfg_async_ssl_any!(
+    use tokio_openssl::SslStream;
+    use openssl::ssl::{SslContext, SslMethod, Ssl};
+    use core::pin::Pin;
+    use crate::error::SslError;
 
-        /// An asynchronous database connection over Skyhash/TLS
-        pub struct TlsConnection {
-            stream: SslStream<TcpStream>,
-            buffer: BytesMut
+    /// An asynchronous database connection over Skyhash/TLS
+    pub struct TlsConnection {
+        stream: SslStream<TcpStream>,
+        buffer: BytesMut
+    }
+
+    impl TlsConnection {
+        /// Pass the `host` and `port` and the path to the CA certificate to use for TLS
+        pub async fn new(host: &str, port: u16, sslcert: &str) -> Result<Self, SslError> {
+            let mut ctx = SslContext::builder(SslMethod::tls_client())?;
+            ctx.set_ca_file(sslcert)?;
+            let ssl = Ssl::new(&ctx.build())?;
+            let stream = TcpStream::connect((host, port)).await?;
+            let mut stream = SslStream::new(ssl, stream)?;
+            Pin::new(&mut stream).connect().await?;
+            Ok(Self {
+                stream,
+                buffer: BytesMut::with_capacity(BUF_CAP),
+            })
         }
-
-        impl TlsConnection {
-            /// Pass the `host` and `port` and the path to the CA certificate to use for TLS
-            pub async fn new(host: &str, port: u16, sslcert: &str) -> Result<Self, SslError> {
-                let mut ctx = SslContext::builder(SslMethod::tls_client())?;
-                ctx.set_ca_file(sslcert)?;
-                let ssl = Ssl::new(&ctx.build())?;
-                let stream = TcpStream::connect((host, port)).await?;
-                let mut stream = SslStream::new(ssl, stream)?;
-                Pin::new(&mut stream).connect().await?;
-                Ok(Self {
-                    stream,
-                    buffer: BytesMut::with_capacity(BUF_CAP),
-                })
-            }
-        }
-        impl_async_methods!(TlsConnection);
-    );
+    }
+    impl_async_methods!(TlsConnection);
 );

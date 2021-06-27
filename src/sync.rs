@@ -121,32 +121,33 @@ cfg_sync!(
 
     impl_sync_methods!(Connection);
 
-    cfg_sync_ssl_any!(
-        use openssl::ssl::{Ssl, SslContext, SslMethod, SslStream};
-        use crate::error::SslError;
-        #[derive(Debug)]
-        /// A database connection over Skyhash/TLS
-        pub struct TlsConnection {
-            stream: SslStream<TcpStream>,
-            buffer: Vec<u8>,
-        }
+);
 
-        impl TlsConnection {
-            /// Pass the `host` and `port` and the path to the CA certificate to use for TLS
-            pub fn new(host: &str, port: u16, ssl_certificate: &str) -> Result<Self, SslError> {
-                let mut ctx = SslContext::builder(SslMethod::tls_client())?;
-                ctx.set_ca_file(ssl_certificate)?;
-                let ssl = Ssl::new(&ctx.build())?;
-                let stream = TcpStream::connect((host, port))?;
-                let mut stream = SslStream::new(ssl, stream).map_err(|e| SslError::SslError(e.into()))?;
-                stream.connect()?;
-                Ok(Self {
-                    stream,
-                    buffer: Vec::with_capacity(BUF_CAP),
-                })
-            }
-        }
+cfg_sync_ssl_any!(
+    use openssl::ssl::{Ssl, SslContext, SslMethod, SslStream};
+    use crate::error::SslError;
+    #[derive(Debug)]
+    /// A database connection over Skyhash/TLS
+    pub struct TlsConnection {
+        stream: SslStream<TcpStream>,
+        buffer: Vec<u8>,
+    }
 
-        impl_sync_methods!(TlsConnection);
-    );
+    impl TlsConnection {
+        /// Pass the `host` and `port` and the path to the CA certificate to use for TLS
+        pub fn new(host: &str, port: u16, ssl_certificate: &str) -> Result<Self, SslError> {
+            let mut ctx = SslContext::builder(SslMethod::tls_client())?;
+            ctx.set_ca_file(ssl_certificate)?;
+            let ssl = Ssl::new(&ctx.build())?;
+            let stream = TcpStream::connect((host, port))?;
+            let mut stream = SslStream::new(ssl, stream).map_err(|e| SslError::SslError(e.into()))?;
+            stream.connect()?;
+            Ok(Self {
+                stream,
+                buffer: Vec::with_capacity(BUF_CAP),
+            })
+        }
+    }
+
+    impl_sync_methods!(TlsConnection);
 );

@@ -1,2 +1,2 @@
 [workspace]
-members = ["basic", "actions"]
+members = ["basic", "actions", "aio"]

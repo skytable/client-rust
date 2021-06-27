@@ -1,10 +1,10 @@
 [package]
-name = "basic"
+name = "aio"
 version = "0.1.0"
-authors = ["Sayan Nandan <nandansayan@outlook.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-skytable = "0.4.0"
+skytable = { version="*", features=["async"], default-features=false }
+tokio = { version="*", features=["full"] }

@@ -33,7 +33,7 @@
 //! use skytable::{actions::Actions, Connection};
 //! let mut con = Connection::new("127.0.0.1", 2003).unwrap();
 //! con.set("x", "100").unwrap();
-//! assert_eq!(con.get("x").unwrap(), "100".to_owned());
+//! assert_eq!(con.get("x").unwrap(), Vec::from("100"));
 //!
 //! ```
 
@@ -173,7 +173,7 @@ implement_actions!(
         Response::Item(Element::RespCode(RespCode::Okay)) => {}
     }
     /// Get the value of a key
-    fn get(key: impl IntoSkyhashBytes + 's) -> String {
+    fn get(key: impl IntoSkyhashBytes + 's) -> Vec<u8> {
         { Query::from("get").arg(key)}
         Response::Item(Element::String(st)) => st
     }
@@ -185,7 +185,7 @@ implement_actions!(
     /// Returns a vector of keys
     ///
     /// Do note that the order might be completely meaningless
-    fn lskeys(count: usize) -> Vec<String> {
+    fn lskeys(count: usize) -> Vec<Vec<u8>> {
         { Query::from("lskeys").arg(count)}
         Response::Item(Element::FlatArray(arr)) => arr
     }

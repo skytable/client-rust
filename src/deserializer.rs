@@ -65,12 +65,12 @@ pub(super) struct Parser<'a> {
 pub enum Element {
     /// Arrays can be nested! Their `<tsymbol>` is `&`
     Array(Vec<Element>),
-    /// A String value; `<tsymbol>` is `+`
-    String(String),
+    /// A binary/unicode string value; `<tsymbol>` is `+`
+    String(Vec<u8>),
     /// An unsigned integer value; `<tsymbol>` is `:`
     UnsignedInt(u64),
     /// A non-recursive String array; tsymbol: `_`
-    FlatArray(Vec<String>),
+    FlatArray(Vec<Vec<u8>>),
     /// A response code
     RespCode(RespCode),
 }
@@ -280,9 +280,9 @@ impl<'a> Parser<'a> {
         }
     }
     /// The cursor should have passed the `+` tsymbol
-    fn parse_next_string(&mut self) -> ParseResult<String> {
+    fn parse_next_string(&mut self) -> ParseResult<Vec<u8>> {
         let our_string_chunk = self.__get_next_element()?;
-        let our_string = String::from_utf8_lossy(&our_string_chunk).to_string();
+        let our_string = Vec::from(our_string_chunk);
         if self.will_cursor_give_linefeed()? {
             // there is a lf after the end of the string; great!
             // let's skip that now
@@ -337,7 +337,7 @@ impl<'a> Parser<'a> {
         }
     }
     /// The cursor should have passed the tsymbol
-    fn parse_next_flat_array(&mut self) -> ParseResult<Vec<String>> {
+    fn parse_next_flat_array(&mut self) -> ParseResult<Vec<Vec<u8>>> {
         let (start, stop) = self.read_line();
         if let Some(our_size_chunk) = self.buffer.get(start..stop) {
             let array_size = Self::parse_into_usize(&our_size_chunk)?;

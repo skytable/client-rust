@@ -57,10 +57,14 @@
 //!     let mut con = Connection::new("127.0.0.1", 2003)?;
 //!     let query = Query::from("heya");
 //!     let res = con.run_simple_query(&query)?;
-//!     assert_eq!(res, Response::Item(Element::String("HEY!".to_owned())));
+//!     assert_eq!(res, Response::Item(Element::String(Vec::from("HEY"))));
 //!     Ok(())
 //! }
 //! ```
+//!
+//! **And why was our string a [`Vec`]?**
+//! That's because the server sends a binary string with arbitrary bytes. The returned value may
+//! or may not be unicode, and this depends on the data type you set for your table.
 //!
 //! Way to go &mdash; you're all set! Now go ahead and run more advanced queries!
 //!

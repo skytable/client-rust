@@ -69,7 +69,7 @@ macro_rules! impl_async_methods {
                                 self.buffer.clear();
                                 return Ok(Response::InvalidResponse);
                             }
-                            ParseError::DataTypeParseError => return Ok(Response::ParseError),
+                            ParseError::DataTypeError => return Ok(Response::ParseError),
                             ParseError::Empty => {
                                 return Err(Error::from(ErrorKind::ConnectionReset))
                             }

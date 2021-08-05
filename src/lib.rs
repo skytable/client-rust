@@ -149,6 +149,106 @@ cfg_sync!(
     pub use sync::Connection;
 );
 
+#[derive(Debug)]
+/// A connection builder for easily building connections
+///
+/// ## Example (sync)
+/// ```no_run
+/// let con =
+///     ConnectionBuilder::new()
+///     .set_host("127.0.0.1")
+///     .set_port(2003)
+///     .get_connection()
+///     .unwrap();
+/// ```
+///
+/// ## Example (async)
+/// ```no_run
+/// let con =
+///     ConnectionBuilder::new()
+///     .set_host("127.0.0.1")
+///     .set_port(2003)
+///     .get_async_connection()
+///     .unwrap();
+/// ```
+pub struct ConnectionBuilder<'a> {
+    port: Option<u16>,
+    host: Option<&'a str>,
+}
+
+impl<'a> Default for ConnectionBuilder<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub type ConnectionBuilderResult<T> = Result<T, error::Error>;
+
+impl<'a> ConnectionBuilder<'a> {
+    /// Create an empty connection builder
+    pub fn new() -> Self {
+        Self {
+            port: None,
+            host: None,
+        }
+    }
+    /// Set the port
+    pub fn set_port(mut self, port: u16) -> Self {
+        self.port = Some(port);
+        self
+    }
+    /// Set the host
+    pub fn set_host(mut self, host: &'a str) -> Self {
+        self.host = Some(host);
+        self
+    }
+    cfg_sync! {
+        /// Get a [sync connection](sync::Connection) to the database
+        pub fn get_connection(&self) -> ConnectionBuilderResult<sync::Connection> {
+            let con =
+                sync::Connection::new(self.host.unwrap_or("127.0.0.1"), self.port.unwrap_or(2003))?;
+            Ok(con)
+        }
+        cfg_sync_ssl_any! {
+            /// Get a [sync TLS connection](sync::TlsConnection) to the database
+            pub fn get_tls_connection(
+                &self,
+                sslcert: String,
+            ) -> ConnectionBuilderResult<sync::TlsConnection> {
+                let con = sync::TlsConnection::new(
+                    self.host.unwrap_or("127.0.0.1"),
+                    self.port.unwrap_or(2003),
+                    &sslcert,
+                )?;
+                Ok(con)
+            }
+        }
+    }
+    cfg_async! {
+        /// Get an [async connection](aio::Connection) to the database
+        pub async fn get_async_connection(&self) -> ConnectionBuilderResult<aio::Connection> {
+            let con = aio::Connection::new(self.host.unwrap_or("127.0.0.1"), self.port.unwrap_or(2003))
+                .await?;
+            Ok(con)
+        }
+        cfg_async_ssl_any! {
+            /// Get an [async TLS connection](aio::TlsConnection) to the database
+            pub async fn get_async_tls_connection(
+                &self,
+                sslcert: String,
+            ) -> ConnectionBuilderResult<aio::TlsConnection> {
+                let con = aio::TlsConnection::new(
+                    self.host.unwrap_or("127.0.0.1"),
+                    self.port.unwrap_or(2003),
+                    &sslcert,
+                )
+                .await?;
+                Ok(con)
+            }
+        }
+    }
+}
+
 #[macro_export]
 /// A macro that can be used to easily create queries with _almost_ variadic properties.
 /// Where you'd normally create queries like this:
@@ -438,4 +538,69 @@ pub mod error {
             }
         }
     );
+    #[derive(Debug)]
+    /// An error originating from the Skyhash protocol
+    pub enum SkyhashError {
+        /// The server sent an invalid response
+        InvalidResponse,
+        /// The server sent a response but it could not be parsed
+        ParseError,
+        /// The server sent a data type not supported by this client version
+        UnsupportedDataType,
+    }
+
+    #[derive(Debug)]
+    /// A standard error type for the client driver
+    pub enum Error {
+        /// An I/O error occurred
+        IoError(std::io::Error),
+        #[cfg(all(feature = "sync", any(feature = "ssl", feature = "sslv")))]
+        #[cfg_attr(
+            docsrs,
+            doc(cfg(all(feature = "sync", any(feature = "ssl", feature = "sslv"))))
+        )]
+        /// An SSL error occurred
+        SslError(openssl::ssl::Error),
+        /// A Skyhash error occurred
+        SkyError(SkyhashError),
+        /// An application level parse error occurred
+        ParseError,
+    }
+
+    #[cfg(all(feature = "sync", any(feature = "ssl", feature = "sslv")))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(all(feature = "sync", any(feature = "ssl", feature = "sslv"))))
+    )]
+    impl From<openssl::ssl::Error> for Error {
+        fn from(err: openssl::ssl::Error) -> Self {
+            Self::SslError(err)
+        }
+    }
+
+    impl From<std::io::Error> for Error {
+        fn from(err: std::io::Error) -> Self {
+            Self::IoError(err)
+        }
+    }
+
+    #[cfg(all(feature = "sync", any(feature = "ssl", feature = "sslv")))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(all(feature = "sync", any(feature = "ssl", feature = "sslv"))))
+    )]
+    impl From<SslError> for Error {
+        fn from(err: SslError) -> Self {
+            match err {
+                SslError::IoError(ioerr) => Self::IoError(ioerr),
+                SslError::SslError(sslerr) => Self::SslError(sslerr),
+            }
+        }
+    }
+
+    impl From<SkyhashError> for Error {
+        fn from(err: SkyhashError) -> Self {
+            Self::SkyError(err)
+        }
+    }
 }

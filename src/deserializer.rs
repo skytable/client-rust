@@ -92,7 +92,7 @@ pub enum ParseError {
     /// A data type was given but the parser failed to serialize it into this type
     ///
     /// This can happen not just for elements but can also happen for their sizes ([`Self::parse_into_u64`])
-    DataTypeParseError,
+    DataTypeError,
     /// A data type that the client doesn't know was passed into the query
     ///
     /// This is a frequent problem that can arise between different server editions as more data types
@@ -188,7 +188,7 @@ impl<'a> Parser<'a> {
         for dig in byte_iter {
             if !dig.is_ascii_digit() {
                 // dig has to be an ASCII digit
-                return Err(ParseError::DataTypeParseError);
+                return Err(ParseError::DataTypeError);
             }
             // 48 is the ASCII code for 0, and 57 is the ascii code for 9
             // so if 0 is given, the subtraction should give 0; similarly
@@ -200,11 +200,11 @@ impl<'a> Parser<'a> {
             // The usize can overflow; check that case
             let product = match item_usize.checked_mul(10) {
                 Some(not_overflowed) => not_overflowed,
-                None => return Err(ParseError::DataTypeParseError),
+                None => return Err(ParseError::DataTypeError),
             };
             let sum = match product.checked_add(curdig) {
                 Some(not_overflowed) => not_overflowed,
-                None => return Err(ParseError::DataTypeParseError),
+                None => return Err(ParseError::DataTypeError),
             };
             item_usize = sum;
         }
@@ -220,7 +220,7 @@ impl<'a> Parser<'a> {
         for dig in byte_iter {
             if !dig.is_ascii_digit() {
                 // dig has to be an ASCII digit
-                return Err(ParseError::DataTypeParseError);
+                return Err(ParseError::DataTypeError);
             }
             // 48 is the ASCII code for 0, and 57 is the ascii code for 9
             // so if 0 is given, the subtraction should give 0; similarly
@@ -232,11 +232,11 @@ impl<'a> Parser<'a> {
             // Now the entire u64 can overflow, so let's attempt to check it
             let product = match item_u64.checked_mul(10) {
                 Some(not_overflowed) => not_overflowed,
-                None => return Err(ParseError::DataTypeParseError),
+                None => return Err(ParseError::DataTypeError),
             };
             let sum = match product.checked_add(curdig) {
                 Some(not_overflowed) => not_overflowed,
-                None => return Err(ParseError::DataTypeParseError),
+                None => return Err(ParseError::DataTypeError),
             };
             item_u64 = sum;
         }
@@ -340,7 +340,7 @@ impl<'a> Parser<'a> {
     fn parse_next_flat_array(&mut self) -> ParseResult<Vec<Vec<u8>>> {
         let (start, stop) = self.read_line();
         if let Some(our_size_chunk) = self.buffer.get(start..stop) {
-            let array_size = Self::parse_into_usize(&our_size_chunk)?;
+            let array_size = Self::parse_into_usize(our_size_chunk)?;
             let mut array = Vec::with_capacity(array_size);
             for _ in 0..array_size {
                 if let Some(tsymbol) = self.buffer.get(self.cursor) {

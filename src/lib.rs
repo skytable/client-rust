@@ -554,10 +554,20 @@ pub mod error {
     pub enum Error {
         /// An I/O error occurred
         IoError(std::io::Error),
-        #[cfg(all(feature = "sync", any(feature = "ssl", feature = "sslv")))]
+        #[cfg(any(
+            feature = "ssl",
+            feature = "sslv",
+            feature = "aio-ssl",
+            feature = "aio-sslv"
+        ))]
         #[cfg_attr(
             docsrs,
-            doc(cfg(all(feature = "sync", any(feature = "ssl", feature = "sslv"))))
+            doc(cfg(any(
+                feature = "ssl",
+                feature = "sslv",
+                feature = "aio-ssl",
+                feature = "aio-sslv"
+            )))
         )]
         /// An SSL error occurred
         SslError(openssl::ssl::Error),
@@ -567,14 +577,11 @@ pub mod error {
         ParseError,
     }
 
-    #[cfg(all(feature = "sync", any(feature = "ssl", feature = "sslv")))]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(all(feature = "sync", any(feature = "ssl", feature = "sslv"))))
-    )]
-    impl From<openssl::ssl::Error> for Error {
-        fn from(err: openssl::ssl::Error) -> Self {
-            Self::SslError(err)
+    cfg_ssl_any! {
+        impl From<openssl::ssl::Error> for Error {
+            fn from(err: openssl::ssl::Error) -> Self {
+                Self::SslError(err)
+            }
         }
     }
 
@@ -584,16 +591,13 @@ pub mod error {
         }
     }
 
-    #[cfg(all(feature = "sync", any(feature = "ssl", feature = "sslv")))]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(all(feature = "sync", any(feature = "ssl", feature = "sslv"))))
-    )]
-    impl From<SslError> for Error {
-        fn from(err: SslError) -> Self {
-            match err {
-                SslError::IoError(ioerr) => Self::IoError(ioerr),
-                SslError::SslError(sslerr) => Self::SslError(sslerr),
+    cfg_ssl_any! {
+        impl From<SslError> for Error {
+            fn from(err: SslError) -> Self {
+                match err {
+                    SslError::IoError(ioerr) => Self::IoError(ioerr),
+                    SslError::SslError(sslerr) => Self::SslError(sslerr),
+                }
             }
         }
     }

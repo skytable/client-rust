@@ -33,7 +33,7 @@
 //! use skytable::{actions::Actions, Connection};
 //! let mut con = Connection::new("127.0.0.1", 2003).unwrap();
 //! con.set("x", "100").unwrap();
-//! assert_eq!(con.get("x").unwrap(), Vec::from("100"));
+//! assert_eq!(con.get("x").unwrap(), "100");
 //!
 //! ```
 

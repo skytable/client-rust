@@ -75,6 +75,10 @@ pub enum Element {
     FlatArray(Vec<Vec<u8>>),
     /// A response code
     RespCode(RespCode),
+    /// An array of unicode strings
+    StrArray(Vec<String>),
+    /// An array of binary strings
+    BinArray(Vec<Vec<u8>>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -325,7 +329,7 @@ impl<'a> Parser<'a> {
     fn parse_next_element(&mut self) -> ParseResult<Element> {
         if let Some(tsymbol) = self.buffer.get(self.cursor) {
             // so we have a tsymbol; nice, let's match it
-            // but advance the cursor before doing that
+            // but advance the cursor before doing that (skip)
             self.incr_cursor();
             let ret = match *tsymbol {
                 b'?' => Element::Binstr(self.parse_next_binstr()?),
@@ -333,12 +337,59 @@ impl<'a> Parser<'a> {
                 b':' => Element::UnsignedInt(self.parse_next_u64()?),
                 b'&' => Element::Array(self.parse_next_array()?),
                 b'!' => Element::RespCode(self.parse_next_respcode()?),
+                b'@' => {
+                    // hmmm, a typed array; let's check the tsymbol
+                    if let Some(array_type) = self.buffer.get(self.cursor) {
+                        // got tsymbol, let's skip it
+                        self.incr_cursor();
+                        match array_type {
+                            b'+' => Element::StrArray(self.parse_next_typed_array_str()?),
+                            b'?' => Element::BinArray(self.parse_next_typed_array_bin()?),
+                            _ => return Err(ParseError::UnknownDatatype),
+                        }
+                    } else {
+                        // if we couldn't fetch a tsymbol, there wasn't enough
+                        // data left
+                        return Err(ParseError::NotEnough);
+                    }
+                }
                 b'_' => Element::FlatArray(self.parse_next_flat_array()?),
                 _ => return Err(ParseError::UnknownDatatype),
             };
             Ok(ret)
         } else {
             // Not enough bytes to read an element
+            Err(ParseError::NotEnough)
+        }
+    }
+    /// The cursor should have passed the `@+` chars
+    fn parse_next_typed_array_str(&mut self) -> ParseResult<Vec<String>> {
+        let (start, stop) = self.read_line();
+        if let Some(our_size_chunk) = self.buffer.get(start..stop) {
+            // so we have a size chunk; let's get the size
+            let array_size = Self::parse_into_usize(our_size_chunk)?;
+            let mut array = Vec::with_capacity(array_size);
+            for _ in 0..array_size {
+                // no tsymbol, just elements and their sizes
+                array.push(self.parse_next_string()?);
+            }
+            Ok(array)
+        } else {
+            Err(ParseError::NotEnough)
+        }
+    }
+    /// The cursor should have passed the `@?` chars
+    fn parse_next_typed_array_bin(&mut self) -> ParseResult<Vec<Vec<u8>>> {
+        let (start, stop) = self.read_line();
+        if let Some(our_size_chunk) = self.buffer.get(start..stop) {
+            // got size chunk, let's get the size
+            let array_size = Self::parse_into_usize(our_size_chunk)?;
+            let mut array = Vec::with_capacity(array_size);
+            for _ in 0..array_size {
+                array.push(self.parse_next_binstr()?);
+            }
+            Ok(array)
+        } else {
             Err(ParseError::NotEnough)
         }
     }
@@ -426,4 +477,34 @@ impl<'a> Parser<'a> {
             }
         }
     }
+}
+
+#[test]
+fn test_typed_str_array() {
+    let typed_array_packet = "*1\n@+3\n3\nthe\n3\ncat\n6\nmeowed\n".as_bytes();
+    let (parsed, forward) = Parser::new(typed_array_packet).parse().unwrap();
+    assert_eq!(forward, typed_array_packet.len());
+    assert_eq!(
+        parsed,
+        RawResponse::SimpleQuery(Element::StrArray(vec![
+            "the".to_owned(),
+            "cat".to_owned(),
+            "meowed".to_owned()
+        ]))
+    );
+}
+
+#[test]
+fn test_typed_bin_array() {
+    let typed_array_packet = "*1\n@?3\n3\nthe\n3\ncat\n6\nmeowed\n".as_bytes();
+    let (parsed, forward) = Parser::new(typed_array_packet).parse().unwrap();
+    assert_eq!(forward, typed_array_packet.len());
+    assert_eq!(
+        parsed,
+        RawResponse::SimpleQuery(Element::BinArray(vec![
+            Vec::from("the"),
+            Vec::from("cat"),
+            Vec::from("meowed")
+        ]))
+    );
 }

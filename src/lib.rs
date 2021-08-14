@@ -57,7 +57,7 @@
 //!     let mut con = Connection::new("127.0.0.1", 2003)?;
 //!     let query = Query::from("heya");
 //!     let res = con.run_simple_query(&query)?;
-//!     assert_eq!(res, Response::Item(Element::String(Vec::from("HEY"))));
+//!     assert_eq!(res, Response::Item(Element::Binstr(Vec::from("HEY"))));
 //!     Ok(())
 //! }
 //! ```
@@ -154,6 +154,7 @@ cfg_sync!(
 ///
 /// ## Example (sync)
 /// ```no_run
+/// use skytable::ConnectionBuilder;
 /// let con =
 ///     ConnectionBuilder::new()
 ///     .set_host("127.0.0.1")
@@ -163,13 +164,17 @@ cfg_sync!(
 /// ```
 ///
 /// ## Example (async)
-/// ```no_run
-/// let con =
-///     ConnectionBuilder::new()
-///     .set_host("127.0.0.1")
-///     .set_port(2003)
-///     .get_async_connection()
-///     .unwrap();
+/// ```no_test
+/// use skytable::ConnectionBuilder;
+/// async fn main() {
+///     let con =
+///         ConnectionBuilder::new()
+///         .set_host("127.0.0.1")
+///         .set_port(2003)
+///         .get_async_connection()
+///         .await
+///         .unwrap();
+/// }
 /// ```
 pub struct ConnectionBuilder<'a> {
     port: Option<u16>,

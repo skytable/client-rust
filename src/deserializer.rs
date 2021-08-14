@@ -65,8 +65,10 @@ pub(super) struct Parser<'a> {
 pub enum Element {
     /// Arrays can be nested! Their `<tsymbol>` is `&`
     Array(Vec<Element>),
-    /// A binary/unicode string value; `<tsymbol>` is `+`
-    String(Vec<u8>),
+    /// An unicode string value; `<tsymbol>` is `+`
+    Str(String),
+    /// A binary string (`?`)
+    Binstr(Vec<u8>),
     /// An unsigned integer value; `<tsymbol>` is `:`
     UnsignedInt(u64),
     /// A non-recursive String array; tsymbol: `_`
@@ -279,19 +281,22 @@ impl<'a> Parser<'a> {
             Err(ParseError::NotEnough)
         }
     }
-    /// The cursor should have passed the `+` tsymbol
-    fn parse_next_string(&mut self) -> ParseResult<Vec<u8>> {
-        let our_string_chunk = self.__get_next_element()?;
-        let our_string = Vec::from(our_string_chunk);
+    /// The cursor should have passed the `?` tsymbol
+    fn parse_next_binstr(&mut self) -> ParseResult<Vec<u8>> {
+        let our_string_chunk = self.__get_next_element()?.to_owned();
         if self.will_cursor_give_linefeed()? {
-            // there is a lf after the end of the string; great!
+            // there is a lf after the end of the binary string; great!
             // let's skip that now
             self.incr_cursor();
             // let's return our string
-            Ok(our_string)
+            Ok(our_string_chunk)
         } else {
             Err(ParseError::UnexpectedByte)
         }
+    }
+    /// The cursor should have passed the `+` tsymbol
+    fn parse_next_string(&mut self) -> ParseResult<String> {
+        Ok(String::from_utf8_lossy(&self.parse_next_binstr()?).to_string())
     }
     /// The cursor should have passed the `:` tsymbol
     fn parse_next_u64(&mut self) -> ParseResult<u64> {
@@ -323,7 +328,8 @@ impl<'a> Parser<'a> {
             // but advance the cursor before doing that
             self.incr_cursor();
             let ret = match *tsymbol {
-                b'+' => Element::String(self.parse_next_string()?),
+                b'?' => Element::Binstr(self.parse_next_binstr()?),
+                b'+' => Element::Str(self.parse_next_string()?),
                 b':' => Element::UnsignedInt(self.parse_next_u64()?),
                 b'&' => Element::Array(self.parse_next_array()?),
                 b'!' => Element::RespCode(self.parse_next_respcode()?),
@@ -347,7 +353,7 @@ impl<'a> Parser<'a> {
                     // good, there is a tsymbol; move the cursor ahead
                     self.incr_cursor();
                     let ret = match *tsymbol {
-                        b'+' => self.parse_next_string()?,
+                        b'+' => self.parse_next_binstr()?,
                         _ => return Err(ParseError::UnknownDatatype),
                     };
                     array.push(ret);

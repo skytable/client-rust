@@ -173,9 +173,9 @@ implement_actions!(
         Response::Item(Element::RespCode(RespCode::Okay)) => {}
     }
     /// Get the value of a key
-    fn get(key: impl IntoSkyhashBytes + 's) -> Vec<u8> {
+    fn get(key: impl IntoSkyhashBytes + 's) -> String {
         { Query::from("get").arg(key)}
-        Response::Item(Element::String(st)) => st
+        Response::Item(Element::Str(st)) => st
     }
     /// Get the length of a key
     fn keylen(key: impl IntoSkyhashBytes + 's) -> usize {

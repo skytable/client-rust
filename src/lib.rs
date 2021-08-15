@@ -455,8 +455,6 @@ impl Query {
             // the newline
             len += 1;
             element_lengths.iter().for_each(|elem| {
-                // the tsymbol
-                len += 1;
                 // the digit length
                 len += dig_count(*elem);
                 // the newline

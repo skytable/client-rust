@@ -37,6 +37,7 @@
 //!
 //! ```
 
+use crate::deserializer::FlatElement;
 use crate::types::Array;
 use crate::types::SnapshotResult;
 use crate::types::Str;
@@ -187,7 +188,7 @@ implement_actions!(
     /// Returns a vector of keys
     ///
     /// Do note that the order might be completely meaningless
-    fn lskeys(count: usize) -> Vec<Vec<u8>> {
+    fn lskeys(count: usize) -> Vec<FlatElement> {
         { Query::from("lskeys").arg(count)}
         Response::Item(Element::FlatArray(arr)) => arr
     }

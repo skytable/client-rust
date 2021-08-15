@@ -58,6 +58,14 @@ pub(super) struct Parser<'a> {
 }
 
 #[derive(Debug, PartialEq)]
+pub enum FlatElement {
+    String(String),
+    Binstr(Vec<u8>),
+    RespCode(RespCode),
+    UnsignedInt(u64),
+}
+
+#[derive(Debug, PartialEq)]
 #[non_exhaustive]
 /// # Data Types
 ///
@@ -71,8 +79,8 @@ pub enum Element {
     Binstr(Vec<u8>),
     /// An unsigned integer value; `<tsymbol>` is `:`
     UnsignedInt(u64),
-    /// A non-recursive String array; tsymbol: `_`
-    FlatArray(Vec<Vec<u8>>),
+    /// A non-recursive array; tsymbol: `_`
+    FlatArray(Vec<FlatElement>),
     /// A response code
     RespCode(RespCode),
     /// An array of unicode strings
@@ -441,7 +449,7 @@ impl<'a> Parser<'a> {
         }
     }
     /// The cursor should have passed the tsymbol
-    fn parse_next_flat_array(&mut self) -> ParseResult<Vec<Vec<u8>>> {
+    fn parse_next_flat_array(&mut self) -> ParseResult<Vec<FlatElement>> {
         let (start, stop) = self.read_line();
         if let Some(our_size_chunk) = self.buffer.get(start..stop) {
             let array_size = Self::parse_into_usize(our_size_chunk)?;
@@ -451,7 +459,10 @@ impl<'a> Parser<'a> {
                     // good, there is a tsymbol; move the cursor ahead
                     self.incr_cursor();
                     let ret = match *tsymbol {
-                        b'+' => self.parse_next_binstr()?,
+                        b'+' => FlatElement::String(self.parse_next_string()?),
+                        b'?' => FlatElement::Binstr(self.parse_next_binstr()?),
+                        b'!' => FlatElement::RespCode(self.parse_next_respcode()?),
+                        b':' => FlatElement::UnsignedInt(self.parse_next_u64()?),
                         _ => return Err(ParseError::UnknownDatatype),
                     };
                     array.push(ret);

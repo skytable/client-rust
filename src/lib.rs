@@ -345,8 +345,7 @@ impl Query {
             panic!("Argument cannot be empty")
         }
         // A data element will look like:
-        // `+<bytes_in_next_line>\n<data>`
-        self.data.push(b'+');
+        // `<bytes_in_next_line>\n<data>`
         let bytes_in_next_line = arg.len().to_string().into_bytes();
         self.data.extend(bytes_in_next_line);
         // add the LF char
@@ -398,7 +397,7 @@ impl Query {
             stream.write_all(b"*1\n").await?;
             // Add the dataframe
             let number_of_items_in_datagroup = self.__len().to_string().into_bytes();
-            stream.write_all(&[b'_']).await?;
+            stream.write_all(&[b'~']).await?;
             stream.write_all(&number_of_items_in_datagroup).await?;
             stream.write_all(&[b'\n']).await?;
             stream.write_all(self.get_holding_buffer()).await?;
@@ -416,7 +415,7 @@ impl Query {
             stream.write_all(b"*1\n")?;
             // Add the dataframe
             let number_of_items_in_datagroup = self.__len().to_string().into_bytes();
-            stream.write_all(&[b'_'])?;
+            stream.write_all(&[b'~'])?;
             stream.write_all(&number_of_items_in_datagroup)?;
             stream.write_all(&[b'\n'])?;
             stream.write_all(self.get_holding_buffer())?;
@@ -433,7 +432,7 @@ impl Query {
         /// return the raw query that would be written to the stream, serialized using the Skyhash serialization protocol
         pub fn into_raw_query(self) -> Vec<u8> {
             let mut v = Vec::with_capacity(self.data.len());
-            v.extend(b"*1\n_");
+            v.extend(b"*1\n~");
             v.extend(self.__len().to_string().into_bytes());
             v.extend(b"\n");
             v.extend(self.get_holding_buffer());

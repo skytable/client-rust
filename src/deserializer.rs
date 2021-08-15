@@ -27,6 +27,7 @@
 //! by Sayan Nandan and this is the first client implementation of the protocol
 //!
 
+use crate::types::FlatElement;
 use crate::RespCode;
 use std::hint::unreachable_unchecked;
 
@@ -55,14 +56,6 @@ pub(super) struct Parser<'a> {
     cursor: usize,
     /// The buffer slice
     buffer: &'a [u8],
-}
-
-#[derive(Debug, PartialEq)]
-pub enum FlatElement {
-    String(String),
-    Binstr(Vec<u8>),
-    RespCode(RespCode),
-    UnsignedInt(u64),
 }
 
 #[derive(Debug, PartialEq)]

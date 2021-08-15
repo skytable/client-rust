@@ -76,6 +76,7 @@
 //!
 //! ```
 
+use crate::RespCode;
 use crate::Query;
 
 /// Anything that implements this trait can be turned into a [`String`]. This trait is implemented
@@ -281,4 +282,12 @@ pub enum Array {
 pub enum Str {
     Unicode(String),
     Binary(Vec<u8>),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum FlatElement {
+    String(String),
+    Binstr(Vec<u8>),
+    RespCode(RespCode),
+    UnsignedInt(u64),
 }

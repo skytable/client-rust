@@ -37,8 +37,8 @@
 //!
 //! ```
 
-use crate::deserializer::FlatElement;
 use crate::types::Array;
+use crate::types::FlatElement;
 use crate::types::SnapshotResult;
 use crate::types::Str;
 use crate::Element;

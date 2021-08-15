@@ -39,6 +39,10 @@ pub enum RespCode {
     OtherError,
     /// `7`: Wrongtype Error
     Wrongtype,
+    /// `8`: Unknown Data Type Error
+    UnknownDataType,
+    /// `9`: Encoding error
+    EncodingError,
 }
 
 impl RespCode {
@@ -54,6 +58,8 @@ impl RespCode {
                 5 => ServerError,
                 6 => OtherError,
                 7 => Wrongtype,
+                8 => UnknownDataType,
+                9 => EncodingError,
                 _ => Self::ErrorString(st.to_owned()),
             },
             Err(_) => ErrorString(st.to_owned()),
@@ -73,6 +79,8 @@ impl From<RespCode> for u8 {
             ServerError => 5,
             OtherError | ErrorString(_) => 6,
             Wrongtype => 7,
+            UnknownDataType => 8,
+            EncodingError => 9,
         }
     }
 }

@@ -37,7 +37,9 @@
 //!
 //! ```
 
+use crate::types::Array;
 use crate::types::SnapshotResult;
+use crate::types::Str;
 use crate::Element;
 use crate::GetIterator;
 use crate::IntoSkyhashAction;
@@ -193,9 +195,10 @@ implement_actions!(
     ///
     /// This returns a vector of [`Element`]s which either contain the values
     /// as strings or contains `Not Found (Code: 1)` response codes
-    fn mget(keys: impl IntoSkyhashAction+ 's) -> Vec<Element> {
+    fn mget(keys: impl IntoSkyhashAction+ 's) -> Array {
         { Query::from("mget").arg(keys)}
-        Response::Item(Element::Array(array)) => array
+        Response::Item(Element::BinArray(brr)) => Array::Bin(brr),
+        Response::Item(Element::StrArray(srr)) => Array::Str(srr)
     }
     /// Creates a snapshot
     ///
@@ -247,9 +250,16 @@ implement_actions!(
     ///
     /// This should return either the corresponding values of the provided keys or `Not Found`
     /// error codes
-    fn pop(keys: impl IntoSkyhashAction + 's) -> Vec<Element> {
+    fn pop(keys: impl IntoSkyhashBytes + 's) -> Str {
         { Query::from("POP").arg(keys) }
-        Response::Item(Element::Array(arr)) => arr
+        Response::Item(Element::Str(st)) => Str::Unicode(st),
+        Response::Item(Element::Binstr(bstr)) => Str::Binary(bstr)
+    }
+    /// Consumes the provided keys if they exist
+    fn mpop(keys: impl IntoSkyhashAction + 's) -> Array {
+        { Query::from("mpop").arg(keys)}
+        Response::Item(Element::BinArray(brr)) => Array::Bin(brr),
+        Response::Item(Element::StrArray(srr)) => Array::Str(srr)
     }
     /// Deletes all the provided keys if they exist or doesn't do anything at all. This method
     /// will return true if all the provided keys were deleted, else it will return false

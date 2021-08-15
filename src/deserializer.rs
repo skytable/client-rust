@@ -76,9 +76,9 @@ pub enum Element {
     /// A response code
     RespCode(RespCode),
     /// An array of unicode strings
-    StrArray(Vec<String>),
+    StrArray(Vec<Option<String>>),
     /// An array of binary strings
-    BinArray(Vec<Vec<u8>>),
+    BinArray(Vec<Option<Vec<u8>>>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -298,9 +298,48 @@ impl<'a> Parser<'a> {
             Err(ParseError::UnexpectedByte)
         }
     }
+    /// Parse the next null checked element
+    fn parse_next_chunk_nullck(&mut self) -> ParseResult<Option<&[u8]>> {
+        // we have the chunk
+        let (start, stop) = self.read_line();
+        if let Some(sizeline) = self.buffer.get(start..stop) {
+            let string_size = Self::parse_into_usize_nullck(sizeline)?;
+            if let Some(size) = string_size {
+                // so it isn't null
+                let our_chunk = self.read_until(size)?;
+                Ok(Some(our_chunk))
+            } else {
+                Ok(None)
+            }
+        } else {
+            Err(ParseError::NotEnough)
+        }
+    }
     /// The cursor should have passed the `+` tsymbol
     fn parse_next_string(&mut self) -> ParseResult<String> {
         Ok(String::from_utf8_lossy(&self.parse_next_binstr()?).to_string())
+    }
+    fn parse_next_binstr_nullck(&mut self) -> ParseResult<Option<Vec<u8>>> {
+        let our_chunk = self.parse_next_chunk_nullck()?;
+        if let Some(chunk) = our_chunk {
+            let our_chunk = chunk.to_owned();
+            if self.will_cursor_give_linefeed()? {
+                // there is a lf after the end of the binary string; great!
+                // let's skip that now
+                self.incr_cursor();
+                Ok(Some(our_chunk))
+            } else {
+                Err(ParseError::UnexpectedByte)
+            }
+        } else {
+            Ok(None)
+        }
+    }
+    fn parse_next_str_nullck(&mut self) -> ParseResult<Option<String>> {
+        match self.parse_next_binstr_nullck()? {
+            Some(chunk) => Ok(Some(String::from_utf8_lossy(&chunk).to_string())),
+            None => Ok(None),
+        }
     }
     /// The cursor should have passed the `:` tsymbol
     fn parse_next_u64(&mut self) -> ParseResult<u64> {
@@ -362,8 +401,16 @@ impl<'a> Parser<'a> {
             Err(ParseError::NotEnough)
         }
     }
+    /// Parse the next null checked usize
+    fn parse_into_usize_nullck(inp: &[u8]) -> ParseResult<Option<usize>> {
+        if inp == [0] {
+            Ok(None)
+        } else {
+            Ok(Some(Self::parse_into_usize(inp)?))
+        }
+    }
     /// The cursor should have passed the `@+` chars
-    fn parse_next_typed_array_str(&mut self) -> ParseResult<Vec<String>> {
+    fn parse_next_typed_array_str(&mut self) -> ParseResult<Vec<Option<String>>> {
         let (start, stop) = self.read_line();
         if let Some(our_size_chunk) = self.buffer.get(start..stop) {
             // so we have a size chunk; let's get the size
@@ -371,7 +418,7 @@ impl<'a> Parser<'a> {
             let mut array = Vec::with_capacity(array_size);
             for _ in 0..array_size {
                 // no tsymbol, just elements and their sizes
-                array.push(self.parse_next_string()?);
+                array.push(self.parse_next_str_nullck()?);
             }
             Ok(array)
         } else {
@@ -379,14 +426,14 @@ impl<'a> Parser<'a> {
         }
     }
     /// The cursor should have passed the `@?` chars
-    fn parse_next_typed_array_bin(&mut self) -> ParseResult<Vec<Vec<u8>>> {
+    fn parse_next_typed_array_bin(&mut self) -> ParseResult<Vec<Option<Vec<u8>>>> {
         let (start, stop) = self.read_line();
         if let Some(our_size_chunk) = self.buffer.get(start..stop) {
             // got size chunk, let's get the size
             let array_size = Self::parse_into_usize(our_size_chunk)?;
             let mut array = Vec::with_capacity(array_size);
             for _ in 0..array_size {
-                array.push(self.parse_next_binstr()?);
+                array.push(self.parse_next_binstr_nullck()?);
             }
             Ok(array)
         } else {
@@ -487,9 +534,9 @@ fn test_typed_str_array() {
     assert_eq!(
         parsed,
         RawResponse::SimpleQuery(Element::StrArray(vec![
-            "the".to_owned(),
-            "cat".to_owned(),
-            "meowed".to_owned()
+            Some("the".to_owned()),
+            Some("cat".to_owned()),
+            Some("meowed".to_owned())
         ]))
     );
 }
@@ -502,9 +549,39 @@ fn test_typed_bin_array() {
     assert_eq!(
         parsed,
         RawResponse::SimpleQuery(Element::BinArray(vec![
-            Vec::from("the"),
-            Vec::from("cat"),
-            Vec::from("meowed")
+            Some(Vec::from("the")),
+            Some(Vec::from("cat")),
+            Some(Vec::from("meowed"))
+        ]))
+    );
+}
+
+#[test]
+fn test_typed_bin_array_null() {
+    let typed_array_packet = "*1\n@?3\n3\nthe\n3\ncat\n\0\n".as_bytes();
+    let (parsed, forward) = Parser::new(typed_array_packet).parse().unwrap();
+    assert_eq!(forward, typed_array_packet.len());
+    assert_eq!(
+        parsed,
+        RawResponse::SimpleQuery(Element::BinArray(vec![
+            Some(Vec::from("the")),
+            Some(Vec::from("cat")),
+            None
+        ]))
+    );
+}
+
+#[test]
+fn test_typed_str_array_null() {
+    let typed_array_packet = "*1\n@+3\n3\nthe\n3\ncat\n\0\n".as_bytes();
+    let (parsed, forward) = Parser::new(typed_array_packet).parse().unwrap();
+    assert_eq!(forward, typed_array_packet.len());
+    assert_eq!(
+        parsed,
+        RawResponse::SimpleQuery(Element::StrArray(vec![
+            Some("the".to_owned()),
+            Some("cat".to_owned()),
+            None
         ]))
     );
 }

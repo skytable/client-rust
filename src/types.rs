@@ -270,3 +270,15 @@ impl<T: IntoSkyhashBytes> GetIterator<T> for &Vec<T> {
         self.iter()
     }
 }
+
+/// Array types
+pub enum Array {
+    Bin(Vec<Option<Vec<u8>>>),
+    Str(Vec<Option<String>>),
+}
+
+/// String types
+pub enum Str {
+    Unicode(String),
+    Binary(Vec<u8>),
+}

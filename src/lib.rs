@@ -380,6 +380,14 @@ impl Query {
         });
         self
     }
+    /// Returns the number of arguments in this query
+    pub fn len(&self) -> usize {
+        self.size_count
+    }
+    /// Check if the query is empty
+    pub fn is_empty(&self) -> bool {
+        self.size_count == 0
+    }
     /// Number of items in the datagroup
     pub(crate) fn __len(&self) -> usize {
         self.size_count

@@ -8,4 +8,4 @@ edition = "2018"
 
 [dependencies]
 # We use the `const-gen` feature to work with arrays; you can choose to leave it out
-skytable = { version="0.4.0", features=["const-gen"] }
+skytable = { version="0.5.0-alpha.1", features=["const-gen"] }

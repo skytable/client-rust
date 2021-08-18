@@ -1,13 +1,13 @@
-# Skytable client [![Crates.io](https://img.shields.io/crates/v/skytable?style=flat-square)](https://crates.io/crates/skytable) [![docs.rs](https://img.shields.io/docsrs/skytable?style=flat-square)](https://docs.rs/skytable) [![GitHub release (latest SemVer including pre-releases)](https://img.shields.io/github/v/release/skytable/client-rust?include_prereleases&style=flat-square)](https://github.com/skytable/client-rust/releases)
+# Skytable client [![Crates.io](https://img.shields.io/crates/v/skytable?style=flat-square)](https://crates.io/crates/skytable) [![Test](https://github.com/skytable/client-rust/actions/workflows/test.yml/badge.svg)](https://github.com/skytable/client-rust/actions/workflows/test.yml) [![docs.rs](https://img.shields.io/docsrs/skytable?style=flat-square)](https://docs.rs/skytable) [![GitHub release (latest SemVer including pre-releases)](https://img.shields.io/github/v/release/skytable/client-rust?include_prereleases&style=flat-square)](https://github.com/skytable/client-rust/releases)
 
 ## Introduction
 
 This library is the official client for the free and open-source NoSQL database
 [Skytable](https://github.com/skytable/skytable). First, go ahead and install Skytable by
 following the instructions [here](https://docs.skytable.io/getting-started). This library supports
-all Skytable versions that work with the [Skyhash 1.0 Protocol](https://docs.skytable.io/protocol/skyhash).
+all Skytable versions that work with the [Skyhash 1.1 Protocol](https://docs.skytable.io/protocol/skyhash).
 This version of the library was tested with the latest Skytable release
-(release [0.6](https://github.com/skytable/skytable/releases/v0.6.0)).
+(release [0.7](https://github.com/skytable/skytable/releases/v0.7.0)).
 
 ## Using this library
 
@@ -26,7 +26,7 @@ cargo new skyapp
 First add this to your `Cargo.toml` file:
 
 ```toml
-skytable = "0.4.0"
+skytable = "0.5.0-alpha.1"
 ```
 
 Now open up your `src/main.rs` file and establish a connection to the server while also adding some
@@ -60,7 +60,7 @@ Way to go &mdash; you're all set! Now go ahead and run more advanced queries!
 If you need to use an `async` API, just change your import to:
 
 ```toml
-skytable = { version = "0.4.0", features=["async"], default-features= false }
+skytable = { version = "0.5.0-alpha.1", features=["async"], default-features= false }
 ```
 
 You can now establish a connection by using `skytable::AsyncConnection::new()`, adding `.await`s wherever
@@ -72,7 +72,7 @@ With this client driver, it is possible to use both sync and `async` APIs **at t
 this, simply change your import to:
 
 ```toml
-skytable = { version="0.4.0", features=["sync", "async"] }
+skytable = { version="0.5.0-alpha.1", features=["sync", "async"] }
 ```
 
 ## TLS
@@ -82,7 +82,7 @@ If you need to use TLS features, this crate will let you do so with OpenSSL.
 ### Using TLS with sync interfaces
 
 ```toml
-skytable = { version="0.4.0", features=["sync","ssl"] }
+skytable = { version="0.5.0-alpha.1", features=["sync","ssl"] }
 ```
 
 You can now use the sync `sync::TlsConnection` object.
@@ -90,7 +90,7 @@ You can now use the sync `sync::TlsConnection` object.
 ### Using TLS with async interfaces
 
 ```toml
-skytable = { version="0.4.0", features=["async","aio-ssl"], default-features=false }
+skytable = { version="0.5.0-alpha.1", features=["async","aio-ssl"], default-features=false }
 ```
 
 You can now use the async `aio::TlsConnection` object.

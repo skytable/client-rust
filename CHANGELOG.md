@@ -2,6 +2,13 @@
 
 All changes in this project will be noted in this file.
 
+## Version 0.5.0
+
+> Breaking changes
+
+- Added support for Skyhash 1.1
+- Changed `Query` type to `AnyArray` as in the latest protocol
+
 ## Version 0.4.0
 
 > Breaking changes

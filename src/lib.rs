@@ -38,7 +38,7 @@
 //!
 //! First add this to your `Cargo.toml` file:
 //! ```toml
-//! skytable = "0.4.0"
+//! skytable = "0.5.0-alpha.1"
 //! ```
 //! Now open up your `src/main.rs` file and establish a connection to the server while also adding some
 //! imports:
@@ -78,7 +78,7 @@
 //!
 //! If you need to use an `async` API, just change your import to:
 //! ```toml
-//! skytable = { version = "0.4.0", features=["async"], default-features=false }
+//! skytable = { version = "0.5.0-alpha.1", features=["async"], default-features=false }
 //! ```
 //! You can now establish a connection by using `skytable::AsyncConnection::new()`, adding `.await`s wherever
 //! necessary. Do note that you'll the [Tokio runtime](https://tokio.rs).
@@ -88,7 +88,7 @@
 //! With this client driver, it is possible to use both sync and `async` APIs **at the same time**. To do
 //! this, simply change your import to:
 //! ```toml
-//! skytable = { version="0.4.0", features=["sync", "async"] }
+//! skytable = { version="0.5.0-alpha.1", features=["sync", "async"] }
 //! ```
 //!
 //! ## TLS
@@ -97,13 +97,13 @@
 //!
 //! ### Using TLS with sync interfaces
 //! ```toml
-//! skytable = { version="0.4.0", features=["sync","ssl"] }
+//! skytable = { version="0.5.0-alpha.1", features=["sync","ssl"] }
 //! ```
 //! You can now use the async `sync::TlsConnection` object.
 //!
 //! ### Using TLS with async interfaces
 //! ```toml
-//! skytable = { version="0.4.0", features=["async","aio-ssl"], default-features=false }
+//! skytable = { version="0.5.0-alpha.1", features=["async","aio-ssl"], default-features=false }
 //! ```
 //! You can now use the async `aio::TlsConnection` object.
 //!

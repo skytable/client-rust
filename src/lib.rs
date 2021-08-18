@@ -20,9 +20,9 @@
 //! This library is the official client for the free and open-source NoSQL database
 //! [Skytable](https://github.com/skytable/skytable). First, go ahead and install Skytable by
 //! following the instructions [here](https://docs.skytable.io/getting-started). This library supports
-//! all Skytable versions that work with the [Skyhash 1.0 Protocol](https://docs.skytable.io/protocol/skyhash).
+//! all Skytable versions that work with the [Skyhash 1.1 Protocol](https://docs.skytable.io/protocol/skyhash).
 //! This version of the library was tested with the latest Skytable release
-//! (release [0.6](https://github.com/skytable/skytable/releases/v0.6.0)).
+//! (release [0.7](https://github.com/skytable/skytable/releases/v0.7.0)).
 //!
 //! ## Using this library
 //!
@@ -94,13 +94,13 @@
 //! ```toml
 //! skytable = { version="0.5.0-alpha.1", features=["sync","ssl"] }
 //! ```
-//! You can now use the async `sync::TlsConnection` object.
+//! You can now use the async [TlsConnection](`sync::TlsConnection`) object.
 //!
 //! ### Using TLS with async interfaces
 //! ```toml
 //! skytable = { version="0.5.0-alpha.1", features=["async","aio-ssl"], default-features=false }
 //! ```
-//! You can now use the async `aio::TlsConnection` object.
+//! You can now use the async [TlsConnection](`aio::TlsConnection`) object.
 //!
 //! ### _Packed TLS_ setup
 //!
@@ -125,6 +125,7 @@
 mod util;
 pub mod actions;
 mod deserializer;
+pub mod error;
 mod respcode;
 pub mod types;
 use crate::types::GetIterator;
@@ -375,8 +376,8 @@ impl Query {
         U: IntoSkyhashBytes,
     {
         v1.get_iter().zip(v2.get_iter()).for_each(|(a, b)| {
-            self.push(a.to_bytes());
-            self.push(b.to_bytes());
+            self._push_arg(a.to_bytes());
+            self._push_arg(b.to_bytes());
         });
         self
     }
@@ -483,126 +484,3 @@ cfg_dbg!(
         assert_eq!(ma_query_len, q_len);
     }
 );
-
-pub mod error {
-    //! Errors
-    use crate::RespCode;
-    use std::io::ErrorKind;
-    cfg_ssl_any!(
-        use std::fmt;
-        /// Errors that may occur while initiating an [async TLS connection](crate::aio::TlsConnection)
-        /// or a [sync TLS connection](crate::sync::TlsConnection)
-        #[derive(Debug)]
-        pub enum SslError {
-            /// An [I/O Error](std::io::Error) occurred
-            IoError(std::io::Error),
-            /// An [SSL Error](openssl::error::Error) occurred
-            SslError(openssl::ssl::Error),
-        }
-
-        impl From<openssl::ssl::Error> for SslError {
-            fn from(e: openssl::ssl::Error) -> Self {
-                Self::SslError(e)
-            }
-        }
-
-        impl From<std::io::Error> for SslError {
-            fn from(e: std::io::Error) -> Self {
-                Self::IoError(e)
-            }
-        }
-
-        impl From<openssl::error::ErrorStack> for SslError {
-            fn from(e: openssl::error::ErrorStack) -> Self {
-                Self::SslError(e.into())
-            }
-        }
-
-        impl fmt::Display for SslError {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-                match self {
-                    Self::IoError(e) => write!(f, "{}", e),
-                    Self::SslError(e) => write!(f, "{}", e),
-                }
-            }
-        }
-    );
-    #[derive(Debug)]
-    #[non_exhaustive]
-    /// An error originating from the Skyhash protocol
-    pub enum SkyhashError {
-        /// The server sent data but we failed to parse it
-        ParseError,
-        /// The server sent an unexpected data type for this action
-        UnexpectedDataType,
-        /// The server sent an unknown data type that we cannot parse
-        UnknownDataType,
-        /// The server sent an invalid response
-        InvalidResponse,
-        /// An I/O error occurred while running this action
-        IoError(ErrorKind),
-        /// The server returned a response code **other than the one that should have been returned
-        /// for this action** (if any)
-        Code(RespCode),
-    }
-
-    #[derive(Debug)]
-    #[non_exhaustive]
-    /// A standard error type for the client driver
-    pub enum Error {
-        /// An I/O error occurred
-        IoError(std::io::Error),
-        #[cfg(any(
-            feature = "ssl",
-            feature = "sslv",
-            feature = "aio-ssl",
-            feature = "aio-sslv"
-        ))]
-        #[cfg_attr(
-            docsrs,
-            doc(cfg(any(
-                feature = "ssl",
-                feature = "sslv",
-                feature = "aio-ssl",
-                feature = "aio-sslv"
-            )))
-        )]
-        /// An SSL error occurred
-        SslError(openssl::ssl::Error),
-        /// A Skyhash error occurred
-        SkyError(SkyhashError),
-        /// An application level parse error occurred
-        ParseError,
-    }
-
-    cfg_ssl_any! {
-        impl From<openssl::ssl::Error> for Error {
-            fn from(err: openssl::ssl::Error) -> Self {
-                Self::SslError(err)
-            }
-        }
-    }
-
-    impl From<std::io::Error> for Error {
-        fn from(err: std::io::Error) -> Self {
-            Self::IoError(err)
-        }
-    }
-
-    cfg_ssl_any! {
-        impl From<SslError> for Error {
-            fn from(err: SslError) -> Self {
-                match err {
-                    SslError::IoError(ioerr) => Self::IoError(ioerr),
-                    SslError::SslError(sslerr) => Self::SslError(sslerr),
-                }
-            }
-        }
-    }
-
-    impl From<SkyhashError> for Error {
-        fn from(err: SkyhashError) -> Self {
-            Self::SkyError(err)
-        }
-    }
-}

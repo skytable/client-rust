@@ -37,9 +37,9 @@
 //!
 //! ```
 
-use crate::error::{Error, SkyhashError};
+use crate::error::SkyhashError;
 use crate::types::Array;
-use crate::types::FlatElement;
+use crate::types::SimpleArray;
 use crate::types::SnapshotResult;
 use crate::types::Str;
 use crate::Element;
@@ -48,6 +48,7 @@ use crate::IntoSkyhashAction;
 use crate::IntoSkyhashBytes;
 use crate::Query;
 use crate::RespCode;
+use crate::SkyRawResult;
 use crate::SkyResult;
 
 cfg_async!(
@@ -63,17 +64,16 @@ cfg_async!(
     /// A special result that is returned when running actions (async)
     pub type AsyncResult<'s, T> = Pin<Box<dyn Future<Output = T> + Send + Sync + 's>>;
     #[doc(hidden)]
+    /// A raw async connection to the database server
     pub trait AsyncSocket: Send + Sync {
         fn run(&mut self, q: Query) -> AsyncResult<SkyResult>;
     }
     impl<T> AsyncActions for T where T: AsyncSocket {}
 );
 
-/// A special result that is returned when running actions
-pub type ActionResult<T> = Result<T, Error>;
-
 cfg_sync!(
     #[doc(hidden)]
+    /// A raw synchronous connection to the database server
     pub trait SyncSocket {
         fn run(&mut self, q: Query) -> SkyResult;
     }
@@ -104,11 +104,22 @@ macro_rules! implement_actions {
         #[cfg(feature = "sync")]
         #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
         /// Actions that can be run on a [`SyncSocket`] connection
+        ///
+        /// ## Example
+        /// ```no_run
+        /// use skytable::actions::Actions;
+        /// use skytable::sync::Connection;
+        ///
+        /// let mut con = Connection::new("127.0.0.1", 2003).unwrap();
+        /// con.set("x", "100").unwrap();
+        /// let x = con.get("x").unwrap();
+        /// assert_eq!(x, "100");
+        /// ```
         pub trait Actions: SyncSocket {
             $(
                 $(#[$attr])*
                 #[inline]
-                fn $name<'s, $($($tyargs: $ty $(+$tye)*, )*)?>(&'s mut self $(, $argname: $argty)*) -> ActionResult<$ret> {
+                fn $name<'s, $($($tyargs: $ty $(+$tye)*, )*)?>(&'s mut self $(, $argname: $argty)*) -> SkyRawResult<$ret> {
                     gen_match!(self.run($($block)?), $($($mtch)+, $expect),*)
                 }
             )*
@@ -120,7 +131,7 @@ macro_rules! implement_actions {
             $(
                 $(#[$attr])*
                 #[inline]
-                fn $name<'s, $($($tyargs: $ty $(+$tye)*, )*)?>(&'s mut self $(, $argname: $argty)*) -> AsyncResult<ActionResult<$ret>> {
+                fn $name<'s, $($($tyargs: $ty $(+$tye)*, )*)?>(&'s mut self $(, $argname: $argty)*) -> AsyncResult<SkyRawResult<$ret>> {
                     Box::pin(async move {gen_match!(self.run($($block)?).await, $($($mtch)+, $expect),*)})
                 }
             )*
@@ -130,23 +141,23 @@ macro_rules! implement_actions {
 
 implement_actions!(
     /// Get the number of keys present in the database
-    fn dbsize() -> usize {
+    fn dbsize() -> u64 {
         { Query::from("dbsize") }
-        Element::UnsignedInt(int) => int as usize
+        Element::UnsignedInt(int) => int
     }
     /// Deletes a single or a number of keys
     ///
     /// This will return the number of keys that were deleted
-    fn del(key: impl IntoSkyhashAction + 's) -> usize {
+    fn del(key: impl IntoSkyhashAction + 's) -> u64 {
         { Query::from("del").arg(key) }
-        Element::UnsignedInt(int) => int as usize
+        Element::UnsignedInt(int) => int as u64
     }
     /// Checks if a key (or keys) exist(s)
     ///
     /// This will return the number of keys that do exist
-    fn exists(key: impl IntoSkyhashAction + 's) -> usize {
+    fn exists(key: impl IntoSkyhashAction + 's) -> u64 {
         { Query::from("exists").arg(key) }
-        Element::UnsignedInt(int) => int as usize
+        Element::UnsignedInt(int) => int as u64
     }
     /// Removes all the keys present in the database
     fn flushdb() -> () {
@@ -154,30 +165,31 @@ implement_actions!(
         Element::RespCode(RespCode::Okay) => {}
     }
     /// Get the value of a key
-    fn get(key: impl IntoSkyhashBytes + 's) -> String {
+    fn get(key: impl IntoSkyhashBytes + 's) -> Str {
         { Query::from("get").arg(key)}
-        Element::String(st) => st
+        Element::String(st) => Str::Unicode(st),
+        Element::Binstr(bstr) => Str::Binary(bstr)
     }
     /// Get the length of a key
-    fn keylen(key: impl IntoSkyhashBytes + 's) -> usize {
+    fn keylen(key: impl IntoSkyhashBytes + 's) -> u64 {
         { Query::from("keylen").arg(key)}
-        Element::UnsignedInt(int) => int as usize
+        Element::UnsignedInt(int) => int as u64
     }
     /// Returns a vector of keys
     ///
     /// Do note that the order might be completely meaningless
-    fn lskeys(count: usize) -> Vec<FlatElement> {
-        { Query::from("lskeys").arg(count)}
-        Element::Array(Array::Flat(arr)) => arr
+    fn lskeys(count: u64) -> SimpleArray {
+        { Query::from("lskeys").arg(count.to_string())}
+        Element::Array(Array::Bin(brr)) => SimpleArray::Bin(brr),
+        Element::Array(Array::Str(srr)) => SimpleArray::Str(srr)
     }
     /// Get multiple keys
     ///
-    /// This returns a vector of [`Element`]s which either contain the values
-    /// as strings or contains `Not Found (Code: 1)` response codes
-    fn mget(keys: impl IntoSkyhashAction+ 's) -> Array {
+    /// This returns a [`SimpleArray`] of values for the provided keys
+    fn mget(keys: impl IntoSkyhashAction+ 's) -> SimpleArray {
         { Query::from("mget").arg(keys)}
-        Element::Array(Array::Bin(brr)) => Array::Bin(brr),
-        Element::Array(Array::Str(srr)) => Array::Str(srr)
+        Element::Array(Array::Bin(brr)) => SimpleArray::Bin(brr),
+        Element::Array(Array::Str(srr)) => SimpleArray::Str(srr)
     }
     /// Creates a snapshot
     ///
@@ -204,12 +216,12 @@ implement_actions!(
     (
         keys: impl GetIterator<T> + 's,
         values: impl GetIterator<U> + 's
-    ) -> usize {
+    ) -> u64 {
         {
             assert!(keys.incr_len_by() == values.incr_len_by(), "The number of keys and values for mset must be equal");
             Query::from("mset")._push_alt_iter(keys, values)
         }
-        Element::UnsignedInt(int) => int as usize
+        Element::UnsignedInt(int) => int as u64
     }
     /// Updates the value of multiple keys and values and returns the number of keys that were updated
     ///
@@ -219,27 +231,27 @@ implement_actions!(
     (
         keys: impl GetIterator<T> + 's,
         values: impl GetIterator<U> + 's
-    ) -> usize {
+    ) -> u64 {
         {
             assert!(keys.incr_len_by() == values.incr_len_by(), "The number of keys and values for mupdate must be equal");
             Query::from("mset")._push_alt_iter(keys, values)
         }
-        Element::UnsignedInt(int) => int as usize
+        Element::UnsignedInt(int) => int as u64
     }
     /// Consumes a key if it exists
     ///
-    /// This should return either the corresponding values of the provided keys or `Not Found`
-    /// error codes
+    /// This will return the corresponding values of the provided key as an [`Str`] type
+    /// depending on the type for that table
     fn pop(keys: impl IntoSkyhashBytes + 's) -> Str {
         { Query::from("POP").arg(keys) }
         Element::String(st) => Str::Unicode(st),
         Element::Binstr(bstr) => Str::Binary(bstr)
     }
     /// Consumes the provided keys if they exist
-    fn mpop(keys: impl IntoSkyhashAction + 's) -> Array {
+    fn mpop(keys: impl IntoSkyhashAction + 's) -> SimpleArray {
         { Query::from("mpop").arg(keys)}
-        Element::Array(Array::Bin(brr)) => Array::Bin(brr),
-        Element::Array(Array::Str(srr)) => Array::Str(srr)
+        Element::Array(Array::Bin(brr)) => SimpleArray::Bin(brr),
+        Element::Array(Array::Str(srr)) => SimpleArray::Str(srr)
     }
     /// Deletes all the provided keys if they exist or doesn't do anything at all. This method
     /// will return true if all the provided keys were deleted, else it will return false
@@ -249,9 +261,10 @@ implement_actions!(
         Element::RespCode(RespCode::NotFound) => false
     }
     /// Set the value of a key
-    fn set(key: impl IntoSkyhashBytes + 's, value: impl IntoSkyhashBytes + 's) -> () {
+    fn set(key: impl IntoSkyhashBytes + 's, value: impl IntoSkyhashBytes + 's) -> bool {
         { Query::from("set").arg(key).arg(value) }
-        Element::RespCode(RespCode::Okay) => {}
+        Element::RespCode(RespCode::Okay) => true,
+        Element::RespCode(RespCode::OverwriteError) => false
     }
     /// Sets the value of all the provided keys or does nothing. This method will return true if all the keys
     /// were set or will return false if none were set
@@ -306,7 +319,7 @@ implement_actions!(
     (
         keys: impl GetIterator<T> + 's,
         values: impl GetIterator<U> + 's
-    ) -> usize {
+    ) -> u64 {
         {
             assert!(
                 keys.incr_len_by() == values.incr_len_by(),
@@ -314,6 +327,6 @@ implement_actions!(
             );
             Query::from("uset")._push_alt_iter(keys, values)
         }
-        Element::UnsignedInt(int) => int as usize
+        Element::UnsignedInt(int) => int as u64
     }
 );

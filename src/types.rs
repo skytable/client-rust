@@ -25,12 +25,6 @@
 //! If you have an object that can be turned into a [`Vec<u8>`] or a sequence of [`Vec<u8>`] objects, then
 //! your type can be serialized by Skyhash (this might change in the future with more types being supported).
 //!
-//! ## Use [`RawString`]!
-//!
-//! It is very important that you use [`RawString`] for types like String or `Vec<u8>`, else
-//! all the elements will be individually serialized! See the [`RawString`] docs for more
-//! information.
-//!
 //! Here is a simple example:
 //! ```
 //! use skytable::actions::Actions;
@@ -55,7 +49,7 @@
 //! impl IntoSkyhashAction for CoolStringCollection {
 //!     fn push_into_query(&self, query: &mut Query) {
 //!         self.0.iter().for_each(|item| {
-//!             query.push(RawString(item.to_bytes()))
+//!             query.push(RawString::from(item.to_bytes()))
 //! });
 //!     }
 //!     fn incr_len_by(&self) -> usize {
@@ -126,10 +120,7 @@ macro_rules! impl_skyhash_bytes {
     };
 }
 
-impl_skyhash_bytes!(
-    u8, i8, u16, i16, u32, i32, u64, i64, u128, i128, f32, f64, bool, char, usize, isize, String,
-    &str, &String, str
-);
+impl_skyhash_bytes!(String, &str, &String, str);
 
 /// Anything that implements this trait can directly add itself to the bytes part of a [`Query`] object
 ///
@@ -308,6 +299,28 @@ pub enum Str {
     Binary(Vec<u8>),
 }
 
+impl<T> PartialEq<T> for Str
+where
+    T: AsRef<str>,
+{
+    fn eq(&self, oth: &T) -> bool {
+        let oth = oth.as_ref();
+        match self {
+            Self::Unicode(uc) => uc.eq(oth),
+            _ => false,
+        }
+    }
+}
+
+impl PartialEq<[u8]> for Str {
+    fn eq(&self, oth: &[u8]) -> bool {
+        match self {
+            Self::Binary(brr) => brr.eq(oth),
+            _ => false,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 #[non_exhaustive]
 /// A _flat_ element. This corresponds to the types that can be present
@@ -323,25 +336,11 @@ pub enum FlatElement {
     UnsignedInt(u64),
 }
 
-/// A raw binary string
+/// A raw string
 ///
-/// Use this type when you need to directly send binary data instead of converting
-/// each element into a Skyhash binary string. For example, if you:
-///
-/// ```
-/// use skytable::query;
-/// let myvec: Vec<u8> = vec![1, 2, 3, 4];
-/// let x = query!("SET", "mybindata", myvec);
-/// ```
-///
-/// **⚠️⚠️⚠️ You're not sending a binary/unicode string!** Instead, what you're actually running is:
-/// ```
-/// use skytable::query;
-/// let x = query!("SET", "mybindata", 1, 2, 3, 4);
-/// ```
-///
-/// This type allows you to _escape_ this so that you can send already assembled
-/// binary data like this:
+/// Use this type when you need to directly send raw data (i.e a byte sequence) instead of converting
+/// each element into a Skyhash binary string.
+/// This type allows you to send already assembled binary data like this:
 /// ```
 /// use skytable::query;
 /// use skytable::types::RawString;
@@ -361,7 +360,7 @@ pub enum FlatElement {
 /// assert_eq!(mybin, vec![1, 2, 3]);
 /// ```
 #[derive(Debug, PartialEq)]
-pub struct RawString(pub Vec<u8>);
+pub struct RawString(Vec<u8>);
 
 impl Default for RawString {
     fn default() -> Self {
@@ -370,9 +369,11 @@ impl Default for RawString {
 }
 
 impl RawString {
+    /// Create a new [`RawString`] with the provided capacity
     pub fn with_capacity(cap: usize) -> Self {
         Self(Vec::with_capacity(cap))
     }
+    /// Create a new [`RawString`] with the default capacity
     pub fn new() -> Self {
         Self(Vec::new())
     }
@@ -409,4 +410,12 @@ impl IntoSkyhashBytes for RawString {
     fn to_bytes(&self) -> Vec<u8> {
         self.0.to_owned()
     }
+}
+
+/// Simple, non-recursive arrays with monotype elements
+pub enum SimpleArray {
+    /// An array of binary strings
+    Bin(Vec<Option<Vec<u8>>>),
+    /// An array of unicode strings
+    Str(Vec<Option<String>>),
 }

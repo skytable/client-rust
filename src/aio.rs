@@ -17,7 +17,7 @@
 
 //! # Asynchronous database connections
 //!
-//! This module provides sync interfaces for database connections. There are two versions:
+//! This module provides async interfaces for database connections. There are two versions:
 //! - The [`Connection`]: a connection to the database over Skyhash/TCP
 //! - The [`TlsConnection`]: a connection to the database over Skyhash/TLS
 //!

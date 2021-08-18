@@ -22,23 +22,30 @@
 //!
 //!
 //! ## Implementing a Skyhash serializable type
-//! If you have an object that can be turned into a [`String`] or a sequence of [`String`] objects, then
+//! If you have an object that can be turned into a [`Vec<u8>`] or a sequence of [`Vec<u8>`] objects, then
 //! your type can be serialized by Skyhash (this might change in the future with more types being supported).
+//!
+//! ## Use [`RawString`]!
+//!
+//! It is very important that you use [`RawString`] for types like String or `Vec<u8>`, else
+//! all the elements will be individually serialized! See the [`RawString`] docs for more
+//! information.
+//!
 //! Here is a simple example:
 //! ```
 //! use skytable::actions::Actions;
-//! use skytable::types::{IntoSkyhashAction, IntoSkyhashBytes, GetIterator};
+//! use skytable::types::{IntoSkyhashAction, IntoSkyhashBytes, GetIterator, RawString};
 //! use skytable::Query;
 //!
 //! /// Our custom element that adds "cool" to the end of every string when serialized
 //! struct CoolString(String);
 //!
 //! impl IntoSkyhashBytes for CoolString {
-//!     fn as_string(&self) -> String {
+//!     fn to_bytes(&self) -> Vec<u8> {
 //!         let mut st = self.0.to_string();
 //!         // add cool
 //!         st.push_str("cool");
-//!         st
+//!         st.into_bytes()
 //!     }
 //! }
 //!
@@ -47,7 +54,9 @@
 //!
 //! impl IntoSkyhashAction for CoolStringCollection {
 //!     fn push_into_query(&self, query: &mut Query) {
-//!         self.0.iter().for_each(|item| query.push(item.as_string()));
+//!         self.0.iter().for_each(|item| {
+//!             query.push(RawString(item.to_bytes()))
+//! });
 //!     }
 //!     fn incr_len_by(&self) -> usize {
 //!         self.0.len()
@@ -79,6 +88,8 @@
 use crate::Element;
 use crate::Query;
 use crate::RespCode;
+use core::ops::Deref;
+use core::ops::DerefMut;
 
 /// Anything that implements this trait can be turned into a [`String`]. This trait is implemented
 /// for most primitive types by default using [`std`]'s [`ToString`] trait.
@@ -92,23 +103,23 @@ use crate::RespCode;
 /// struct MyStringWrapper(String);
 ///
 /// impl IntoSkyhashBytes for MyStringWrapper {
-///     fn as_string(&self) -> String {
-///         self.0.to_string()
+///     fn to_bytes(&self) -> Vec<u8> {
+///         self.0.as_bytes().to_owned()
 ///     }
 /// }
 /// ```
 ///
 pub trait IntoSkyhashBytes: Send + Sync {
     /// Turn `Self` into a [`String`]
-    fn as_string(&self) -> String;
+    fn to_bytes(&self) -> Vec<u8>;
 }
 
 macro_rules! impl_skyhash_bytes {
     ($($ty:ty),*) => {
         $(
             impl IntoSkyhashBytes for $ty {
-                fn as_string(&self) -> String {
-                    self.to_string()
+                fn to_bytes(&self) -> Vec<u8> {
+                    self.to_string().into_bytes()
                 }
             }
         )*
@@ -161,7 +172,7 @@ where
     T: IntoSkyhashBytes,
 {
     fn push_into_query(&self, q: &mut Query) {
-        q._push_arg(self.as_string());
+        q._push_arg(self.to_bytes());
     }
     fn incr_len_by(&self) -> usize {
         1
@@ -310,4 +321,92 @@ pub enum FlatElement {
     RespCode(RespCode),
     /// An unsigned integer
     UnsignedInt(u64),
+}
+
+/// A raw binary string
+///
+/// Use this type when you need to directly send binary data instead of converting
+/// each element into a Skyhash binary string. For example, if you:
+///
+/// ```
+/// use skytable::query;
+/// let myvec: Vec<u8> = vec![1, 2, 3, 4];
+/// let x = query!("SET", "mybindata", myvec);
+/// ```
+///
+/// **⚠️⚠️⚠️ You're not sending a binary/unicode string!** Instead, what you're actually running is:
+/// ```
+/// use skytable::query;
+/// let x = query!("SET", "mybindata", 1, 2, 3, 4);
+/// ```
+///
+/// This type allows you to _escape_ this so that you can send already assembled
+/// binary data like this:
+/// ```
+/// use skytable::query;
+/// use skytable::types::RawString;
+///
+/// let mut mybin = RawString::from(vec![1, 2, 3, 4]);
+/// let x = query!("SET", "mybindata", mybin);
+///
+/// ```
+/// You can also use the RawString as a standard `Vec<u8>`:
+/// ```
+/// use skytable::types::RawString;
+/// let mut mybin = RawString::new();
+/// mybin.push(1);
+/// mybin.push(2);
+/// mybin.push(3);
+///
+/// assert_eq!(mybin, vec![1, 2, 3]);
+/// ```
+#[derive(Debug, PartialEq)]
+pub struct RawString(pub Vec<u8>);
+
+impl Default for RawString {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl RawString {
+    pub fn with_capacity(cap: usize) -> Self {
+        Self(Vec::with_capacity(cap))
+    }
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+}
+
+impl Deref for RawString {
+    type Target = Vec<u8>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for RawString {
+    fn deref_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.0
+    }
+}
+
+impl From<Vec<u8>> for RawString {
+    fn from(oth: Vec<u8>) -> Self {
+        Self(oth)
+    }
+}
+
+impl PartialEq<Vec<u8>> for RawString {
+    fn eq(&self, oth: &Vec<u8>) -> bool {
+        self.0.eq(oth)
+    }
+}
+
+impl Eq for RawString {}
+
+impl IntoSkyhashBytes for RawString {
+    fn to_bytes(&self) -> Vec<u8> {
+        self.0.to_owned()
+    }
 }

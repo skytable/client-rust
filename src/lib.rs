@@ -57,15 +57,10 @@
 //!     let mut con = Connection::new("127.0.0.1", 2003)?;
 //!     let query = Query::from("heya");
 //!     let res = con.run_simple_query(&query)?;
-//!     assert_eq!(res, Response::Item(Element::Binstr(Vec::from("HEY"))));
+//!     assert_eq!(res, Response::Item(Element::Str("HEY".to_owned())));
 //!     Ok(())
 //! }
 //! ```
-//!
-//! **And why was our string a [`Vec`]?**
-//! That's because the server sends a binary string with arbitrary bytes. The returned value may
-//! or may not be unicode, and this depends on the data type you set for your table.
-//!
 //! Way to go &mdash; you're all set! Now go ahead and run more advanced queries!
 //!
 //! ## Going advanced
@@ -268,7 +263,7 @@ impl<'a> ConnectionBuilder<'a> {
 /// ```
 macro_rules! query {
     ($($arg:expr),+) => {
-        skytable::Query::new()$(.arg($arg))*
+        $crate::Query::new()$(.arg($arg))*
     };
 }
 
@@ -291,6 +286,9 @@ macro_rules! query {
 /// let q2 = Query::from(vec!["mset", "x", "100", "y", "200", "z", "300"]);
 /// let q3 = Query::from("get").arg("x");
 /// ```
+/// **Important:** You should use the [`RawString`](types::RawString) type if you're willing to directly add things like
+/// `Vec<u8>` to your query.
+///
 /// Finally, queries can also be created by taking references. For example:
 /// ```
 /// use skytable::Query;
@@ -339,8 +337,7 @@ impl Query {
         arg.push_into_query(&mut self);
         self
     }
-    pub(in crate) fn _push_arg(&mut self, arg: impl IntoSkyhashBytes) {
-        let arg = arg.as_string();
+    pub(in crate) fn _push_arg(&mut self, arg: Vec<u8>) {
         if arg.is_empty() {
             panic!("Argument cannot be empty")
         }
@@ -351,7 +348,7 @@ impl Query {
         // add the LF char
         self.data.push(b'\n');
         // Add the data itself, which is `arg`
-        self.data.extend(arg.into_bytes());
+        self.data.extend(arg);
         self.data.push(b'\n'); // add the LF char
         self.size_count += 1;
     }
@@ -375,8 +372,8 @@ impl Query {
         U: IntoSkyhashBytes,
     {
         v1.get_iter().zip(v2.get_iter()).for_each(|(a, b)| {
-            self.push(a.as_string());
-            self.push(b.as_string());
+            self.push(a.to_bytes());
+            self.push(b.to_bytes());
         });
         self
     }

@@ -43,7 +43,7 @@
 //! Now open up your `src/main.rs` file and establish a connection to the server while also adding some
 //! imports:
 //! ```no_run
-//! use skytable::{Connection, Query, Response, Element};
+//! use skytable::{Connection, Query, Element};
 //! fn main() -> std::io::Result<()> {
 //!     let mut con = Connection::new("127.0.0.1", 2003)?;
 //!     Ok(())
@@ -52,7 +52,7 @@
 //!
 //! Now let's run a [`Query`]! Change the previous code block to:
 //! ```no_run
-//! use skytable::{error, Connection, Query, Response, Element};
+//! use skytable::{error, Connection, Query, Element};
 //! fn main() -> Result<(), error::Error> {
 //!     let mut con = Connection::new("127.0.0.1", 2003)?;
 //!     let query = Query::from("heya");
@@ -473,25 +473,6 @@ impl Query {
     );
 }
 
-/// # Responses
-///
-/// This enum represents responses returned by the server. This can either be an array (or bulk), a single item
-/// or can be a parse error if the server returned some data but it couldn't be parsed into the expected type
-/// or it can be an invalid response in the event the server sent some invalid data.
-/// This enum is `#[non_exhaustive]` as more types of responses can be added in the future.
-#[derive(Debug, PartialEq)]
-#[non_exhaustive]
-pub enum Response {
-    /// The server sent an invalid response
-    InvalidResponse,
-    /// The server responded with _something_. This can be any of the [`Element`] variants
-    Item(Element),
-    /// We failed to parse data
-    ParseError,
-    /// The server sent some data of a type that this client doesn't support
-    UnsupportedDataType,
-}
-
 cfg_dbg!(
     #[test]
     fn my_query() {
@@ -505,9 +486,9 @@ cfg_dbg!(
 
 pub mod error {
     //! Errors
+    use crate::RespCode;
+    use std::io::ErrorKind;
     cfg_ssl_any!(
-        use crate::RespCode;
-        use std::io::ErrorKind;
         use std::fmt;
         /// Errors that may occur while initiating an [async TLS connection](crate::aio::TlsConnection)
         /// or a [sync TLS connection](crate::sync::TlsConnection)

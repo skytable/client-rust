@@ -27,6 +27,7 @@
 //! by Sayan Nandan and this is the first client implementation of the protocol
 //!
 
+use crate::types::Array;
 use crate::types::FlatElement;
 use crate::RespCode;
 use std::hint::unreachable_unchecked;
@@ -65,24 +66,19 @@ pub(super) struct Parser<'a> {
 /// This enum represents the data types supported by the Skyhash Protocol
 pub enum Element {
     /// Arrays can be nested! Their `<tsymbol>` is `&`
-    Array(Vec<Element>),
+    Array(Array),
     /// An unicode string value; `<tsymbol>` is `+`
     Str(String),
     /// A binary string (`?`)
     Binstr(Vec<u8>),
     /// An unsigned integer value; `<tsymbol>` is `:`
     UnsignedInt(u64),
-    /// A non-recursive array; tsymbol: `_`
-    FlatArray(Vec<FlatElement>),
     /// A response code
     RespCode(RespCode),
-    /// An array of unicode strings
-    StrArray(Vec<Option<String>>),
-    /// An array of binary strings
-    BinArray(Vec<Option<Vec<u8>>>),
 }
 
 #[derive(Debug, PartialEq)]
+#[non_exhaustive]
 /// # Parser Errors
 ///
 /// Several errors can arise during parsing and this enum accounts for them
@@ -375,7 +371,7 @@ impl<'a> Parser<'a> {
                 b'?' => Element::Binstr(self.parse_next_binstr()?),
                 b'+' => Element::Str(self.parse_next_string()?),
                 b':' => Element::UnsignedInt(self.parse_next_u64()?),
-                b'&' => Element::Array(self.parse_next_array()?),
+                b'&' => Element::Array(Array::Recursive(self.parse_next_array()?)),
                 b'!' => Element::RespCode(self.parse_next_respcode()?),
                 b'@' => {
                     // hmmm, a typed array; let's check the tsymbol
@@ -383,8 +379,8 @@ impl<'a> Parser<'a> {
                         // got tsymbol, let's skip it
                         self.incr_cursor();
                         match array_type {
-                            b'+' => Element::StrArray(self.parse_next_typed_array_str()?),
-                            b'?' => Element::BinArray(self.parse_next_typed_array_bin()?),
+                            b'+' => Element::Array(Array::Str(self.parse_next_typed_array_str()?)),
+                            b'?' => Element::Array(Array::Bin(self.parse_next_typed_array_bin()?)),
                             _ => return Err(ParseError::UnknownDatatype),
                         }
                     } else {
@@ -393,7 +389,7 @@ impl<'a> Parser<'a> {
                         return Err(ParseError::NotEnough);
                     }
                 }
-                b'_' => Element::FlatArray(self.parse_next_flat_array()?),
+                b'_' => Element::Array(Array::Flat(self.parse_next_flat_array()?)),
                 _ => return Err(ParseError::UnknownDatatype),
             };
             Ok(ret)
@@ -537,11 +533,11 @@ fn test_typed_str_array() {
     assert_eq!(forward, typed_array_packet.len());
     assert_eq!(
         parsed,
-        RawResponse::SimpleQuery(Element::StrArray(vec![
+        RawResponse::SimpleQuery(Element::Array(Array::Str(vec![
             Some("the".to_owned()),
             Some("cat".to_owned()),
             Some("meowed".to_owned())
-        ]))
+        ])))
     );
 }
 
@@ -552,11 +548,11 @@ fn test_typed_bin_array() {
     assert_eq!(forward, typed_array_packet.len());
     assert_eq!(
         parsed,
-        RawResponse::SimpleQuery(Element::BinArray(vec![
+        RawResponse::SimpleQuery(Element::Array(Array::Bin(vec![
             Some(Vec::from("the")),
             Some(Vec::from("cat")),
             Some(Vec::from("meowed"))
-        ]))
+        ])))
     );
 }
 
@@ -567,11 +563,11 @@ fn test_typed_bin_array_null() {
     assert_eq!(forward, typed_array_packet.len());
     assert_eq!(
         parsed,
-        RawResponse::SimpleQuery(Element::BinArray(vec![
+        RawResponse::SimpleQuery(Element::Array(Array::Bin(vec![
             Some(Vec::from("the")),
             Some(Vec::from("cat")),
             None
-        ]))
+        ])))
     );
 }
 
@@ -582,10 +578,10 @@ fn test_typed_str_array_null() {
     assert_eq!(forward, typed_array_packet.len());
     assert_eq!(
         parsed,
-        RawResponse::SimpleQuery(Element::StrArray(vec![
+        RawResponse::SimpleQuery(Element::Array(Array::Str(vec![
             Some("the".to_owned()),
             Some("cat".to_owned()),
             None
-        ]))
+        ])))
     );
 }

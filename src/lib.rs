@@ -549,6 +549,7 @@ pub mod error {
         }
     );
     #[derive(Debug)]
+    #[non_exhaustive]
     /// An error originating from the Skyhash protocol
     pub enum SkyhashError {
         /// The server sent an invalid response
@@ -560,6 +561,7 @@ pub mod error {
     }
 
     #[derive(Debug)]
+    #[non_exhaustive]
     /// A standard error type for the client driver
     pub enum Error {
         /// An I/O error occurred

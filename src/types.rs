@@ -76,8 +76,9 @@
 //!
 //! ```
 
-use crate::RespCode;
+use crate::Element;
 use crate::Query;
+use crate::RespCode;
 
 /// Anything that implements this trait can be turned into a [`String`]. This trait is implemented
 /// for most primitive types by default using [`std`]'s [`ToString`] trait.
@@ -273,21 +274,40 @@ impl<T: IntoSkyhashBytes> GetIterator<T> for &Vec<T> {
 }
 
 /// Array types
+#[derive(Debug, PartialEq)]
+#[non_exhaustive]
 pub enum Array {
+    //// A binary array (typed array tsymbol `?`, `@` base tsymbol)
     Bin(Vec<Option<Vec<u8>>>),
+    /// An unicode string array (typed array tsymbol `+`, `@` base tsymbol)
     Str(Vec<Option<String>>),
+    /// A non-recursive 'flat' array (tsymbol `_`)
+    Flat(Vec<FlatElement>),
+    /// A recursive array (tsymbol `&`)
+    Recursive(Vec<Element>),
 }
 
 /// String types
+#[derive(Debug, PartialEq)]
+#[non_exhaustive]
 pub enum Str {
+    /// An unicode string
     Unicode(String),
+    /// A binary string (blob)
     Binary(Vec<u8>),
 }
 
 #[derive(Debug, PartialEq)]
+#[non_exhaustive]
+/// A _flat_ element. This corresponds to the types that can be present
+/// in a flat array as defined by the Skyhash protocol
 pub enum FlatElement {
+    /// An unicode string
     String(String),
+    /// A binary string (blob)
     Binstr(Vec<u8>),
+    /// A response code
     RespCode(RespCode),
+    /// An unsigned integer
     UnsignedInt(u64),
 }

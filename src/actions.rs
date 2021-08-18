@@ -61,6 +61,7 @@ pub const ERR_SNAPSHOT_DISABLED: &str = "err-snapshot-disabled";
 
 /// Errors while running actions
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum ActionError {
     /// The server sent data but we failed to parse it
     ParseError,
@@ -190,7 +191,7 @@ implement_actions!(
     /// Do note that the order might be completely meaningless
     fn lskeys(count: usize) -> Vec<FlatElement> {
         { Query::from("lskeys").arg(count)}
-        Response::Item(Element::FlatArray(arr)) => arr
+        Response::Item(Element::Array(Array::Flat(arr))) => arr
     }
     /// Get multiple keys
     ///
@@ -198,8 +199,8 @@ implement_actions!(
     /// as strings or contains `Not Found (Code: 1)` response codes
     fn mget(keys: impl IntoSkyhashAction+ 's) -> Array {
         { Query::from("mget").arg(keys)}
-        Response::Item(Element::BinArray(brr)) => Array::Bin(brr),
-        Response::Item(Element::StrArray(srr)) => Array::Str(srr)
+        Response::Item(Element::Array(Array::Bin(brr))) => Array::Bin(brr),
+        Response::Item(Element::Array(Array::Str(srr))) => Array::Str(srr)
     }
     /// Creates a snapshot
     ///
@@ -259,8 +260,8 @@ implement_actions!(
     /// Consumes the provided keys if they exist
     fn mpop(keys: impl IntoSkyhashAction + 's) -> Array {
         { Query::from("mpop").arg(keys)}
-        Response::Item(Element::BinArray(brr)) => Array::Bin(brr),
-        Response::Item(Element::StrArray(srr)) => Array::Str(srr)
+        Response::Item(Element::Array(Array::Bin(brr))) => Array::Bin(brr),
+        Response::Item(Element::Array(Array::Str(srr))) => Array::Str(srr)
     }
     /// Deletes all the provided keys if they exist or doesn't do anything at all. This method
     /// will return true if all the provided keys were deleted, else it will return false

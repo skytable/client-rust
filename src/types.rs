@@ -413,9 +413,60 @@ impl IntoSkyhashBytes for RawString {
 }
 
 /// Simple, non-recursive arrays with monotype elements
+#[derive(Debug, PartialEq)]
+#[non_exhaustive]
 pub enum SimpleArray {
     /// An array of binary strings
     Bin(Vec<Option<Vec<u8>>>),
     /// An array of unicode strings
     Str(Vec<Option<String>>),
+}
+
+impl SimpleArray {
+    /// Try to convert self into a [`Vec<String>`]
+    ///
+    /// If self is a binstr array or if all the elements are not valid,
+    /// then this will return an `Err` variant with the [`SimpleArray`]
+    /// itself
+    pub fn try_into_string_array(self) -> Result<Vec<String>, Self> {
+        if let Self::Str(st) = self {
+            let all_valid = st.iter().all(|v| v.is_some());
+            if all_valid {
+                Ok(st
+                    .into_iter()
+                    .map(|v| match v {
+                        Some(v) => v,
+                        None => unsafe { core::hint::unreachable_unchecked() },
+                    })
+                    .collect())
+            } else {
+                Err(Self::Str(st))
+            }
+        } else {
+            Err(self)
+        }
+    }
+    /// Try to convert self into a [`Vec<Vec<u8>>`]
+    ///
+    /// If self is a str array or if all the elements are not valid,
+    /// then this will return an `Err` variant with the [`SimpleArray`]
+    /// itself
+    pub fn try_into_u8_array(self) -> Result<Vec<Vec<u8>>, Self> {
+        if let Self::Bin(st) = self {
+            let all_valid = st.iter().all(|v| v.is_some());
+            if all_valid {
+                Ok(st
+                    .into_iter()
+                    .map(|v| match v {
+                        Some(v) => v,
+                        None => unsafe { core::hint::unreachable_unchecked() },
+                    })
+                    .collect())
+            } else {
+                Err(Self::Bin(st))
+            }
+        } else {
+            Err(self)
+        }
+    }
 }

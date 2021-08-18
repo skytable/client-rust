@@ -65,10 +65,10 @@ pub(super) struct Parser<'a> {
 ///
 /// This enum represents the data types supported by the Skyhash Protocol
 pub enum Element {
-    /// Arrays can be nested! Their `<tsymbol>` is `&`
+    /// Array types
     Array(Array),
     /// An unicode string value; `<tsymbol>` is `+`
-    Str(String),
+    String(String),
     /// A binary string (`?`)
     Binstr(Vec<u8>),
     /// An unsigned integer value; `<tsymbol>` is `:`
@@ -369,7 +369,7 @@ impl<'a> Parser<'a> {
             self.incr_cursor();
             let ret = match *tsymbol {
                 b'?' => Element::Binstr(self.parse_next_binstr()?),
-                b'+' => Element::Str(self.parse_next_string()?),
+                b'+' => Element::String(self.parse_next_string()?),
                 b':' => Element::UnsignedInt(self.parse_next_u64()?),
                 b'&' => Element::Array(Array::Recursive(self.parse_next_array()?)),
                 b'!' => Element::RespCode(self.parse_next_respcode()?),

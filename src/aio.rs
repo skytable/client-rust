@@ -25,10 +25,12 @@
 //!
 
 use crate::deserializer::{ParseError, Parser, RawResponse};
+use crate::error::SkyhashError;
 use crate::IoResult;
-use crate::{Query, Response};
+use crate::Query;
+use crate::SkyResult;
 use bytes::{Buf, BytesMut};
-use std::io::{Error, ErrorKind};
+use std::io::{Error as IoError, ErrorKind};
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufWriter};
 use tokio::net::TcpStream;
 
@@ -40,24 +42,24 @@ macro_rules! impl_async_methods {
         impl $ty {
             /// This function will write a [`Query`] to the stream and read the response from the
             /// server. It will then determine if the returned response is complete or incomplete
-            /// or invalid and return an appropriate variant of [`Response`] wrapped in [`IoResult`]
+            /// or invalid and return an appropriate variant of [`Error`](crate::error::Error) wrapped in [`IoResult`]
             /// for any I/O errors that may occur
             ///
             /// ## Panics
             /// This method will panic if the [`Query`] supplied is empty (i.e has no arguments)
-            pub async fn run_simple_query(&mut self, query: &Query) -> IoResult<Response> {
+            pub async fn run_simple_query(&mut self, query: &Query) -> SkyResult {
                 assert!(query.len() != 0, "A `Query` cannot be of zero length!");
                 query.write_query_to(&mut self.stream).await?;
                 self.stream.flush().await?;
                 loop {
                     if 0usize == self.stream.read_buf(&mut self.buffer).await? {
-                        return Err(Error::from(ErrorKind::ConnectionReset));
+                        return Err(IoError::from(ErrorKind::ConnectionReset).into());
                     }
                     match self.try_response() {
                         Ok((query, forward_by)) => {
                             self.buffer.advance(forward_by);
                             match query {
-                                RawResponse::SimpleQuery(s) => return Ok(Response::Item(s)),
+                                RawResponse::SimpleQuery(s) => return Ok(s),
                                 RawResponse::PipelinedQuery(_) => {
                                     unimplemented!("Pipelined queries aren't implemented yet")
                                 }
@@ -67,14 +69,16 @@ macro_rules! impl_async_methods {
                             ParseError::NotEnough => (),
                             ParseError::BadPacket | ParseError::UnexpectedByte => {
                                 self.buffer.clear();
-                                return Ok(Response::InvalidResponse);
+                                return Err(SkyhashError::InvalidResponse.into());
                             }
-                            ParseError::DataTypeError => return Ok(Response::ParseError),
+                            ParseError::DataTypeError => {
+                                return Err(SkyhashError::ParseError.into())
+                            }
                             ParseError::Empty => {
-                                return Err(Error::from(ErrorKind::ConnectionReset))
+                                return Err(IoError::from(ErrorKind::ConnectionReset).into())
                             }
                             ParseError::UnknownDatatype => {
-                                return Ok(Response::UnsupportedDataType)
+                                return Err(SkyhashError::UnknownDataType.into())
                             }
                         },
                     }
@@ -90,7 +94,7 @@ macro_rules! impl_async_methods {
             }
         }
         impl crate::actions::AsyncSocket for $ty {
-            fn run(&mut self, q: Query) -> crate::actions::AsyncResult<std::io::Result<Response>> {
+            fn run(&mut self, q: Query) -> crate::actions::AsyncResult<SkyResult> {
                 Box::pin(async move { self.run_simple_query(&q).await })
             }
         }

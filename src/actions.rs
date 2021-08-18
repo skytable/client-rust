@@ -37,6 +37,7 @@
 //!
 //! ```
 
+use crate::error::{Error, SkyhashError};
 use crate::types::Array;
 use crate::types::FlatElement;
 use crate::types::SnapshotResult;
@@ -47,54 +48,34 @@ use crate::IntoSkyhashAction;
 use crate::IntoSkyhashBytes;
 use crate::Query;
 use crate::RespCode;
-use crate::Response;
+use crate::SkyResult;
 
 cfg_async!(
     use core::{future::Future, pin::Pin};
 );
-use std::io::ErrorKind;
 
 /// The error string returned when the snapshot engine is busy
 pub const ERR_SNAPSHOT_BUSY: &str = "err-snapshot-busy";
 /// The error string returned when periodic snapshots are busy
 pub const ERR_SNAPSHOT_DISABLED: &str = "err-snapshot-disabled";
 
-/// Errors while running actions
-#[derive(Debug)]
-#[non_exhaustive]
-pub enum ActionError {
-    /// The server sent data but we failed to parse it
-    ParseError,
-    /// The server sent an unexpected data type for this action
-    UnexpectedDataType,
-    /// The server sent an unknown data type that we cannot parse
-    UnknownDataType,
-    /// The server sent an invalid response
-    InvalidResponse,
-    /// An I/O error occurred while running this action
-    IoError(ErrorKind),
-    /// The server returned a response code **other than the one that should have been returned
-    /// for this action** (if any)
-    Code(RespCode),
-}
-
 cfg_async!(
     /// A special result that is returned when running actions (async)
     pub type AsyncResult<'s, T> = Pin<Box<dyn Future<Output = T> + Send + Sync + 's>>;
     #[doc(hidden)]
     pub trait AsyncSocket: Send + Sync {
-        fn run(&mut self, q: Query) -> AsyncResult<std::io::Result<Response>>;
+        fn run(&mut self, q: Query) -> AsyncResult<SkyResult>;
     }
     impl<T> AsyncActions for T where T: AsyncSocket {}
 );
 
 /// A special result that is returned when running actions
-pub type ActionResult<T> = Result<T, ActionError>;
+pub type ActionResult<T> = Result<T, Error>;
 
 cfg_sync!(
     #[doc(hidden)]
     pub trait SyncSocket {
-        fn run(&mut self, q: Query) -> std::io::Result<Response>;
+        fn run(&mut self, q: Query) -> SkyResult;
     }
     impl<T> Actions for T where T: SyncSocket {}
 );
@@ -103,12 +84,8 @@ macro_rules! gen_match {
     ($ret:expr, $($($mtch:pat)+ $(if $exp:expr)*, $expect:expr),*) => {
         match $ret {
             $($(Ok($mtch))|* $(if $exp:expr)* => Ok($expect),)*
-            Ok(Response::InvalidResponse) => Err(ActionError::InvalidResponse),
-            Ok(Response::ParseError) => Err(ActionError::ParseError),
-            Ok(Response::UnsupportedDataType) => Err(ActionError::UnknownDataType),
-            Ok(Response::Item(Element::RespCode(code))) => Err(ActionError::Code(code)),
-            Ok(Response::Item(_)) => Err(ActionError::UnexpectedDataType),
-            Err(e) => Err(ActionError::IoError(e.kind())),
+            Ok(_) => Err(SkyhashError::UnexpectedDataType.into()),
+            Err(e) => Err(e),
         }
     };
 }
@@ -155,43 +132,43 @@ implement_actions!(
     /// Get the number of keys present in the database
     fn dbsize() -> usize {
         { Query::from("dbsize") }
-        Response::Item(Element::UnsignedInt(int)) => int as usize
+        Element::UnsignedInt(int) => int as usize
     }
     /// Deletes a single or a number of keys
     ///
     /// This will return the number of keys that were deleted
     fn del(key: impl IntoSkyhashAction + 's) -> usize {
         { Query::from("del").arg(key) }
-        Response::Item(Element::UnsignedInt(int)) => int as usize
+        Element::UnsignedInt(int) => int as usize
     }
     /// Checks if a key (or keys) exist(s)
     ///
     /// This will return the number of keys that do exist
     fn exists(key: impl IntoSkyhashAction + 's) -> usize {
         { Query::from("exists").arg(key) }
-        Response::Item(Element::UnsignedInt(int)) => int as usize
+        Element::UnsignedInt(int) => int as usize
     }
     /// Removes all the keys present in the database
     fn flushdb() -> () {
         { Query::from("flushdb") }
-        Response::Item(Element::RespCode(RespCode::Okay)) => {}
+        Element::RespCode(RespCode::Okay) => {}
     }
     /// Get the value of a key
     fn get(key: impl IntoSkyhashBytes + 's) -> String {
         { Query::from("get").arg(key)}
-        Response::Item(Element::Str(st)) => st
+        Element::String(st) => st
     }
     /// Get the length of a key
     fn keylen(key: impl IntoSkyhashBytes + 's) -> usize {
         { Query::from("keylen").arg(key)}
-        Response::Item(Element::UnsignedInt(int)) => int as usize
+        Element::UnsignedInt(int) => int as usize
     }
     /// Returns a vector of keys
     ///
     /// Do note that the order might be completely meaningless
     fn lskeys(count: usize) -> Vec<FlatElement> {
         { Query::from("lskeys").arg(count)}
-        Response::Item(Element::Array(Array::Flat(arr))) => arr
+        Element::Array(Array::Flat(arr)) => arr
     }
     /// Get multiple keys
     ///
@@ -199,8 +176,8 @@ implement_actions!(
     /// as strings or contains `Not Found (Code: 1)` response codes
     fn mget(keys: impl IntoSkyhashAction+ 's) -> Array {
         { Query::from("mget").arg(keys)}
-        Response::Item(Element::Array(Array::Bin(brr))) => Array::Bin(brr),
-        Response::Item(Element::Array(Array::Str(srr))) => Array::Str(srr)
+        Element::Array(Array::Bin(brr)) => Array::Bin(brr),
+        Element::Array(Array::Str(srr)) => Array::Str(srr)
     }
     /// Creates a snapshot
     ///
@@ -209,15 +186,16 @@ implement_actions!(
     /// which is normal behavior and _not an inherent error_
     fn mksnap() -> SnapshotResult {
        { Query::from("mksnap")}
-       Response::Item(Element::RespCode(RespCode::Okay)) => SnapshotResult::Okay,
-       Response::Item(Element::RespCode(RespCode::ErrorString(er))) => {
+       Element::RespCode(RespCode::Okay) => SnapshotResult::Okay,
+       Element::RespCode(RespCode::ErrorString(er)) => {
            match er.as_str() {
                ERR_SNAPSHOT_BUSY => SnapshotResult::Busy,
                ERR_SNAPSHOT_DISABLED => SnapshotResult::Disabled,
-               _ => return Err(ActionError::InvalidResponse)
+               _ => return Err(SkyhashError::InvalidResponse.into())
            }
        }
     }
+
     /// Sets the value of multiple keys and values and returns the number of keys that were set
     ///
     /// ## Panics
@@ -231,7 +209,7 @@ implement_actions!(
             assert!(keys.incr_len_by() == values.incr_len_by(), "The number of keys and values for mset must be equal");
             Query::from("mset")._push_alt_iter(keys, values)
         }
-        Response::Item(Element::UnsignedInt(int)) => int as usize
+        Element::UnsignedInt(int) => int as usize
     }
     /// Updates the value of multiple keys and values and returns the number of keys that were updated
     ///
@@ -246,7 +224,7 @@ implement_actions!(
             assert!(keys.incr_len_by() == values.incr_len_by(), "The number of keys and values for mupdate must be equal");
             Query::from("mset")._push_alt_iter(keys, values)
         }
-        Response::Item(Element::UnsignedInt(int)) => int as usize
+        Element::UnsignedInt(int) => int as usize
     }
     /// Consumes a key if it exists
     ///
@@ -254,26 +232,26 @@ implement_actions!(
     /// error codes
     fn pop(keys: impl IntoSkyhashBytes + 's) -> Str {
         { Query::from("POP").arg(keys) }
-        Response::Item(Element::Str(st)) => Str::Unicode(st),
-        Response::Item(Element::Binstr(bstr)) => Str::Binary(bstr)
+        Element::String(st) => Str::Unicode(st),
+        Element::Binstr(bstr) => Str::Binary(bstr)
     }
     /// Consumes the provided keys if they exist
     fn mpop(keys: impl IntoSkyhashAction + 's) -> Array {
         { Query::from("mpop").arg(keys)}
-        Response::Item(Element::Array(Array::Bin(brr))) => Array::Bin(brr),
-        Response::Item(Element::Array(Array::Str(srr))) => Array::Str(srr)
+        Element::Array(Array::Bin(brr)) => Array::Bin(brr),
+        Element::Array(Array::Str(srr)) => Array::Str(srr)
     }
     /// Deletes all the provided keys if they exist or doesn't do anything at all. This method
     /// will return true if all the provided keys were deleted, else it will return false
     fn sdel(keys: impl IntoSkyhashAction + 's) -> bool {
         { Query::from("sdel").arg(keys) }
-        Response::Item(Element::RespCode(RespCode::Okay)) => true,
-        Response::Item(Element::RespCode(RespCode::NotFound)) => false
+        Element::RespCode(RespCode::Okay) => true,
+        Element::RespCode(RespCode::NotFound) => false
     }
     /// Set the value of a key
     fn set(key: impl IntoSkyhashBytes + 's, value: impl IntoSkyhashBytes + 's) -> () {
         { Query::from("set").arg(key).arg(value) }
-        Response::Item(Element::RespCode(RespCode::Okay)) => {}
+        Element::RespCode(RespCode::Okay) => {}
     }
     /// Sets the value of all the provided keys or does nothing. This method will return true if all the keys
     /// were set or will return false if none were set
@@ -292,8 +270,8 @@ implement_actions!(
             );
             Query::from("sset")._push_alt_iter(keys, values)
         }
-        Response::Item(Element::RespCode(RespCode::Okay)) => true,
-        Response::Item(Element::RespCode(RespCode::OverwriteError)) => false
+        Element::RespCode(RespCode::Okay) => true,
+        Element::RespCode(RespCode::OverwriteError) => false
     }
     /// Updates the value of all the provided keys or does nothing. This method will return true if all the keys
     /// were updated or will return false if none were updated
@@ -312,13 +290,13 @@ implement_actions!(
             );
             Query::from("supdate")._push_alt_iter(keys, values)
         }
-        Response::Item(Element::RespCode(RespCode::Okay)) => true,
-        Response::Item(Element::RespCode(RespCode::NotFound)) => false
+        Element::RespCode(RespCode::Okay) => true,
+        Element::RespCode(RespCode::NotFound) => false
     }
     /// Update the value of a key
     fn update(key: impl IntoSkyhashBytes + 's, value: impl IntoSkyhashBytes + 's) -> () {
         { Query::from("update").arg(key).arg(value) }
-        Response::Item(Element::RespCode(RespCode::Okay)) => {}
+        Element::RespCode(RespCode::Okay) => {}
     }
     /// Updates or sets all the provided keys and returns the number of keys that were set
     ///
@@ -336,6 +314,6 @@ implement_actions!(
             );
             Query::from("uset")._push_alt_iter(keys, values)
         }
-        Response::Item(Element::UnsignedInt(int)) => int as usize
+        Element::UnsignedInt(int) => int as usize
     }
 );

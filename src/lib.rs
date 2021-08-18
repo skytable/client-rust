@@ -52,12 +52,12 @@
 //!
 //! Now let's run a [`Query`]! Change the previous code block to:
 //! ```no_run
-//! use skytable::{Connection, Query, Response, Element};
-//! fn main() -> std::io::Result<()> {
+//! use skytable::{error, Connection, Query, Response, Element};
+//! fn main() -> Result<(), error::Error> {
 //!     let mut con = Connection::new("127.0.0.1", 2003)?;
 //!     let query = Query::from("heya");
 //!     let res = con.run_simple_query(&query)?;
-//!     assert_eq!(res, Response::Item(Element::Str("HEY".to_owned())));
+//!     assert_eq!(res, Element::String("HEY".to_owned()));
 //!     Ok(())
 //! }
 //! ```
@@ -144,6 +144,11 @@ cfg_sync!(
     pub use sync::Connection;
 );
 
+/// A generic result type
+pub type SkyRawResult<T> = Result<T, self::error::Error>;
+/// A specialized error type for queries
+pub type SkyResult = SkyRawResult<Element>;
+
 #[derive(Debug)]
 /// A connection builder for easily building connections
 ///
@@ -182,8 +187,6 @@ impl<'a> Default for ConnectionBuilder<'a> {
     }
 }
 
-pub type ConnectionBuilderResult<T> = Result<T, error::Error>;
-
 impl<'a> ConnectionBuilder<'a> {
     /// Create an empty connection builder
     pub fn new() -> Self {
@@ -204,7 +207,7 @@ impl<'a> ConnectionBuilder<'a> {
     }
     cfg_sync! {
         /// Get a [sync connection](sync::Connection) to the database
-        pub fn get_connection(&self) -> ConnectionBuilderResult<sync::Connection> {
+        pub fn get_connection(&self) -> SkyRawResult<sync::Connection> {
             let con =
                 sync::Connection::new(self.host.unwrap_or("127.0.0.1"), self.port.unwrap_or(2003))?;
             Ok(con)
@@ -214,7 +217,7 @@ impl<'a> ConnectionBuilder<'a> {
             pub fn get_tls_connection(
                 &self,
                 sslcert: String,
-            ) -> ConnectionBuilderResult<sync::TlsConnection> {
+            ) -> SkyRawResult<sync::TlsConnection> {
                 let con = sync::TlsConnection::new(
                     self.host.unwrap_or("127.0.0.1"),
                     self.port.unwrap_or(2003),
@@ -226,7 +229,7 @@ impl<'a> ConnectionBuilder<'a> {
     }
     cfg_async! {
         /// Get an [async connection](aio::Connection) to the database
-        pub async fn get_async_connection(&self) -> ConnectionBuilderResult<aio::Connection> {
+        pub async fn get_async_connection(&self) -> SkyRawResult<aio::Connection> {
             let con = aio::Connection::new(self.host.unwrap_or("127.0.0.1"), self.port.unwrap_or(2003))
                 .await?;
             Ok(con)
@@ -236,7 +239,7 @@ impl<'a> ConnectionBuilder<'a> {
             pub async fn get_async_tls_connection(
                 &self,
                 sslcert: String,
-            ) -> ConnectionBuilderResult<aio::TlsConnection> {
+            ) -> SkyRawResult<aio::TlsConnection> {
                 let con = aio::TlsConnection::new(
                     self.host.unwrap_or("127.0.0.1"),
                     self.port.unwrap_or(2003),

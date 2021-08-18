@@ -25,9 +25,11 @@
 //!
 
 use crate::deserializer::{ParseError, Parser, RawResponse};
+use crate::error::SkyhashError;
 use crate::IoResult;
-use crate::{Query, Response};
-use std::io::{Error, ErrorKind, Read, Write};
+use crate::Query;
+use crate::SkyResult;
+use std::io::{Error as IoError, ErrorKind, Read, Write};
 use std::net::TcpStream;
 
 macro_rules! impl_sync_methods {
@@ -35,30 +37,30 @@ macro_rules! impl_sync_methods {
         impl $ty {
             /// This function will write a [`Query`] to the stream and read the response from the
             /// server. It will then determine if the returned response is complete or incomplete
-            /// or invalid and return an appropriate variant of [`Response`] wrapped in [`IoResult`]
+            /// or invalid and return an appropriate variant of [`Error`](crate::error::Error) wrapped in [`IoResult`]
             /// for any I/O errors that may occur
             ///
             /// ## Panics
             /// This method will panic if the [`Query`] supplied is empty (i.e has no arguments)
             /// This function is a subroutine of `run_query` used to parse the response packet
-            pub fn run_simple_query(&mut self, query: &Query) -> IoResult<Response> {
+            pub fn run_simple_query(&mut self, query: &Query) -> SkyResult {
                 assert!(query.len() != 0, "A `Query` cannot be of zero length!");
                 query.write_query_to_sync(&mut self.stream)?;
                 self.stream.flush()?;
                 loop {
                     let mut buffer = [0u8; 1024];
                     match self.stream.read(&mut buffer) {
-                        Ok(0) => return Err(Error::from(ErrorKind::ConnectionReset)),
+                        Ok(0) => return Err(IoError::from(ErrorKind::ConnectionReset).into()),
                         Ok(read) => {
                             self.buffer.extend(&buffer[..read]);
                         }
-                        Err(e) => return Err(e),
+                        Err(e) => return Err(e.into()),
                     }
                     match self.try_response() {
                         Ok((query, forward_by)) => {
                             self.buffer.drain(..forward_by);
                             match query {
-                                RawResponse::SimpleQuery(s) => return Ok(Response::Item(s)),
+                                RawResponse::SimpleQuery(s) => return Ok(s),
                                 RawResponse::PipelinedQuery(_) => {
                                     unimplemented!("Pipelined queries aren't implemented yet")
                                 }
@@ -68,14 +70,16 @@ macro_rules! impl_sync_methods {
                             ParseError::NotEnough => (),
                             ParseError::BadPacket | ParseError::UnexpectedByte => {
                                 self.buffer.clear();
-                                return Ok(Response::InvalidResponse);
+                                return Err(SkyhashError::InvalidResponse.into());
                             }
-                            ParseError::DataTypeError => return Ok(Response::ParseError),
+                            ParseError::DataTypeError => {
+                                return Err(SkyhashError::ParseError.into())
+                            }
                             ParseError::Empty => {
-                                return Err(Error::from(ErrorKind::ConnectionReset))
+                                return Err(IoError::from(ErrorKind::ConnectionReset).into())
                             }
                             ParseError::UnknownDatatype => {
-                                return Ok(Response::UnsupportedDataType)
+                                return Err(SkyhashError::UnknownDataType.into())
                             }
                         },
                     }
@@ -90,7 +94,7 @@ macro_rules! impl_sync_methods {
             }
         }
         impl crate::actions::SyncSocket for $ty {
-            fn run(&mut self, q: Query) -> std::result::Result<Response, std::io::Error> {
+            fn run(&mut self, q: Query) -> SkyResult {
                 self.run_simple_query(&q)
             }
         }

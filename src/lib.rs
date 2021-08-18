@@ -385,10 +385,6 @@ impl Query {
     pub fn is_empty(&self) -> bool {
         self.size_count == 0
     }
-    /// Number of items in the datagroup
-    pub(crate) fn __len(&self) -> usize {
-        self.size_count
-    }
     fn get_holding_buffer(&self) -> &[u8] {
         &self.data
     }
@@ -401,7 +397,7 @@ impl Query {
             // Write the metaframe
             stream.write_all(b"*1\n").await?;
             // Add the dataframe
-            let number_of_items_in_datagroup = self.__len().to_string().into_bytes();
+            let number_of_items_in_datagroup = self.len().to_string().into_bytes();
             stream.write_all(&[b'~']).await?;
             stream.write_all(&number_of_items_in_datagroup).await?;
             stream.write_all(&[b'\n']).await?;
@@ -419,7 +415,7 @@ impl Query {
             // Write the metaframe
             stream.write_all(b"*1\n")?;
             // Add the dataframe
-            let number_of_items_in_datagroup = self.__len().to_string().into_bytes();
+            let number_of_items_in_datagroup = self.len().to_string().into_bytes();
             stream.write_all(&[b'~'])?;
             stream.write_all(&number_of_items_in_datagroup)?;
             stream.write_all(&[b'\n'])?;
@@ -438,7 +434,7 @@ impl Query {
         pub fn into_raw_query(self) -> Vec<u8> {
             let mut v = Vec::with_capacity(self.data.len());
             v.extend(b"*1\n~");
-            v.extend(self.__len().to_string().into_bytes());
+            v.extend(self.len().to_string().into_bytes());
             v.extend(b"\n");
             v.extend(self.get_holding_buffer());
             v
@@ -507,6 +503,8 @@ cfg_dbg!(
 pub mod error {
     //! Errors
     cfg_ssl_any!(
+        use crate::RespCode;
+        use std::io::ErrorKind;
         use std::fmt;
         /// Errors that may occur while initiating an [async TLS connection](crate::aio::TlsConnection)
         /// or a [sync TLS connection](crate::sync::TlsConnection)
@@ -549,12 +547,19 @@ pub mod error {
     #[non_exhaustive]
     /// An error originating from the Skyhash protocol
     pub enum SkyhashError {
+        /// The server sent data but we failed to parse it
+        ParseError,
+        /// The server sent an unexpected data type for this action
+        UnexpectedDataType,
+        /// The server sent an unknown data type that we cannot parse
+        UnknownDataType,
         /// The server sent an invalid response
         InvalidResponse,
-        /// The server sent a response but it could not be parsed
-        ParseError,
-        /// The server sent a data type not supported by this client version
-        UnsupportedDataType,
+        /// An I/O error occurred while running this action
+        IoError(ErrorKind),
+        /// The server returned a response code **other than the one that should have been returned
+        /// for this action** (if any)
+        Code(RespCode),
     }
 
     #[derive(Debug)]

@@ -110,7 +110,7 @@ use core::ops::DerefMut;
 /// ```
 ///
 pub trait IntoSkyhashBytes: Send + Sync {
-    /// Turn `Self` into a [`String`]
+    /// Turn `Self` into a [`Vec<u8>`]
     fn to_bytes(&self) -> Vec<u8>;
 }
 

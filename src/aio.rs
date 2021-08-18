@@ -46,7 +46,7 @@ macro_rules! impl_async_methods {
             /// ## Panics
             /// This method will panic if the [`Query`] supplied is empty (i.e has no arguments)
             pub async fn run_simple_query(&mut self, query: &Query) -> IoResult<Response> {
-                assert!(query.__len() != 0, "A `Query` cannot be of zero length!");
+                assert!(query.len() != 0, "A `Query` cannot be of zero length!");
                 query.write_query_to(&mut self.stream).await?;
                 self.stream.flush().await?;
                 loop {

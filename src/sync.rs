@@ -42,7 +42,7 @@ macro_rules! impl_sync_methods {
             /// This method will panic if the [`Query`] supplied is empty (i.e has no arguments)
             /// This function is a subroutine of `run_query` used to parse the response packet
             pub fn run_simple_query(&mut self, query: &Query) -> IoResult<Response> {
-                assert!(query.__len() != 0, "A `Query` cannot be of zero length!");
+                assert!(query.len() != 0, "A `Query` cannot be of zero length!");
                 query.write_query_to_sync(&mut self.stream)?;
                 self.stream.flush()?;
                 loop {

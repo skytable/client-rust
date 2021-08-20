@@ -84,6 +84,8 @@ macro_rules! gen_match {
     ($ret:expr, $($($mtch:pat)+ $(if $exp:expr)*, $expect:expr),*) => {
         match $ret {
             $($(Ok($mtch))|* $(if $exp:expr)* => Ok($expect),)*
+            // IMPORTANT: Translate respcodes into errors!
+            Ok(Element::RespCode(rc)) => Err(SkyhashError::Code(rc).into()),
             Ok(_) => Err(SkyhashError::UnexpectedDataType.into()),
             Err(e) => Err(e),
         }

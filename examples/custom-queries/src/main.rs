@@ -26,7 +26,7 @@ fn main() {
         }
         Ok(Element::Array(Array::Str(strarr))) => {
             println!("Got a string array!");
-            for element in binarr {
+            for element in strarr {
                 match element {
                     Some(item) => println!("Got a string: {}", item),
                     None => println!("Got null!"),

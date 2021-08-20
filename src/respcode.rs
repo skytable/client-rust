@@ -17,6 +17,8 @@
 
 //! Response codes
 
+use core::fmt;
+
 /// Response codes returned by the server
 #[derive(Debug, PartialEq)]
 #[non_exhaustive]
@@ -81,6 +83,25 @@ impl From<RespCode> for u8 {
             Wrongtype => 7,
             UnknownDataType => 8,
             EncodingError => 9,
+        }
+    }
+}
+
+impl fmt::Display for RespCode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use RespCode::*;
+        match self {
+            Okay => write!(f, "Response code: 0 (okay)"),
+            NotFound => write!(f, "Response code: 1 (not found)"),
+            OverwriteError => write!(f, "Response code: 2 (overwrite error)"),
+            ActionError => write!(f, "Response code: 3 (action error)"),
+            PacketError => write!(f, "Response code: 4 (client side packet error)"),
+            ServerError => write!(f, "Response code: 5 (server error)"),
+            OtherError => write!(f, "Response code: 6, (other error)"),
+            Wrongtype => write!(f, "Response code: 7 (wrongtype error)"),
+            UnknownDataType => write!(f, "Response code: 8 (unknown data type error)"),
+            EncodingError => write!(f, "Response code: 9 (encoding error)"),
+            ErrorString(estr) => write!(f, "Error: {}", estr),
         }
     }
 }

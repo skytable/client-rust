@@ -20,9 +20,9 @@
 //! This module contains error types that the client returns in different cases
 
 use crate::RespCode;
-use std::io::ErrorKind;
+use core::fmt;
+
 cfg_ssl_any!(
-    use std::fmt;
     /// Errors that may occur while initiating an [async TLS connection](crate::aio::TlsConnection)
     /// or a [sync TLS connection](crate::sync::TlsConnection)
     #[derive(Debug)]
@@ -72,8 +72,6 @@ pub enum SkyhashError {
     UnknownDataType,
     /// The server sent an invalid response
     InvalidResponse,
-    /// An I/O error occurred while running this action
-    IoError(ErrorKind),
     /// The server returned a response code **other than the one that should have been returned
     /// for this action** (if any)
     Code(RespCode),
@@ -106,6 +104,42 @@ pub enum Error {
     SkyError(SkyhashError),
     /// An application level parse error occurred
     ParseError,
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::IoError(eio) => write!(f, "{}", eio),
+            #[cfg(any(
+                feature = "ssl",
+                feature = "sslv",
+                feature = "aio-ssl",
+                feature = "aio-sslv"
+            ))]
+            #[cfg_attr(
+                docsrs,
+                doc(cfg(any(
+                    feature = "ssl",
+                    feature = "sslv",
+                    feature = "aio-ssl",
+                    feature = "aio-sslv"
+                )))
+            )]
+            Self::SslError(essl) => write!(f, "{}", essl),
+            Self::ParseError => write!(f, "Skyhash parse error"),
+            Self::SkyError(eproto) => match eproto {
+                SkyhashError::Code(rcode) => write!(f, "{}", rcode),
+                SkyhashError::InvalidResponse => {
+                    write!(f, "Invalid Skyhash response received from server")
+                }
+                SkyhashError::ParseError => write!(f, "Client-side datatype parse error"),
+                SkyhashError::UnexpectedDataType => write!(f, "Wrong type sent by server"),
+                SkyhashError::UnknownDataType => {
+                    write!(f, "Server sent unknown data type for this client version")
+                }
+            },
+        }
+    }
 }
 
 cfg_ssl_any! {

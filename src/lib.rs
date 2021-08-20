@@ -63,6 +63,27 @@
 //! ```
 //! Way to go &mdash; you're all set! Now go ahead and run more advanced queries!
 //!
+//! ## Binary data
+//!
+//! The `default:default` keyspace has the following declaration:
+//! ```json
+//! Keymap { data:(binstr,binstr), volatile:false }
+//! ```
+//!
+//! This means that the default keyspace is ready to store binary data. Let's say
+//! you wanted to `SET` the value of a key called `bindata` to some binary data stored
+//! in a `Vec<u8>`. You can achieve this with the [`RawString`](types::RawString) type:
+//!
+//! ```no_run
+//! use skytable::actions::Actions;
+//! use skytable::sync::Connection;
+//! use skytable::types::RawString;
+//!
+//! let mut con = Connection::new("127.0.0.1", 2003).unwrap();
+//! let mybinarydata = RawString::from(vec![1, 2, 3, 4]);
+//! assert!(con.set("bindata", mybinarydata).unwrap());
+//! ```
+//!
 //! ## Going advanced
 //!
 //! Now that you know how you can run basic queries, check out the [`actions`] module documentation for learning

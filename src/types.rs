@@ -412,6 +412,12 @@ impl IntoSkyhashBytes for RawString {
     }
 }
 
+impl<'a> IntoSkyhashBytes for &'a RawString {
+    fn to_bytes(&self) -> Vec<u8> {
+        self.0.to_owned()
+    }
+}
+
 /// Simple, non-recursive arrays with monotype elements
 #[derive(Debug, PartialEq)]
 #[non_exhaustive]

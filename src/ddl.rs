@@ -230,29 +230,47 @@ implement_ddl! {
         }
     }
     /// Create the provided keyspace
-    fn create_keyspace(ks: impl IntoSkyhashBytes + 's) -> () {
+    ///
+    /// This is equivalent to:
+    /// ```text
+    /// CREATE KEYSPACE <ksname>
+    /// ```
+    /// This will return true if the keyspace was created or false if the keyspace
+    /// already exists
+    fn create_keyspace(ks: impl IntoSkyhashBytes + 's) -> bool {
         { Query::from("CREATE").arg("KEYSPACE").arg(ks) }
-        Element::RespCode(RespCode::Okay) => {}
+        Element::RespCode(RespCode::Okay) => true,
+        Element::RespCode(RespCode::ErrorString(estr)) => match_estr! {
+            estr,
+            errors::ERR_ALREADY_EXISTS => false
+        }
     }
     /// Create a table from the provided configuration
     fn create_table(table: impl CreateTableIntoQuery + 's) -> CreateTableResult {
         { table.into_query() }
         Element::RespCode(RespCode::Okay) => CreateTableResult::Okay,
         Element::RespCode(RespCode::ErrorString(estr)) => {
-            match estr.as_str() {
+            match_estr! {
+                estr,
                 errors::ERR_ALREADY_EXISTS => CreateTableResult::AlreadyExists,
                 errors::DEFAULT_CONTAINER_UNSET => CreateTableResult::DefaultContainerUnset,
-                errors::ERR_PROTECTED_OBJECT => CreateTableResult::ProtectedObject,
-                _ => return Err(SkyhashError::UnexpectedDataType.into())
+                errors::ERR_PROTECTED_OBJECT => CreateTableResult::ProtectedObject
             }
         }
     }
     /// Drop the provided table
-    fn drop_table(table: impl IntoSkyhashBytes + 's) -> () {
+    ///
+    /// This returns true if the table was removed for false if the table didn't exist
+    fn drop_table(table: impl IntoSkyhashBytes + 's) -> bool {
         { Query::from("DROP").arg("TABLE").arg(table) }
-        Element::RespCode(RespCode::Okay) => {}
+        Element::RespCode(RespCode::Okay) => true,
+        Element::RespCode(RespCode::ErrorString(estr)) => match_estr! {
+            estr,
+            errors::CONTAINER_NOT_FOUND => false
+        }
     }
     /// Drop the provided keyspace
+    ///
     fn drop_keyspace(keyspace: impl IntoSkyhashBytes + 's, force: bool) -> () {
         {
             let q = Query::from("DROP").arg("KEYSPACE").arg(keyspace);

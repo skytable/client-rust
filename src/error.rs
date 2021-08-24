@@ -30,6 +30,9 @@ pub enum SkyhashError {
     ParseError,
     /// The server sent an unexpected data type for this action
     UnexpectedDataType,
+    /// The server sent data, that is valid, however, for this specific query, it
+    /// was unexpected. This indicates a bug in the server
+    UnexpectedResponse,
     /// The server sent an unknown data type that we cannot parse
     UnknownDataType,
     /// The server sent an invalid response
@@ -93,6 +96,9 @@ impl fmt::Display for Error {
                 SkyhashError::Code(rcode) => write!(f, "{}", rcode),
                 SkyhashError::InvalidResponse => {
                     write!(f, "Invalid Skyhash response received from server")
+                }
+                SkyhashError::UnexpectedResponse => {
+                    write!(f, "Unexpected response from server")
                 }
                 SkyhashError::ParseError => write!(f, "Client-side datatype parse error"),
                 SkyhashError::UnexpectedDataType => write!(f, "Wrong type sent by server"),

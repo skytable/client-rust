@@ -29,6 +29,18 @@ macro_rules! gen_match {
     };
 }
 
+macro_rules! match_estr {
+    (
+        $ret:expr,
+        $($mtch:pat => $expect:expr),*
+    ) => {
+        match $ret.as_str() {
+            $($mtch => $expect,)*
+            _ => return Err($crate::error::SkyhashError::UnexpectedResponse.into())
+        }
+    };
+}
+
 macro_rules! cfg_sync_ssl_any {
     ($($body:item)*) => {
         $(

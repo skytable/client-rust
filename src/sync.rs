@@ -25,6 +25,7 @@
 //!
 
 use crate::deserializer::{ParseError, Parser, RawResponse};
+use crate::error::Error;
 use crate::error::SkyhashError;
 use crate::IoResult;
 use crate::Query;
@@ -129,7 +130,6 @@ cfg_sync!(
 
 cfg_sync_ssl_any!(
     use openssl::ssl::{Ssl, SslContext, SslMethod, SslStream};
-    use crate::error::SslError;
     #[derive(Debug)]
     /// A database connection over Skyhash/TLS
     pub struct TlsConnection {
@@ -139,12 +139,12 @@ cfg_sync_ssl_any!(
 
     impl TlsConnection {
         /// Pass the `host` and `port` and the path to the CA certificate to use for TLS
-        pub fn new(host: &str, port: u16, ssl_certificate: &str) -> Result<Self, SslError> {
+        pub fn new(host: &str, port: u16, ssl_certificate: &str) -> Result<Self, Error> {
             let mut ctx = SslContext::builder(SslMethod::tls_client())?;
             ctx.set_ca_file(ssl_certificate)?;
             let ssl = Ssl::new(&ctx.build())?;
             let stream = TcpStream::connect((host, port))?;
-            let mut stream = SslStream::new(ssl, stream).map_err(|e| SslError::SslError(e.into()))?;
+            let mut stream = SslStream::new(ssl, stream)?;
             stream.connect()?;
             Ok(Self {
                 stream,

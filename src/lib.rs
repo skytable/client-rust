@@ -142,13 +142,20 @@
 //!
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
+// macro mods
 #[macro_use]
 mod util;
+// endof macro mods
+// public mods
 pub mod actions;
-mod deserializer;
+pub mod ddl;
 pub mod error;
-mod respcode;
 pub mod types;
+// endof public mods
+// private mods
+mod deserializer;
+mod respcode;
+// endof private mods
 use crate::types::GetIterator;
 pub use deserializer::Element;
 pub use respcode::RespCode;

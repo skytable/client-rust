@@ -25,6 +25,7 @@
 //!
 
 use crate::deserializer::{ParseError, Parser, RawResponse};
+use crate::error::Error;
 use crate::error::SkyhashError;
 use crate::IoResult;
 use crate::Query;
@@ -125,7 +126,6 @@ cfg_async_ssl_any!(
     use tokio_openssl::SslStream;
     use openssl::ssl::{SslContext, SslMethod, Ssl};
     use core::pin::Pin;
-    use crate::error::SslError;
 
     /// An asynchronous database connection over Skyhash/TLS
     pub struct TlsConnection {
@@ -135,7 +135,7 @@ cfg_async_ssl_any!(
 
     impl TlsConnection {
         /// Pass the `host` and `port` and the path to the CA certificate to use for TLS
-        pub async fn new(host: &str, port: u16, sslcert: &str) -> Result<Self, SslError> {
+        pub async fn new(host: &str, port: u16, sslcert: &str) -> Result<Self, Error> {
             let mut ctx = SslContext::builder(SslMethod::tls_client())?;
             ctx.set_ca_file(sslcert)?;
             let ssl = Ssl::new(&ctx.build())?;

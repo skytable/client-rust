@@ -80,18 +80,6 @@ cfg_sync!(
     impl<T> Actions for T where T: SyncSocket {}
 );
 
-macro_rules! gen_match {
-    ($ret:expr, $($($mtch:pat)+ $(if $exp:expr)*, $expect:expr),*) => {
-        match $ret {
-            $($(Ok($mtch))|* $(if $exp:expr)* => Ok($expect),)*
-            // IMPORTANT: Translate respcodes into errors!
-            Ok(Element::RespCode(rc)) => Err(SkyhashError::Code(rc).into()),
-            Ok(_) => Err(SkyhashError::UnexpectedDataType.into()),
-            Err(e) => Err(e),
-        }
-    };
-}
-
 macro_rules! implement_actions {
     (
         $(
@@ -149,14 +137,26 @@ implement_actions!(
     }
     /// Deletes a single or a number of keys
     ///
+    /// This is equivalent to:
+    /// ```text
+    /// DEL <k1> <k2> <k3> ...
+    /// ```
+    ///
     /// This will return the number of keys that were deleted
+    ///
     fn del(key: impl IntoSkyhashAction + 's) -> u64 {
         { Query::from("del").arg(key) }
         Element::UnsignedInt(int) => int as u64
     }
     /// Checks if a key (or keys) exist(s)
     ///
+    /// This is equivalent to:
+    /// ```text
+    /// EXISTS <k1> <k2> <k3> ...
+    /// ```
+    ///
     /// This will return the number of keys that do exist
+    ///
     fn exists(key: impl IntoSkyhashAction + 's) -> u64 {
         { Query::from("exists").arg(key) }
         Element::UnsignedInt(int) => int as u64
@@ -167,17 +167,32 @@ implement_actions!(
         Element::RespCode(RespCode::Okay) => {}
     }
     /// Get the value of a key
+    ///
+    /// This is equivalent to:
+    /// ```text
+    /// GET <key>
+    /// ```
     fn get(key: impl IntoSkyhashBytes + 's) -> Str {
         { Query::from("get").arg(key)}
         Element::String(st) => Str::Unicode(st),
         Element::Binstr(bstr) => Str::Binary(bstr)
     }
     /// Get the length of a key
+    ///
+    /// This is equivalent to:
+    /// ```text
+    /// KEYLEN <key>
+    /// ```
     fn keylen(key: impl IntoSkyhashBytes + 's) -> u64 {
         { Query::from("keylen").arg(key)}
         Element::UnsignedInt(int) => int as u64
     }
     /// Returns a vector of keys
+    ///
+    /// This is equivalent to:
+    /// ```text
+    /// LSKEYS <count>
+    /// ```
     ///
     /// Do note that the order might be completely meaningless
     fn lskeys(count: u64) -> SimpleArray {
@@ -188,6 +203,11 @@ implement_actions!(
     /// Get multiple keys
     ///
     /// This returns a [`SimpleArray`] of values for the provided keys
+    ///
+    /// This is equivalent to:
+    /// ```text
+    /// MGET <k1> <k2> ...
+    /// ```
     fn mget(keys: impl IntoSkyhashAction+ 's) -> SimpleArray {
         { Query::from("mget").arg(keys)}
         Element::Array(Array::Bin(brr)) => SimpleArray::Bin(brr),
@@ -212,6 +232,13 @@ implement_actions!(
 
     /// Sets the value of multiple keys and values and returns the number of keys that were set
     ///
+    /// This is equivalent to:
+    /// ```text
+    /// MSET <k1> <v1> <k2> <v2> ...
+    /// ```
+    /// with the only difference that you have to pass in the keys and values as separate
+    /// objects
+    ///
     /// ## Panics
     /// This method will panic if the number of keys and values are not equal
     fn mset<T: IntoSkyhashBytes + 's , U: IntoSkyhashBytes + 's>
@@ -226,6 +253,13 @@ implement_actions!(
         Element::UnsignedInt(int) => int as u64
     }
     /// Updates the value of multiple keys and values and returns the number of keys that were updated
+    ///
+    /// This is equivalent to:
+    /// ```text
+    /// MUPDATE <k1> <v1> <k2> <v2> ...
+    /// ```
+    /// with the only difference that you have to pass in the keys and values as separate
+    /// objects
     ///
     /// ## Panics
     /// This method will panic if the number of keys and values are not equal
@@ -244,12 +278,22 @@ implement_actions!(
     ///
     /// This will return the corresponding values of the provided key as an [`Str`] type
     /// depending on the type for that table
+    ///
+    /// This is equivalent to:
+    /// ```text
+    /// POP <key>
+    /// ```
     fn pop(keys: impl IntoSkyhashBytes + 's) -> Str {
         { Query::from("POP").arg(keys) }
         Element::String(st) => Str::Unicode(st),
         Element::Binstr(bstr) => Str::Binary(bstr)
     }
     /// Consumes the provided keys if they exist
+    ///
+    /// This is equivalent to:
+    /// ```text
+    /// MPOP <k1> <k2> <k3>
+    /// ```
     fn mpop(keys: impl IntoSkyhashAction + 's) -> SimpleArray {
         { Query::from("mpop").arg(keys)}
         Element::Array(Array::Bin(brr)) => SimpleArray::Bin(brr),
@@ -257,12 +301,25 @@ implement_actions!(
     }
     /// Deletes all the provided keys if they exist or doesn't do anything at all. This method
     /// will return true if all the provided keys were deleted, else it will return false
+    ///
+    /// This is equivalent to:
+    /// ```text
+    /// SDEL <k1> <v1> <k2> <v2>
+    /// ```
+    /// with the only difference that you have to pass in the keys and values as separate
+    /// objects
     fn sdel(keys: impl IntoSkyhashAction + 's) -> bool {
         { Query::from("sdel").arg(keys) }
         Element::RespCode(RespCode::Okay) => true,
         Element::RespCode(RespCode::NotFound) => false
     }
     /// Set the value of a key
+    ///
+    /// This is equivalent to:
+    /// ```text
+    /// SET <k> <v>
+    /// ```
+    ///
     fn set(key: impl IntoSkyhashBytes + 's, value: impl IntoSkyhashBytes + 's) -> bool {
         { Query::from("set").arg(key).arg(value) }
         Element::RespCode(RespCode::Okay) => true,
@@ -270,6 +327,13 @@ implement_actions!(
     }
     /// Sets the value of all the provided keys or does nothing. This method will return true if all the keys
     /// were set or will return false if none were set
+    ///
+    /// This is equivalent to:
+    /// ```text
+    /// SSET <k1> <v1> <k2> <v2> ...
+    /// ```
+    /// with the only difference that you have to pass in the keys and values as separate
+    /// objects
     ///
     /// ## Panics
     /// This method will panic if the number of keys and values are not equal
@@ -289,8 +353,14 @@ implement_actions!(
         Element::RespCode(RespCode::OverwriteError) => false
     }
     /// Updates the value of all the provided keys or does nothing. This method will return true if all the keys
-    /// were updated or will return false if none were updated
+    /// were updated or will return false if none were updated.
     ///
+    /// This is equivalent to:
+    /// ```text
+    /// SUPDATE <key1> <value1> <key2> <value2> ...
+    /// ```
+    /// with the only difference that you have to pass in the keys and values as separate
+    /// objects
     /// ## Panics
     /// This method will panic if the number of keys and values are not equal
     fn supdate<T: IntoSkyhashBytes + 's , U: IntoSkyhashBytes + 's>
@@ -309,11 +379,23 @@ implement_actions!(
         Element::RespCode(RespCode::NotFound) => false
     }
     /// Update the value of a key
+    ///
+    /// This is equivalent to:
+    /// ```text
+    /// UPDATE <key> <value>
+    /// ```
     fn update(key: impl IntoSkyhashBytes + 's, value: impl IntoSkyhashBytes + 's) -> () {
         { Query::from("update").arg(key).arg(value) }
         Element::RespCode(RespCode::Okay) => {}
     }
     /// Updates or sets all the provided keys and returns the number of keys that were set
+    ///
+    /// This is equivalent to:
+    /// ```text
+    /// USET <key1> <value1> <key2> <value2> ...
+    /// ```
+    /// with the only difference that you have to pass in the keys and values as separate
+    /// objects
     ///
     /// ## Panics
     /// This method will panic if the number of keys is not equal to the number of values

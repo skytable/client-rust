@@ -22,44 +22,6 @@
 use crate::RespCode;
 use core::fmt;
 
-cfg_ssl_any!(
-    /// Errors that may occur while initiating an [async TLS connection](crate::aio::TlsConnection)
-    /// or a [sync TLS connection](crate::sync::TlsConnection)
-    #[derive(Debug)]
-    pub enum SslError {
-        /// An [I/O Error](std::io::Error) occurred
-        IoError(std::io::Error),
-        /// An [SSL Error](openssl::error::Error) occurred
-        SslError(openssl::ssl::Error),
-    }
-
-    impl From<openssl::ssl::Error> for SslError {
-        fn from(e: openssl::ssl::Error) -> Self {
-            Self::SslError(e)
-        }
-    }
-
-    impl From<std::io::Error> for SslError {
-        fn from(e: std::io::Error) -> Self {
-            Self::IoError(e)
-        }
-    }
-
-    impl From<openssl::error::ErrorStack> for SslError {
-        fn from(e: openssl::error::ErrorStack) -> Self {
-            Self::SslError(e.into())
-        }
-    }
-
-    impl fmt::Display for SslError {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-            match self {
-                Self::IoError(e) => write!(f, "{}", e),
-                Self::SslError(e) => write!(f, "{}", e),
-            }
-        }
-    }
-);
 #[derive(Debug)]
 #[non_exhaustive]
 /// An error originating from the Skyhash protocol
@@ -148,22 +110,17 @@ cfg_ssl_any! {
             Self::SslError(err)
         }
     }
+    impl From<openssl::error::ErrorStack> for Error {
+        fn from(e: openssl::error::ErrorStack) -> Self {
+            let e: openssl::ssl::Error = e.into();
+            Self::SslError(e)
+        }
+    }
 }
 
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
         Self::IoError(err)
-    }
-}
-
-cfg_ssl_any! {
-    impl From<SslError> for Error {
-        fn from(err: SslError) -> Self {
-            match err {
-                SslError::IoError(ioerr) => Self::IoError(ioerr),
-                SslError::SslError(sslerr) => Self::SslError(sslerr),
-            }
-        }
     }
 }
 

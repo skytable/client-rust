@@ -17,6 +17,18 @@
 
 #![allow(unused_macros)] // This is done just to avoid unnecessary complications
 
+macro_rules! gen_match {
+    ($ret:expr, $($($mtch:pat)+ $(if $exp:expr)*, $expect:expr),*) => {
+        match $ret {
+            $($(Ok($mtch))|* $(if $exp:expr)* => Ok($expect),)*
+            // IMPORTANT: Translate respcodes into errors!
+            Ok($crate::Element::RespCode(rc)) => Err($crate::error::SkyhashError::Code(rc).into()),
+            Ok(_) => Err($crate::error::SkyhashError::UnexpectedDataType.into()),
+            Err(e) => Err(e),
+        }
+    };
+}
+
 macro_rules! cfg_sync_ssl_any {
     ($($body:item)*) => {
         $(

@@ -20,6 +20,23 @@
 //! This module contains other modules, types, traits and functions to use the DDL
 //! abilities of Skytable efficiently.
 //!
+//! ## Example: creating tables
+//!
+//! ```no_run
+//! use skytable::ddl::{CreateTableResult, Ddl, Keymap};
+//! use skytable::sync::Connection;
+//! fn main() {
+//!     let mut con = Connection::new("127.0.0.1", 2003).unwrap();
+//!     let table = Keymap::new("mykeyspace:mytable")
+//!         .set_ktype("str")
+//!         .set_vtype("binstr");
+//!     assert_eq!(
+//!        con.create_table(table).unwrap(),
+//!        CreateTableResult::Okay
+//!     );
+//! }
+//! ```
+//!
 
 use crate::error::SkyhashError;
 use crate::Element;
@@ -35,6 +52,66 @@ cfg_async! {
 
 cfg_sync! {
     use crate::actions::SyncSocket;
+}
+
+#[derive(Debug, PartialEq)]
+/// A Keymap Model Table
+///
+pub struct Keymap {
+    entity: Option<String>,
+    ktype: Option<String>,
+    vtype: Option<String>,
+    volatile: bool,
+}
+
+impl Keymap {
+    /// Create a new Keymap model with the provided entity and default types: `(binstr,binstr)`
+    /// and the default volatility (by default a table is **not** volatile)
+    pub fn new(entity: impl AsRef<str>) -> Self {
+        Self {
+            entity: Some(entity.as_ref().to_owned()),
+            ktype: None,
+            vtype: None,
+            volatile: false,
+        }
+    }
+    /// Set the key type
+    pub fn set_ktype(mut self, ktype: impl AsRef<str>) -> Self {
+        self.ktype = Some(ktype.as_ref().to_owned());
+        self
+    }
+    /// Set the value type
+    pub fn set_vtype(mut self, vtype: impl AsRef<str>) -> Self {
+        self.vtype = Some(vtype.as_ref().to_owned());
+        self
+    }
+    /// Make the table volatile
+    pub fn set_volatile(mut self) -> Self {
+        self.volatile = true;
+        self
+    }
+}
+
+/// Any object that represents a table and that can be turned into a query
+pub trait CreateTableIntoQuery: Send + Sync {
+    /// Turns self into a query
+    fn into_query(self) -> Query;
+}
+
+impl CreateTableIntoQuery for Keymap {
+    fn into_query(self) -> Query {
+        let arg = format!(
+            "keymap({ktype},{vtype})",
+            ktype = self.ktype.unwrap_or_else(|| "binstr".to_owned()),
+            vtype = self.vtype.unwrap_or_else(|| "binstr".to_owned()),
+        );
+        let q = Query::from("CREATE").arg("TABLE").arg(arg);
+        if self.volatile {
+            q.arg("volatile")
+        } else {
+            q
+        }
+    }
 }
 
 pub mod errors {
@@ -55,6 +132,16 @@ pub enum SwitchEntityResult {
     ProtectedObject,
     NotReady,
     Okay,
+}
+
+#[derive(Debug, PartialEq)]
+#[non_exhaustive]
+/// Result of creating tables
+pub enum CreateTableResult {
+    Okay,
+    AlreadyExists,
+    DefaultContainerUnset,
+    ProtectedObject,
 }
 
 macro_rules! implement_ddl {
@@ -138,6 +225,19 @@ implement_ddl! {
                 errors::CONTAINER_NOT_FOUND => SwitchEntityResult::ContainerNotFound,
                 errors::ERR_NOT_READY => SwitchEntityResult::NotReady,
                 errors::ERR_PROTECTED_OBJECT => SwitchEntityResult::ProtectedObject,
+                _ => return Err(SkyhashError::UnexpectedDataType.into())
+            }
+        }
+    }
+    /// Create a table from the provided configuration
+    fn create_table(table: impl CreateTableIntoQuery + 's) -> CreateTableResult {
+        { table.into_query() }
+        Element::RespCode(RespCode::Okay) => CreateTableResult::Okay,
+        Element::RespCode(RespCode::ErrorString(estr)) => {
+            match estr.as_str() {
+                errors::ERR_ALREADY_EXISTS => CreateTableResult::AlreadyExists,
+                errors::DEFAULT_CONTAINER_UNSET => CreateTableResult::DefaultContainerUnset,
+                errors::ERR_PROTECTED_OBJECT => CreateTableResult::ProtectedObject,
                 _ => return Err(SkyhashError::UnexpectedDataType.into())
             }
         }

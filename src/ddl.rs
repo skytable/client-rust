@@ -29,12 +29,12 @@ use crate::RespCode;
 use crate::SkyRawResult;
 
 cfg_async! {
-    use crate::actions::SyncSocket;
     use crate::actions::AsyncResult;
+    use crate::actions::AsyncSocket;
 }
 
 cfg_sync! {
-    use crate::actions::AsyncSocket;
+    use crate::actions::SyncSocket;
 }
 
 pub mod errors {

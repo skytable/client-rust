@@ -229,6 +229,11 @@ implement_ddl! {
             }
         }
     }
+    /// Create the provided keyspace
+    fn create_keyspace(ks: impl IntoSkyhashBytes + 's) -> () {
+        { Query::from("CREATE").arg("KEYSPACE").arg(ks) }
+        Element::RespCode(RespCode::Okay) => {}
+    }
     /// Create a table from the provided configuration
     fn create_table(table: impl CreateTableIntoQuery + 's) -> CreateTableResult {
         { table.into_query() }
@@ -241,5 +246,22 @@ implement_ddl! {
                 _ => return Err(SkyhashError::UnexpectedDataType.into())
             }
         }
+    }
+    /// Drop the provided table
+    fn drop_table(table: impl IntoSkyhashBytes + 's) -> () {
+        { Query::from("DROP").arg("TABLE").arg(table) }
+        Element::RespCode(RespCode::Okay) => {}
+    }
+    /// Drop the provided keyspace
+    fn drop_keyspace(keyspace: impl IntoSkyhashBytes + 's, force: bool) -> () {
+        {
+            let q = Query::from("DROP").arg("KEYSPACE").arg(keyspace);
+            if force {
+                q.arg("force")
+            } else {
+                q
+            }
+        }
+        Element::RespCode(RespCode::Okay) => {}
     }
 }

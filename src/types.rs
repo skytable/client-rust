@@ -252,6 +252,7 @@ pub enum SnapshotResult {
 /// Implement this trait for methods in [`actions`](crate::actions) that need them. See the
 /// [module level documentation](crate::types) for more information
 pub trait GetIterator<T: IntoSkyhashBytes>: IntoSkyhashAction {
+    /// Returns an iterator for self
     fn get_iter(&self) -> std::slice::Iter<T>;
 }
 
@@ -421,7 +422,7 @@ impl<'a> IntoSkyhashBytes for &'a RawString {
 ///
 /// // Implement it
 /// impl FromSkyhashBytes for MyCSV {
-///     fn from_bytes(element: Element) -> SkyRawResult<Self> {
+///     fn from_element(element: Element) -> SkyRawResult<Self> {
 ///         if let Element::String(st) = element {
 ///             let splits: Vec<&str> = st.split(",").collect();
 ///             Ok(
@@ -451,13 +452,14 @@ impl<'a> IntoSkyhashBytes for &'a RawString {
 /// with actions (as shown above)!
 ///
 pub trait FromSkyhashBytes: Sized {
-    fn from_bytes(element: Element) -> SkyRawResult<Self>;
+    /// Attempt to convert an element to the target type, returning errors if they occur
+    fn from_element(element: Element) -> SkyRawResult<Self>;
 }
 
 macro_rules! impl_from_skyhash {
     ($($ty:ty),* $(,)?) => {
         $(impl FromSkyhashBytes for $ty {
-            fn from_bytes(element: Element) -> SkyRawResult<$ty> {
+            fn from_element(element: Element) -> SkyRawResult<$ty> {
                 let ret = match element {
                     Element::Binstr(bstr) => String::from_utf8_lossy(&bstr).parse::<$ty>()?,
                     Element::String(st) => st.parse::<$ty>()?,
@@ -473,7 +475,7 @@ macro_rules! impl_from_skyhash {
 impl_from_skyhash!(u8, i8, u16, i16, u32, i32, u64, i64, u128, i128, usize, isize);
 
 impl FromSkyhashBytes for String {
-    fn from_bytes(element: Element) -> SkyRawResult<String> {
+    fn from_element(element: Element) -> SkyRawResult<String> {
         let e = match element {
             Element::Binstr(bstr) => std::string::String::from_utf8(bstr)?,
             Element::String(st) => st,
@@ -485,7 +487,7 @@ impl FromSkyhashBytes for String {
 }
 
 impl FromSkyhashBytes for Vec<String> {
-    fn from_bytes(element: Element) -> SkyRawResult<Self> {
+    fn from_element(element: Element) -> SkyRawResult<Self> {
         let e = match element {
             Element::Array(Array::Bin(binarr)) => {
                 let mut new_arr = Vec::with_capacity(binarr.len());
@@ -516,7 +518,7 @@ impl FromSkyhashBytes for Vec<String> {
 }
 
 impl FromSkyhashBytes for Vec<Vec<u8>> {
-    fn from_bytes(e: Element) -> SkyRawResult<Self> {
+    fn from_element(e: Element) -> SkyRawResult<Self> {
         let e = match e {
             Element::Array(Array::Bin(brr)) => {
                 let mut newarr = Vec::with_capacity(brr.len());
@@ -547,7 +549,7 @@ impl FromSkyhashBytes for Vec<Vec<u8>> {
 }
 
 impl FromSkyhashBytes for Element {
-    fn from_bytes(e: Element) -> SkyRawResult<Element> {
+    fn from_element(e: Element) -> SkyRawResult<Element> {
         Ok(e)
     }
 }

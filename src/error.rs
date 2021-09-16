@@ -48,11 +48,17 @@ pub mod errorstring {
     //! This module contains a collection of constants that represent [error strings](https://docs.skytable.io/protocol/errors)
     //! returned by the server
     //!
+    /// The default container was not set
     pub const DEFAULT_CONTAINER_UNSET: &str = "default-container-unset";
+    /// The container was not found
     pub const CONTAINER_NOT_FOUND: &str = "container-not-found";
+    /// The container is still in use
     pub const STILL_IN_USE: &str = "still-in-use";
+    /// The object is a protected object and is not user accessible
     pub const ERR_PROTECTED_OBJECT: &str = "err-protected-object";
+    /// The container already exists
     pub const ERR_ALREADY_EXISTS: &str = "err-already-exists";
+    /// The container is not ready
     pub const ERR_NOT_READY: &str = "not-ready";
 }
 

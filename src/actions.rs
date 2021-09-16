@@ -66,6 +66,7 @@ cfg_async!(
     #[doc(hidden)]
     /// A raw async connection to the database server
     pub trait AsyncSocket: Send + Sync {
+        /// Run the query
         fn run(&mut self, q: Query) -> AsyncResult<SkyResult>;
     }
     impl<T> AsyncActions for T where T: AsyncSocket {}
@@ -75,6 +76,7 @@ cfg_sync!(
     #[doc(hidden)]
     /// A raw synchronous connection to the database server
     pub trait SyncSocket {
+        /// Run the query
         fn run(&mut self, q: Query) -> SkyResult;
     }
     impl<T> Actions for T where T: SyncSocket {}
@@ -174,7 +176,7 @@ implement_actions!(
     /// ```
     fn get<T: FromSkyhashBytes>(key: impl IntoSkyhashBytes + 's) -> T {
         { Query::from("get").arg(key)}
-        x @ Element::String(_) | x @ Element::Binstr(_) => T::from_bytes(x)?
+        x @ Element::String(_) | x @ Element::Binstr(_) => T::from_element(x)?
     }
     /// Get the length of a key
     ///
@@ -196,7 +198,7 @@ implement_actions!(
     /// Do note that the order might be completely meaningless
     fn lskeys<T: FromSkyhashBytes>(count: u64) -> T {
         { Query::from("lskeys").arg(count.to_string())}
-        x @ Element::Array(Array::Bin(_)) | x @ Element::Array(Array::Str(_)) => T::from_bytes(x)?
+        x @ Element::Array(Array::Bin(_)) | x @ Element::Array(Array::Str(_)) => T::from_element(x)?
     }
     /// Get multiple keys
     ///
@@ -208,7 +210,7 @@ implement_actions!(
     /// ```
     fn mget<T: FromSkyhashBytes>(keys: impl IntoSkyhashAction+ 's) -> T {
         { Query::from("mget").arg(keys)}
-        x @ Element::Array(Array::Bin(_)) | x @ Element::Array(Array::Str(_)) => T::from_bytes(x)?
+        x @ Element::Array(Array::Bin(_)) | x @ Element::Array(Array::Str(_)) => T::from_element(x)?
     }
     /// Creates a snapshot
     ///
@@ -282,7 +284,7 @@ implement_actions!(
     /// ```
     fn pop<T: FromSkyhashBytes>(keys: impl IntoSkyhashBytes + 's) -> T {
         { Query::from("POP").arg(keys) }
-        x @ Element::String(_) | x @ Element::Binstr(_) => T::from_bytes(x)?
+        x @ Element::String(_) | x @ Element::Binstr(_) => T::from_element(x)?
     }
     /// Consumes the provided keys if they exist
     ///
@@ -292,7 +294,7 @@ implement_actions!(
     /// ```
     fn mpop<T: FromSkyhashBytes>(keys: impl IntoSkyhashAction + 's) -> T {
         { Query::from("mpop").arg(keys)}
-        x @ Element::Array(Array::Bin(_)) | x @ Element::Array(Array::Str(_)) => T::from_bytes(x)?
+        x @ Element::Array(Array::Bin(_)) | x @ Element::Array(Array::Str(_)) => T::from_element(x)?
     }
     /// Deletes all the provided keys if they exist or doesn't do anything at all. This method
     /// will return true if all the provided keys were deleted, else it will return false

@@ -82,7 +82,7 @@ pub enum Element {
 impl Element {
     /// Try to convert an element to a type that implements [`FromSkyhashBytes`]
     pub fn try_element_into<T: FromSkyhashBytes>(self) -> SkyRawResult<T> {
-        T::from_bytes(self)
+        T::from_element(self)
     }
 }
 

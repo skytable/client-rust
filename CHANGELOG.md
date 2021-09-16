@@ -20,7 +20,9 @@ All changes in this project will be noted in this file.
 ### Broken
 
 - Errors have been unified into a single error type
-- Some types have been removed to aid simplicity (`types::Str`)
+- Some types have been removed to aid simplicity:
+  - `types::Str`
+  - `types::SimpleArray`
 
 ## Version 0.5.0
 

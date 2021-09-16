@@ -41,7 +41,6 @@
 use crate::error::SkyhashError;
 use crate::types::Array;
 use crate::types::FromSkyhashBytes;
-use crate::types::SimpleArray;
 use crate::types::SnapshotResult;
 use crate::Element;
 use crate::GetIterator;
@@ -207,10 +206,9 @@ implement_actions!(
     /// ```text
     /// MGET <k1> <k2> ...
     /// ```
-    fn mget(keys: impl IntoSkyhashAction+ 's) -> SimpleArray {
+    fn mget<T: FromSkyhashBytes>(keys: impl IntoSkyhashAction+ 's) -> T {
         { Query::from("mget").arg(keys)}
-        Element::Array(Array::Bin(brr)) => SimpleArray::Bin(brr),
-        Element::Array(Array::Str(srr)) => SimpleArray::Str(srr)
+        x @ Element::Array(Array::Bin(_)) | x @ Element::Array(Array::Str(_)) => T::from_bytes(x)?
     }
     /// Creates a snapshot
     ///

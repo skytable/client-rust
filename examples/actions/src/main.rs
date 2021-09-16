@@ -8,8 +8,7 @@ fn main() {
             .unwrap()
             == 3
     );
-    let ret = con.mget(["x", "y", "z"]).unwrap();
-    let ret = ret.try_into_string_array().unwrap();
+    let ret: Vec<String> = con.mget(["x", "y", "z"]).unwrap();
     assert_eq!(
         vec!["100".to_owned(), "200".to_owned(), "300".to_owned()],
         ret

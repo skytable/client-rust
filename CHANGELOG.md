@@ -2,6 +2,18 @@
 
 All changes in this project will be noted in this file.
 
+## Version 0.6.0
+
+> Breaking changes
+
+### Added
+
+- Support for DDL queries
+
+### Broken
+
+- Errors have been unified into a single error type
+
 ## Version 0.5.0
 
 > Breaking changes

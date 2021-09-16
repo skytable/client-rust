@@ -9,10 +9,18 @@ All changes in this project will be noted in this file.
 ### Added
 
 - Support for DDL queries
+- Support for directly getting types from actions. For example:
+  ```rust
+  let mut x: u64 = con.get("my integer key").unwrap();
+  ```
+  All errors resulting from this parse are simply propagated into the `Error::ParseError`
+  variant
+- Support for retrieval of custom types through the use of the `FromSkyhashBytes` trait
 
 ### Broken
 
 - Errors have been unified into a single error type
+- Some types have been removed to aid simplicity (`types::Str`)
 
 ## Version 0.5.0
 

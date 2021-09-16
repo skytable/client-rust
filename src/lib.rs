@@ -61,6 +61,40 @@
 //!     Ok(())
 //! }
 //! ```
+//! 
+//! ## Running actions
+//! 
+//! As noted [below](#binary-data), the default table is a key/value table with a binary key
+//! type and a binary value type. Let's go ahead and run some actions (we're assuming you're
+//! using the sync API; for async, simply change the import to `use skytable::actions::AsyncActions`).
+//! 
+//! ### `SET`ting a key
+//! 
+//! ```no_run
+//! use skytable::actions::Actions;
+//! use skytable::sync::Connection;
+//! 
+//! let mut con = Connection::new("127.0.0.1", 2003).unwrap();
+//! con.set("hello", "world").unwrap();
+//! ```
+//! 
+//! This will set the value of the key `hello` to `world` in the `default:default` entity.
+//! 
+//! ### `GET`ting a key
+//! 
+//! ```no_run
+//! use skytable::actions::Actions;
+//! use skytable::sync::Connection;
+//! use skytable::types::Str;
+//! 
+//! let mut con = Connection::new("127.0.0.1", 2003).unwrap();
+//! let x: String = match con.get("hello").unwrap() {
+//!     Str::Binary(bstr) => String::from_utf8_lossy(&bstr).to_string(),
+//!     _ => panic!("Oops, the default keyspace didn't return a binstr as we expected")
+//! };
+//! assert_eq!(x, "world");
+//! ```
+//! 
 //! Way to go &mdash; you're all set! Now go ahead and run more advanced queries!
 //!
 //! ## Binary data
@@ -236,17 +270,17 @@ impl ConnectionBuilder {
             entity: None,
         }
     }
-    /// Set the port
+    /// Set the port (defaults to `2003`)
     pub fn set_port(mut self, port: u16) -> Self {
         self.port = Some(port);
         self
     }
-    /// Set the host
+    /// Set the host (defaults to `localhost`)
     pub fn set_host(mut self, host: String) -> Self {
         self.host = Some(host);
         self
     }
-    /// Set the entity
+    /// Set the entity (defaults to `default:default`)
     pub fn set_entity(mut self, entity: String) -> Self {
         self.entity = Some(entity);
         self

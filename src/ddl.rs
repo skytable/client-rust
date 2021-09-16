@@ -71,17 +71,17 @@ impl Keymap {
             volatile: false,
         }
     }
-    /// Set the key type
+    /// Set the key type (defaults to `binstr`)
     pub fn set_ktype(mut self, ktype: impl AsRef<str>) -> Self {
         self.ktype = Some(ktype.as_ref().to_owned());
         self
     }
-    /// Set the value type
+    /// Set the value type (defaults to `binstr`)
     pub fn set_vtype(mut self, vtype: impl AsRef<str>) -> Self {
         self.vtype = Some(vtype.as_ref().to_owned());
         self
     }
-    /// Make the table volatile
+    /// Make the table volatile (defaults to `false`)
     pub fn set_volatile(mut self) -> Self {
         self.volatile = true;
         self

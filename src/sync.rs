@@ -25,7 +25,6 @@
 //!
 
 use crate::deserializer::{ParseError, Parser, RawResponse};
-use crate::error::Error;
 use crate::error::SkyhashError;
 use crate::IoResult;
 use crate::Query;
@@ -130,6 +129,7 @@ cfg_sync!(
 
 cfg_sync_ssl_any!(
     use openssl::ssl::{Ssl, SslContext, SslMethod, SslStream};
+    use crate::error::Error;
     #[derive(Debug)]
     /// A database connection over Skyhash/TLS
     pub struct TlsConnection {

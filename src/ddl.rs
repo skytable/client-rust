@@ -23,13 +23,13 @@
 //! ## Example: creating tables
 //!
 //! ```no_run
-//! use skytable::ddl::{Ddl, Keymap};
+//! use skytable::ddl::{Ddl, Keymap, KeymapType};
 //! use skytable::sync::Connection;
 //!
 //! let mut con = Connection::new("127.0.0.1", 2003).unwrap();
 //! let table = Keymap::new("mykeyspace:mytable")
-//!     .set_ktype("str")
-//!     .set_vtype("binstr");
+//!     .set_ktype(KeymapType::Str)
+//!     .set_vtype(KeymapType::Binstr);
 //! con.create_table(table).unwrap();
 //! ```
 //!
@@ -50,13 +50,31 @@ cfg_sync! {
     use crate::actions::SyncSocket;
 }
 
+#[non_exhaustive]
+#[derive(Debug, PartialEq)]
+pub enum KeymapType {
+    Str,
+    Binstr,
+    Other(String),
+}
+
+impl KeymapType {
+    fn priv_to_string(&self) -> String {
+        match self {
+            Self::Str => "str".to_owned(),
+            Self::Binstr => "binstr".to_owned(),
+            Self::Other(oth) => oth.clone(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 /// A Keymap Model Table
 ///
 pub struct Keymap {
     entity: Option<String>,
-    ktype: Option<String>,
-    vtype: Option<String>,
+    ktype: Option<KeymapType>,
+    vtype: Option<KeymapType>,
     volatile: bool,
 }
 
@@ -72,13 +90,13 @@ impl Keymap {
         }
     }
     /// Set the key type (defaults to `binstr`)
-    pub fn set_ktype(mut self, ktype: impl AsRef<str>) -> Self {
-        self.ktype = Some(ktype.as_ref().to_owned());
+    pub fn set_ktype(mut self, ktype: KeymapType) -> Self {
+        self.ktype = Some(ktype);
         self
     }
     /// Set the value type (defaults to `binstr`)
-    pub fn set_vtype(mut self, vtype: impl AsRef<str>) -> Self {
-        self.vtype = Some(vtype.as_ref().to_owned());
+    pub fn set_vtype(mut self, vtype: KeymapType) -> Self {
+        self.vtype = Some(vtype);
         self
     }
     /// Make the table volatile (defaults to `false`)
@@ -98,8 +116,16 @@ impl CreateTableIntoQuery for Keymap {
     fn into_query(self) -> Query {
         let arg = format!(
             "keymap({ktype},{vtype})",
-            ktype = self.ktype.unwrap_or_else(|| "binstr".to_owned()),
-            vtype = self.vtype.unwrap_or_else(|| "binstr".to_owned()),
+            ktype = self
+                .ktype
+                .as_ref()
+                .unwrap_or(&KeymapType::Binstr)
+                .priv_to_string(),
+            vtype = self
+                .ktype
+                .as_ref()
+                .unwrap_or(&KeymapType::Binstr)
+                .priv_to_string(),
         );
         let q = Query::from("CREATE").arg("TABLE").arg(arg);
         if self.volatile {

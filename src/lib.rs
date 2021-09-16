@@ -88,7 +88,8 @@
 //!
 //! Now that you know how you can run basic queries, check out the [`actions`] module documentation for learning
 //! to use actions and the [`types`] module documentation for implementing your own Skyhash serializable
-//! types. You can also find the [latest examples here](https://github.com/skytable/client-rust/tree/next/examples)
+//! types. Need to meddle with DDL queries like creating and dropping tables? Check out the [`ddl`] module.
+//! You can also find the [latest examples here](https://github.com/skytable/client-rust/tree/next/examples)
 //!
 //! ## Async API
 //!
@@ -163,6 +164,13 @@ pub(crate) use std::io::Result as IoResult;
 use types::IntoSkyhashAction;
 use types::IntoSkyhashBytes;
 
+/// The default host address
+pub const DEFAULT_HOSTADDR: &str = "127.0.0.1";
+/// The default port
+pub const DEFAULT_PORT: u16 = 2003;
+/// The default entity
+pub const DEFAULT_ENTITY: &str = "default:default";
+
 cfg_async!(
     pub mod aio;
     pub use aio::Connection as AsyncConnection;
@@ -178,7 +186,7 @@ pub type SkyRawResult<T> = Result<T, self::error::Error>;
 /// A specialized error type for queries
 pub type SkyResult = SkyRawResult<Element>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 /// A connection builder for easily building connections
 ///
 /// ## Example (sync)
@@ -186,8 +194,9 @@ pub type SkyResult = SkyRawResult<Element>;
 /// use skytable::ConnectionBuilder;
 /// let con =
 ///     ConnectionBuilder::new()
-///     .set_host("127.0.0.1")
+///     .set_host("127.0.0.1".to_string())
 ///     .set_port(2003)
+///     .set_entity("mykeyspace:mytable".to_string())
 ///     .get_connection()
 ///     .unwrap();
 /// ```
@@ -200,28 +209,31 @@ pub type SkyResult = SkyRawResult<Element>;
 ///         ConnectionBuilder::new()
 ///         .set_host("127.0.0.1")
 ///         .set_port(2003)
+///         .set_entity("mykeyspace:mytable".to_string())
 ///         .get_async_connection()
 ///         .await
 ///         .unwrap();
 /// }
 /// ```
-pub struct ConnectionBuilder<'a> {
+pub struct ConnectionBuilder {
     port: Option<u16>,
-    host: Option<&'a str>,
+    host: Option<String>,
+    entity: Option<String>,
 }
 
-impl<'a> Default for ConnectionBuilder<'a> {
+impl Default for ConnectionBuilder {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a> ConnectionBuilder<'a> {
+impl ConnectionBuilder {
     /// Create an empty connection builder
     pub fn new() -> Self {
         Self {
             port: None,
             host: None,
+            entity: None,
         }
     }
     /// Set the port
@@ -230,15 +242,22 @@ impl<'a> ConnectionBuilder<'a> {
         self
     }
     /// Set the host
-    pub fn set_host(mut self, host: &'a str) -> Self {
+    pub fn set_host(mut self, host: String) -> Self {
         self.host = Some(host);
+        self
+    }
+    /// Set the entity
+    pub fn set_entity(mut self, entity: String) -> Self {
+        self.entity = Some(entity);
         self
     }
     cfg_sync! {
         /// Get a [sync connection](sync::Connection) to the database
         pub fn get_connection(&self) -> SkyRawResult<sync::Connection> {
-            let con =
-                sync::Connection::new(self.host.unwrap_or("127.0.0.1"), self.port.unwrap_or(2003))?;
+            use crate::ddl::Ddl;
+            let mut con =
+                sync::Connection::new(self.host.as_ref().unwrap_or(&DEFAULT_HOSTADDR.to_owned()), self.port.unwrap_or(2003))?;
+            con.switch(self.entity.as_ref().unwrap_or(&DEFAULT_ENTITY.to_owned()))?;
             Ok(con)
         }
         cfg_sync_ssl_any! {
@@ -247,11 +266,13 @@ impl<'a> ConnectionBuilder<'a> {
                 &self,
                 sslcert: String,
             ) -> SkyRawResult<sync::TlsConnection> {
-                let con = sync::TlsConnection::new(
-                    self.host.unwrap_or("127.0.0.1"),
+                use crate::ddl::Ddl;
+                let mut con = sync::TlsConnection::new(
+                    self.host.as_ref().unwrap_or(&DEFAULT_HOSTADDR.to_owned()),
                     self.port.unwrap_or(2003),
                     &sslcert,
                 )?;
+                con.switch(self.entity.as_ref().unwrap_or(&DEFAULT_ENTITY.to_owned()))?;
                 Ok(con)
             }
         }
@@ -259,8 +280,10 @@ impl<'a> ConnectionBuilder<'a> {
     cfg_async! {
         /// Get an [async connection](aio::Connection) to the database
         pub async fn get_async_connection(&self) -> SkyRawResult<aio::Connection> {
-            let con = aio::Connection::new(self.host.unwrap_or("127.0.0.1"), self.port.unwrap_or(2003))
+            use crate::ddl::AsyncDdl;
+            let mut con = aio::Connection::new(self.host.as_ref().unwrap_or(&DEFAULT_HOSTADDR.to_owned()), self.port.unwrap_or(2003))
                 .await?;
+            con.switch(self.entity.as_ref().unwrap_or(&DEFAULT_ENTITY.to_owned())).await?;
             Ok(con)
         }
         cfg_async_ssl_any! {
@@ -269,12 +292,14 @@ impl<'a> ConnectionBuilder<'a> {
                 &self,
                 sslcert: String,
             ) -> SkyRawResult<aio::TlsConnection> {
-                let con = aio::TlsConnection::new(
-                    self.host.unwrap_or("127.0.0.1"),
+                use crate::ddl::AsyncDdl;
+                let mut con = aio::TlsConnection::new(
+                    self.host.as_ref().unwrap_or(&DEFAULT_HOSTADDR.to_owned()),
                     self.port.unwrap_or(2003),
                     &sslcert,
                 )
                 .await?;
+                con.switch(self.entity.as_ref().unwrap_or(&DEFAULT_ENTITY.to_owned())).await?;
                 Ok(con)
             }
         }

@@ -82,7 +82,7 @@ pub enum Error {
     /// A Skyhash error occurred
     SkyError(SkyhashError),
     /// An application level parse error occurred
-    ParseError,
+    ParseError(String),
 }
 
 impl fmt::Display for Error {
@@ -105,7 +105,9 @@ impl fmt::Display for Error {
                 )))
             )]
             Self::SslError(essl) => write!(f, "{}", essl),
-            Self::ParseError => write!(f, "Skyhash parse error"),
+            Self::ParseError(apperr) => {
+                write!(f, "custom type parse error: {}", apperr)
+            }
             Self::SkyError(eproto) => match eproto {
                 SkyhashError::Code(rcode) => write!(f, "{}", rcode),
                 SkyhashError::InvalidResponse => {
@@ -147,5 +149,35 @@ impl From<std::io::Error> for Error {
 impl From<SkyhashError> for Error {
     fn from(err: SkyhashError) -> Self {
         Self::SkyError(err)
+    }
+}
+
+impl From<std::num::ParseIntError> for Error {
+    fn from(e: std::num::ParseIntError) -> Self {
+        Self::ParseError(e.to_string())
+    }
+}
+
+impl From<std::num::ParseFloatError> for Error {
+    fn from(e: std::num::ParseFloatError) -> Self {
+        Self::ParseError(e.to_string())
+    }
+}
+
+impl From<std::num::TryFromIntError> for Error {
+    fn from(e: std::num::TryFromIntError) -> Self {
+        Self::ParseError(e.to_string())
+    }
+}
+
+impl From<std::convert::Infallible> for Error {
+    fn from(_: std::convert::Infallible) -> Self {
+        unsafe { core::hint::unreachable_unchecked() }
+    }
+}
+
+impl From<std::string::FromUtf8Error> for Error {
+    fn from(e: std::string::FromUtf8Error) -> Self {
+        Self::ParseError(e.to_string())
     }
 }

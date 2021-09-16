@@ -79,11 +79,16 @@
 //!
 //! ```
 
+use crate::error::Error;
 use crate::Element;
 use crate::Query;
 use crate::RespCode;
+use crate::SkyRawResult;
+use core::convert::TryInto;
 use core::ops::Deref;
 use core::ops::DerefMut;
+
+const BAD_ELEMENT: &str = "Bad element type for parsing into custom type";
 
 /// Anything that implements this trait can be turned into a [`String`]. This trait is implemented
 /// for most primitive types by default using [`std`]'s [`ToString`] trait.
@@ -474,5 +479,80 @@ impl SimpleArray {
         } else {
             Err(self)
         }
+    }
+}
+
+/// Implementing this trait enables Skyhash [elements](crate::Element) to be converted
+/// into Rust types. This trait is already implemented for most primitive types, but for
+/// your own custom types, you'll need to implement it yourself.
+///
+/// ## Example implementation
+///
+/// Say we have a key/value table that stores `(str, str)`. The value however contains comma
+/// separted values (CSV). Let's say it looks like: `(Name, E-mail, State)` with types
+/// `String`, `String` and `String` respectively. We'd represent our Rust struct and implement
+/// this trait like this:
+/// ```
+/// use skytable::types::FromSkyhashBytes;
+/// use skytable::error::Error;
+/// use skytable::{SkyRawResult, Element};
+///
+/// pub struct MyCSV {
+///     name: String,
+///     email: String,
+///     state: String,
+/// }
+///
+/// impl FromSkyhashBytes for MyCSV {
+///     fn from_bytes(element: Element) -> SkyRawResult<Self> {
+///         if let Element::String(st) = element {
+///             let splits: Vec<&str> = st.split(",").collect();
+///             Ok(
+///                 MyCSV {
+///                     name: splits[0].to_string(),
+///                     email: splits[1].to_string(),
+///                     state: splits[2].to_string(),
+///                 }
+///             )
+///         } else {
+///             Err(Error::ParseError("Bad element type".to_string()))
+///         }
+///     }
+/// }
+/// ```
+///
+/// Now, you can use this as you like to turn [`Element`]s into your own (or primitive) types!
+///
+pub trait FromSkyhashBytes: Sized {
+    fn from_bytes(element: Element) -> SkyRawResult<Self>;
+}
+
+macro_rules! impl_from_skyhash {
+    ($($ty:ty),* $(,)?) => {
+        $(impl FromSkyhashBytes for $ty {
+            fn from_bytes(element: Element) -> SkyRawResult<$ty> {
+                let ret = match element {
+                    Element::Binstr(bstr) => String::from_utf8_lossy(&bstr).parse::<$ty>()?,
+                    Element::String(st) => st.parse::<$ty>()?,
+                    Element::UnsignedInt(int) => int.try_into()?,
+                    _ => return Err(Error::ParseError(BAD_ELEMENT.to_owned())),
+                };
+                Ok(ret)
+            }
+        })*
+    };
+}
+
+impl_from_skyhash!(u8, i8, u16, i16, u32, i32, u64, i64, u128, i128, usize, isize);
+
+impl FromSkyhashBytes for String {
+    fn from_bytes(element: Element) -> SkyRawResult<String> {
+        let e = match element {
+            Element::Binstr(bstr) => std::string::String::from_utf8(bstr)?,
+            Element::String(st) => st,
+            Element::UnsignedInt(int) => int.to_string(),
+            _ => return Err(Error::ParseError(BAD_ELEMENT.to_owned())),
+        };
+        Ok(e)
     }
 }

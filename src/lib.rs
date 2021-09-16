@@ -88,10 +88,7 @@
 //! use skytable::types::Str;
 //! 
 //! let mut con = Connection::new("127.0.0.1", 2003).unwrap();
-//! let x: String = match con.get("hello").unwrap() {
-//!     Str::Binary(bstr) => String::from_utf8_lossy(&bstr).to_string(),
-//!     _ => panic!("Oops, the default keyspace didn't return a binstr as we expected")
-//! };
+//! let x: String = con.get("hello").unwrap();
 //! assert_eq!(x, "world");
 //! ```
 //! 

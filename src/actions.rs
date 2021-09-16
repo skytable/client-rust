@@ -33,12 +33,14 @@
 //! use skytable::{actions::Actions, Connection};
 //! let mut con = Connection::new("127.0.0.1", 2003).unwrap();
 //! con.set("x", "100").unwrap();
-//! assert_eq!(con.get("x").unwrap(), "100");
-//!
+//! let ret: String = con.get("x").unwrap();
+//! assert_eq!(ret, "100");
 //! ```
+//!
 
 use crate::error::SkyhashError;
 use crate::types::Array;
+use crate::types::FromSkyhashBytes;
 use crate::types::SimpleArray;
 use crate::types::SnapshotResult;
 use crate::types::Str;
@@ -84,7 +86,7 @@ macro_rules! implement_actions {
     (
         $(
             $(#[$attr:meta])+
-            fn $name:ident$(<$($tyargs:ident : $ty:ident $(+$tye:lifetime)*),*>)?(
+            fn $name:ident$(<$($tyargs:ident $(: $ty:ident $(+$tye:lifetime)?)?),*>)?(
                 $($argname:ident: $argty:ty),*) -> $ret:ty {
                     $($block:block)?
                     $($($mtch:pat)|+ => $expect:expr),+
@@ -102,14 +104,14 @@ macro_rules! implement_actions {
         ///
         /// let mut con = Connection::new("127.0.0.1", 2003).unwrap();
         /// con.set("x", "100").unwrap();
-        /// let x = con.get("x").unwrap();
+        /// let x: String = con.get("x").unwrap();
         /// assert_eq!(x, "100");
         /// ```
         pub trait Actions: SyncSocket {
             $(
                 $(#[$attr])*
                 #[inline]
-                fn $name<'s, $($($tyargs: $ty $(+$tye)*, )*)?>(&'s mut self $(, $argname: $argty)*) -> SkyRawResult<$ret> {
+                fn $name<'s, $($($tyargs$(: $ty $(+$tye)*,)* )*)?>(&'s mut self $(, $argname: $argty)*) -> SkyRawResult<$ret> {
                     gen_match!(self.run($($block)?), $($($mtch)+, $expect),*)
                 }
             )*
@@ -121,7 +123,7 @@ macro_rules! implement_actions {
             $(
                 $(#[$attr])*
                 #[inline]
-                fn $name<'s, $($($tyargs: $ty $(+$tye)*, )*)?>(&'s mut self $(, $argname: $argty)*) -> AsyncResult<SkyRawResult<$ret>> {
+                fn $name<'s, $($($tyargs$(: $ty $(+$tye)*,)* )*)?>(&'s mut self $(, $argname: $argty)*) -> AsyncResult<SkyRawResult<$ret>> {
                     Box::pin(async move {gen_match!(self.run($($block)?).await, $($($mtch)+, $expect),*)})
                 }
             )*
@@ -172,10 +174,9 @@ implement_actions!(
     /// ```text
     /// GET <key>
     /// ```
-    fn get(key: impl IntoSkyhashBytes + 's) -> Str {
+    fn get<T: FromSkyhashBytes>(key: impl IntoSkyhashBytes + 's) -> T {
         { Query::from("get").arg(key)}
-        Element::String(st) => Str::Unicode(st),
-        Element::Binstr(bstr) => Str::Binary(bstr)
+        x @ Element::String(_) | x @ Element::Binstr(_) => T::from_bytes(x)?
     }
     /// Get the length of a key
     ///

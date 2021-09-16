@@ -23,22 +23,17 @@
 //! ## Example: creating tables
 //!
 //! ```no_run
-//! use skytable::ddl::{CreateTableResult, Ddl, Keymap};
+//! use skytable::ddl::{Ddl, Keymap};
 //! use skytable::sync::Connection;
-//! fn main() {
-//!     let mut con = Connection::new("127.0.0.1", 2003).unwrap();
-//!     let table = Keymap::new("mykeyspace:mytable")
-//!         .set_ktype("str")
-//!         .set_vtype("binstr");
-//!     assert_eq!(
-//!        con.create_table(table).unwrap(),
-//!        CreateTableResult::Okay
-//!     );
-//! }
+//!
+//! let mut con = Connection::new("127.0.0.1", 2003).unwrap();
+//! let table = Keymap::new("mykeyspace:mytable")
+//!     .set_ktype("str")
+//!     .set_vtype("binstr");
+//! con.create_table(table).unwrap();
 //! ```
 //!
 
-use crate::error::SkyhashError;
 use crate::Element;
 use crate::IntoSkyhashBytes;
 use crate::Query;
@@ -124,26 +119,6 @@ pub mod errors {
     pub const ERR_NOT_READY: &str = "not-ready";
 }
 
-/// Result of switching entities
-#[non_exhaustive]
-#[derive(Debug, PartialEq)]
-pub enum SwitchEntityResult {
-    ContainerNotFound,
-    ProtectedObject,
-    NotReady,
-    Okay,
-}
-
-#[derive(Debug, PartialEq)]
-#[non_exhaustive]
-/// Result of creating tables
-pub enum CreateTableResult {
-    Okay,
-    AlreadyExists,
-    DefaultContainerUnset,
-    ProtectedObject,
-}
-
 macro_rules! implement_ddl {
     (
         $(
@@ -204,30 +179,16 @@ implement_ddl! {
     /// ## Example
     ///
     /// ```no_run
-    /// use skytable::ddl::{Ddl, SwitchEntityResult};
+    /// use skytable::ddl::Ddl;
     /// use skytable::sync::Connection;
     ///
     /// let mut con = Connection::new("127.0.0.1", 2003).unwrap();
-    /// match con.switch("mykeyspace:mytable").unwrap() {
-    ///     SwitchEntityResult::Okay => {},
-    ///     SwitchEntityResult::ContainerNotFound => println!("oops, couldn't find the container"),
-    ///     SwitchEntityResult::NotReady => println!("oops, the container is not ready!"),
-    ///     SwitchEntityResult::ProtectedObject => println!("Oh no, protected object"),
-    ///     _ => panic!("uh oh, something bad happened")
-    /// }
+    /// con.switch("mykeyspace:mytable").unwrap();
     /// ```
     ///
-    fn switch<T: IntoSkyhashBytes + 's>(entity: T) -> SwitchEntityResult {
+    fn switch<T: IntoSkyhashBytes + 's>(entity: T) -> () {
         { Query::from("use").arg(entity) }
-        Element::RespCode(RespCode::Okay) => SwitchEntityResult::Okay,
-        Element::RespCode(RespCode::ErrorString(estr)) => {
-            match estr.as_str() {
-                errors::CONTAINER_NOT_FOUND => SwitchEntityResult::ContainerNotFound,
-                errors::ERR_NOT_READY => SwitchEntityResult::NotReady,
-                errors::ERR_PROTECTED_OBJECT => SwitchEntityResult::ProtectedObject,
-                _ => return Err(SkyhashError::UnexpectedDataType.into())
-            }
-        }
+        Element::RespCode(RespCode::Okay) => ()
     }
     /// Create the provided keyspace
     ///
@@ -246,17 +207,9 @@ implement_ddl! {
         }
     }
     /// Create a table from the provided configuration
-    fn create_table(table: impl CreateTableIntoQuery + 's) -> CreateTableResult {
+    fn create_table(table: impl CreateTableIntoQuery + 's) -> () {
         { table.into_query() }
-        Element::RespCode(RespCode::Okay) => CreateTableResult::Okay,
-        Element::RespCode(RespCode::ErrorString(estr)) => {
-            match_estr! {
-                estr,
-                errors::ERR_ALREADY_EXISTS => CreateTableResult::AlreadyExists,
-                errors::DEFAULT_CONTAINER_UNSET => CreateTableResult::DefaultContainerUnset,
-                errors::ERR_PROTECTED_OBJECT => CreateTableResult::ProtectedObject
-            }
-        }
+        Element::RespCode(RespCode::Okay) => ()
     }
     /// Drop the provided table
     ///

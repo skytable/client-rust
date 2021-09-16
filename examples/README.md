@@ -9,6 +9,7 @@ Example projects include:
 - The [`aio`](./aio) project provides an usage of async features
 - The [`basic`](./basic) project provides basic usage of the sync API
 - The [`custom-queries`](./custom-queries) project provides examples of running custom queries
+- The [`ddl`](./ddl) project provides examples of using DDL queries
 
 ## Building
 

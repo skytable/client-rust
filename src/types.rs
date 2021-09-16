@@ -78,6 +78,12 @@
 //! assert_eq!(q, Query::from(vec!["sayan is cool", "ferris is cool", "llvm is cool"]));
 //!
 //! ```
+//!
+//! ## Implementing Skyhash deserializable types
+//!
+//! See the guide [in `FromSkyhashBytes`](FromSkyhashBytes) to see how you can implement
+//! Skyhash deserializable types.
+//!
 
 use crate::error::Error;
 use crate::Element;
@@ -89,6 +95,7 @@ use core::ops::Deref;
 use core::ops::DerefMut;
 
 const BAD_ELEMENT: &str = "Bad element type for parsing into custom type";
+const HAS_NULL_ELEMENTS: &str = "Array has null elements";
 
 /// Anything that implements this trait can be turned into a [`String`]. This trait is implemented
 /// for most primitive types by default using [`std`]'s [`ToString`] trait.
@@ -294,38 +301,6 @@ pub enum Array {
     Recursive(Vec<Element>),
 }
 
-/// String types
-#[derive(Debug, PartialEq)]
-#[non_exhaustive]
-pub enum Str {
-    /// An unicode string
-    Unicode(String),
-    /// A binary string (blob)
-    Binary(Vec<u8>),
-}
-
-impl<T> PartialEq<T> for Str
-where
-    T: AsRef<str>,
-{
-    fn eq(&self, oth: &T) -> bool {
-        let oth = oth.as_ref();
-        match self {
-            Self::Unicode(uc) => uc.eq(oth),
-            _ => false,
-        }
-    }
-}
-
-impl PartialEq<[u8]> for Str {
-    fn eq(&self, oth: &[u8]) -> bool {
-        match self {
-            Self::Binary(brr) => brr.eq(oth),
-            _ => false,
-        }
-    }
-}
-
 #[derive(Debug, PartialEq)]
 #[non_exhaustive]
 /// A _flat_ element. This corresponds to the types that can be present
@@ -492,7 +467,7 @@ impl SimpleArray {
 /// separted values (CSV). Let's say it looks like: `(Name, E-mail, State)` with types
 /// `String`, `String` and `String` respectively. We'd represent our Rust struct and implement
 /// this trait like this:
-/// ```
+/// ```no_run
 /// use skytable::types::FromSkyhashBytes;
 /// use skytable::error::Error;
 /// use skytable::{SkyRawResult, Element};
@@ -503,6 +478,7 @@ impl SimpleArray {
 ///     state: String,
 /// }
 ///
+/// // Implement it
 /// impl FromSkyhashBytes for MyCSV {
 ///     fn from_bytes(element: Element) -> SkyRawResult<Self> {
 ///         if let Element::String(st) = element {
@@ -519,9 +495,19 @@ impl SimpleArray {
 ///         }
 ///     }
 /// }
+///
+/// // Now use it with actions!
+/// use skytable::sync::Connection;
+/// use skytable::actions::Actions;
+///
+/// fn main() {
+///     let mut con = Connection::new("127.0.0.1", 2003).unwrap();
+///     let mycsv: MyCSV = con.get("mycsv").unwrap();
+/// }
 /// ```
 ///
-/// Now, you can use this as you like to turn [`Element`]s into your own (or primitive) types!
+/// Now, you can use this as you like to turn [`Element`]s into your own (or primitive) types or
+/// with actions (as shown above)!
 ///
 pub trait FromSkyhashBytes: Sized {
     fn from_bytes(element: Element) -> SkyRawResult<Self>;
@@ -555,4 +541,106 @@ impl FromSkyhashBytes for String {
         };
         Ok(e)
     }
+}
+
+impl FromSkyhashBytes for Vec<String> {
+    fn from_bytes(element: Element) -> SkyRawResult<Self> {
+        let e = match element {
+            Element::Array(Array::Bin(binarr)) => {
+                let mut new_arr = Vec::with_capacity(binarr.len());
+                for item in binarr {
+                    if let Some(item) = item {
+                        new_arr.push(String::from_utf8(item)?);
+                    } else {
+                        return Err(Error::ParseError(HAS_NULL_ELEMENTS.to_owned()));
+                    }
+                }
+                new_arr
+            }
+            Element::Array(Array::Str(strarr)) => {
+                let mut new_arr = Vec::with_capacity(strarr.len());
+                for item in strarr {
+                    if let Some(item) = item {
+                        new_arr.push(item);
+                    } else {
+                        return Err(Error::ParseError(HAS_NULL_ELEMENTS.to_owned()));
+                    }
+                }
+                new_arr
+            }
+            _ => return Err(Error::ParseError(BAD_ELEMENT.to_owned())),
+        };
+        Ok(e)
+    }
+}
+
+impl FromSkyhashBytes for Vec<Vec<u8>> {
+    fn from_bytes(e: Element) -> SkyRawResult<Self> {
+        let e = match e {
+            Element::Array(Array::Bin(brr)) => {
+                let mut newarr = Vec::with_capacity(brr.len());
+                for item in brr {
+                    if let Some(item) = item {
+                        newarr.push(item);
+                    } else {
+                        return Err(Error::ParseError(HAS_NULL_ELEMENTS.to_owned()));
+                    }
+                }
+                newarr
+            }
+            Element::Array(Array::Str(srr)) => {
+                let mut newarr = Vec::with_capacity(srr.len());
+                for item in srr {
+                    if let Some(item) = item {
+                        newarr.push(item.into_bytes());
+                    } else {
+                        return Err(Error::ParseError(HAS_NULL_ELEMENTS.to_owned()));
+                    }
+                }
+                newarr
+            }
+            _ => return Err(Error::ParseError(BAD_ELEMENT.to_owned())),
+        };
+        Ok(e)
+    }
+}
+
+impl FromSkyhashBytes for Element {
+    fn from_bytes(e: Element) -> SkyRawResult<Element> {
+        Ok(e)
+    }
+}
+
+#[test]
+fn test_arr_from_str_to_vecstr() {
+    let arr = Element::Array(Array::Str(vec![
+        Some("hello1".to_owned()),
+        Some("world1".to_owned()),
+        Some("hello2".to_owned()),
+        Some("world2".to_owned()),
+    ]));
+    let arr: Vec<String> = arr.try_element_into().unwrap();
+    assert_eq!(
+        arr,
+        vec![
+            "hello1".to_owned(),
+            "world1".to_owned(),
+            "hello2".to_owned(),
+            "world2".to_owned()
+        ]
+    );
+}
+
+#[test]
+fn test_arr_from_str_with_null_to_vecstr() {
+    let arr = Element::Array(Array::Str(vec![
+        Some("hello1".to_owned()),
+        Some("world1".to_owned()),
+        None,
+        Some("world2".to_owned()),
+    ]));
+    assert_eq!(
+        arr.try_element_into::<Vec<String>>().unwrap_err(),
+        Error::ParseError(HAS_NULL_ELEMENTS.to_string())
+    )
 }

@@ -29,7 +29,9 @@
 
 use crate::types::Array;
 use crate::types::FlatElement;
+use crate::types::FromSkyhashBytes;
 use crate::RespCode;
+use crate::SkyRawResult;
 use std::hint::unreachable_unchecked;
 
 #[derive(Debug)]
@@ -75,6 +77,13 @@ pub enum Element {
     UnsignedInt(u64),
     /// A response code
     RespCode(RespCode),
+}
+
+impl Element {
+    /// Try to convert an element to a type that implements [`FromSkyhashBytes`]
+    pub fn try_element_into<T: FromSkyhashBytes>(self) -> SkyRawResult<T> {
+        T::from_bytes(self)
+    }
 }
 
 #[derive(Debug, PartialEq)]

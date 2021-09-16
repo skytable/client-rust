@@ -22,7 +22,7 @@
 use crate::RespCode;
 use core::fmt;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 #[non_exhaustive]
 /// An error originating from the Skyhash protocol
 pub enum SkyhashError {
@@ -83,6 +83,34 @@ pub enum Error {
     SkyError(SkyhashError),
     /// An application level parse error occurred
     ParseError(String),
+}
+
+impl PartialEq for Error {
+    fn eq(&self, oth: &Error) -> bool {
+        use Error::*;
+        match (self, oth) {
+            (IoError(a), IoError(b)) => a.kind().eq(&b.kind()),
+            (SkyError(a), SkyError(b)) => a == b,
+            (ParseError(a), ParseError(b)) => a == b,
+            #[cfg(any(
+                feature = "ssl",
+                feature = "sslv",
+                feature = "aio-ssl",
+                feature = "aio-sslv"
+            ))]
+            #[cfg_attr(
+                docsrs,
+                doc(cfg(any(
+                    feature = "ssl",
+                    feature = "sslv",
+                    feature = "aio-ssl",
+                    feature = "aio-sslv"
+                )))
+            )]
+            (SslError(a), SslError(b)) => a.to_string() == b.to_string(),
+            _ => false,
+        }
+    }
 }
 
 impl fmt::Display for Error {

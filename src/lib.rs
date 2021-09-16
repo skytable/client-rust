@@ -61,37 +61,36 @@
 //!     Ok(())
 //! }
 //! ```
-//! 
+//!
 //! ## Running actions
-//! 
+//!
 //! As noted [below](#binary-data), the default table is a key/value table with a binary key
 //! type and a binary value type. Let's go ahead and run some actions (we're assuming you're
 //! using the sync API; for async, simply change the import to `use skytable::actions::AsyncActions`).
-//! 
+//!
 //! ### `SET`ting a key
-//! 
+//!
 //! ```no_run
 //! use skytable::actions::Actions;
 //! use skytable::sync::Connection;
-//! 
+//!
 //! let mut con = Connection::new("127.0.0.1", 2003).unwrap();
 //! con.set("hello", "world").unwrap();
 //! ```
-//! 
+//!
 //! This will set the value of the key `hello` to `world` in the `default:default` entity.
-//! 
+//!
 //! ### `GET`ting a key
-//! 
+//!
 //! ```no_run
 //! use skytable::actions::Actions;
 //! use skytable::sync::Connection;
-//! use skytable::types::Str;
-//! 
+//!
 //! let mut con = Connection::new("127.0.0.1", 2003).unwrap();
 //! let x: String = con.get("hello").unwrap();
 //! assert_eq!(x, "world");
 //! ```
-//! 
+//!
 //! Way to go &mdash; you're all set! Now go ahead and run more advanced queries!
 //!
 //! ## Binary data

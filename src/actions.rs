@@ -43,7 +43,6 @@ use crate::types::Array;
 use crate::types::FromSkyhashBytes;
 use crate::types::SimpleArray;
 use crate::types::SnapshotResult;
-use crate::types::Str;
 use crate::Element;
 use crate::GetIterator;
 use crate::IntoSkyhashAction;
@@ -196,10 +195,9 @@ implement_actions!(
     /// ```
     ///
     /// Do note that the order might be completely meaningless
-    fn lskeys(count: u64) -> SimpleArray {
+    fn lskeys<T: FromSkyhashBytes>(count: u64) -> T {
         { Query::from("lskeys").arg(count.to_string())}
-        Element::Array(Array::Bin(brr)) => SimpleArray::Bin(brr),
-        Element::Array(Array::Str(srr)) => SimpleArray::Str(srr)
+        x @ Element::Array(Array::Bin(_)) | x @ Element::Array(Array::Str(_)) => T::from_bytes(x)?
     }
     /// Get multiple keys
     ///
@@ -277,17 +275,16 @@ implement_actions!(
     }
     /// Consumes a key if it exists
     ///
-    /// This will return the corresponding values of the provided key as an [`Str`] type
+    /// This will return the corresponding values of the provided key
     /// depending on the type for that table
     ///
     /// This is equivalent to:
     /// ```text
     /// POP <key>
     /// ```
-    fn pop(keys: impl IntoSkyhashBytes + 's) -> Str {
+    fn pop<T: FromSkyhashBytes>(keys: impl IntoSkyhashBytes + 's) -> T {
         { Query::from("POP").arg(keys) }
-        Element::String(st) => Str::Unicode(st),
-        Element::Binstr(bstr) => Str::Binary(bstr)
+        x @ Element::String(_) | x @ Element::Binstr(_) => T::from_bytes(x)?
     }
     /// Consumes the provided keys if they exist
     ///
@@ -295,10 +292,9 @@ implement_actions!(
     /// ```text
     /// MPOP <k1> <k2> <k3>
     /// ```
-    fn mpop(keys: impl IntoSkyhashAction + 's) -> SimpleArray {
+    fn mpop<T: FromSkyhashBytes>(keys: impl IntoSkyhashAction + 's) -> T {
         { Query::from("mpop").arg(keys)}
-        Element::Array(Array::Bin(brr)) => SimpleArray::Bin(brr),
-        Element::Array(Array::Str(srr)) => SimpleArray::Str(srr)
+        x @ Element::Array(Array::Bin(_)) | x @ Element::Array(Array::Str(_)) => T::from_bytes(x)?
     }
     /// Deletes all the provided keys if they exist or doesn't do anything at all. This method
     /// will return true if all the provided keys were deleted, else it will return false

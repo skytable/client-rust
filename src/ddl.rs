@@ -34,6 +34,7 @@
 //! ```
 //!
 
+use crate::error::errorstring;
 use crate::Element;
 use crate::IntoSkyhashBytes;
 use crate::Query;
@@ -109,16 +110,6 @@ impl CreateTableIntoQuery for Keymap {
     }
 }
 
-pub mod errors {
-    //! A module of errors for DDL queries
-    pub const DEFAULT_CONTAINER_UNSET: &str = "default-container-unset";
-    pub const CONTAINER_NOT_FOUND: &str = "container-not-found";
-    pub const STILL_IN_USE: &str = "still-in-use";
-    pub const ERR_PROTECTED_OBJECT: &str = "err-protected-object";
-    pub const ERR_ALREADY_EXISTS: &str = "err-already-exists";
-    pub const ERR_NOT_READY: &str = "not-ready";
-}
-
 macro_rules! implement_ddl {
     (
         $(
@@ -168,8 +159,7 @@ cfg_sync! {
 }
 
 implement_ddl! {
-    /// This function switches to the provided entity. A [`SwitchEntityResult`] is returned
-    /// if the entity could not be switched.
+    /// This function switches to the provided entity.
     ///
     /// This is equivalent to:
     /// ```text
@@ -203,7 +193,7 @@ implement_ddl! {
         Element::RespCode(RespCode::Okay) => true,
         Element::RespCode(RespCode::ErrorString(estr)) => match_estr! {
             estr,
-            errors::ERR_ALREADY_EXISTS => false
+            errorstring::ERR_ALREADY_EXISTS => false
         }
     }
     /// Create a table from the provided configuration
@@ -219,7 +209,7 @@ implement_ddl! {
         Element::RespCode(RespCode::Okay) => true,
         Element::RespCode(RespCode::ErrorString(estr)) => match_estr! {
             estr,
-            errors::CONTAINER_NOT_FOUND => false
+            errorstring::CONTAINER_NOT_FOUND => false
         }
     }
     /// Drop the provided keyspace

@@ -42,6 +42,20 @@ pub enum SkyhashError {
     Code(RespCode),
 }
 
+pub mod errorstring {
+    //! # Error strings
+    //!
+    //! This module contains a collection of constants that represent [error strings](https://docs.skytable.io/protocol/errors)
+    //! returned by the server
+    //!
+    pub const DEFAULT_CONTAINER_UNSET: &str = "default-container-unset";
+    pub const CONTAINER_NOT_FOUND: &str = "container-not-found";
+    pub const STILL_IN_USE: &str = "still-in-use";
+    pub const ERR_PROTECTED_OBJECT: &str = "err-protected-object";
+    pub const ERR_ALREADY_EXISTS: &str = "err-already-exists";
+    pub const ERR_NOT_READY: &str = "not-ready";
+}
+
 #[derive(Debug)]
 #[non_exhaustive]
 /// A standard error type for the client driver

@@ -26,14 +26,14 @@ cargo new skyapp
 First add this to your `Cargo.toml` file:
 
 ```toml
-skytable = "0.6.0-alpha.1"
+skytable = "0.6.0-alpha.2"
 ```
 
 Now open up your `src/main.rs` file and establish a connection to the server while also adding some
 imports:
 
 ```rust
-use skytable::{Connection, Query, Response, Element};
+use skytable::{Connection, Query, Element};
 fn main() -> std::io::Result<()> {
     let mut con = Connection::new("127.0.0.1", 2003)?;
     Ok(())
@@ -48,19 +48,77 @@ fn main() -> Result<(), error::Error> {
     let mut con = Connection::new("127.0.0.1", 2003)?;
     let query = Query::from("heya");
     let res = con.run_simple_query(&query)?;
-    assert_eq!(res, Element::String("HEY!".to_owned()));
+    assert_eq!(res, Element::String("HEY".to_owned()));
     Ok(())
 }
 ```
 
+## Running actions
+
+As noted [below](#binary-data), the default table is a key/value table with a binary key
+type and a binary value type. Let's go ahead and run some actions (we're assuming you're
+using the sync API; for async, simply change the import to `use skytable::actions::AsyncActions`).
+
+### `SET`ting a key
+
+```rust
+use skytable::actions::Actions;
+use skytable::sync::Connection;
+
+let mut con = Connection::new("127.0.0.1", 2003).unwrap();
+con.set("hello", "world").unwrap();
+```
+
+This will set the value of the key `hello` to `world` in the `default:default` entity.
+
+### `GET`ting a key
+
+```rust
+use skytable::actions::Actions;
+use skytable::sync::Connection;
+
+let mut con = Connection::new("127.0.0.1", 2003).unwrap();
+let x: String = con.get("hello").unwrap();
+assert_eq!(x, "world");
+```
+
 Way to go &mdash; you're all set! Now go ahead and run more advanced queries!
+
+## Binary data
+
+The `default:default` keyspace has the following declaration:
+
+```json
+Keymap { data:(binstr,binstr), volatile:false }
+```
+
+This means that the default keyspace is ready to store binary data. Let's say
+you wanted to `SET` the value of a key called `bindata` to some binary data stored
+in a `Vec<u8>`. You can achieve this with the `RawString` type:
+
+```rust
+use skytable::actions::Actions;
+use skytable::sync::Connection;
+use skytable::types::RawString;
+
+let mut con = Connection::new("127.0.0.1", 2003).unwrap();
+let mybinarydata = RawString::from(vec![1, 2, 3, 4]);
+assert!(con.set("bindata", mybinarydata).unwrap());
+```
+
+## Going advanced
+
+Now that you know how you can run basic queries, check out the `actions` module documentation for learning
+to use actions and the `types` module documentation for implementing your own Skyhash serializable
+types. Need to meddle with DDL queries like creating and dropping tables? Check out the `ddl` module.
+You can also find the [latest examples here](https://github.com/skytable/client-rust/tree/next/examples)
 
 ## Async API
 
 If you need to use an `async` API, just change your import to:
 
 ```toml
-skytable = { version = "0.6.0-alpha.1", features=["async"], default-features= false }
+skytable = { version = "0.6.0-alpha.2", features=["async"], default-features = false }
 ```
 
 You can now establish a connection by using `skytable::AsyncConnection::new()`, adding `.await`s wherever
@@ -72,7 +130,7 @@ With this client driver, it is possible to use both sync and `async` APIs **at t
 this, simply change your import to:
 
 ```toml
-skytable = { version="0.6.0-alpha.1", features=["sync", "async"] }
+skytable = { version="0.6.0-alpha.2", features=["sync", "async"] }
 ```
 
 ## TLS
@@ -82,15 +140,15 @@ If you need to use TLS features, this crate will let you do so with OpenSSL.
 ### Using TLS with sync interfaces
 
 ```toml
-skytable = { version="0.6.0-alpha.1", features=["sync","ssl"] }
+skytable = { version="0.6.0-alpha.2", features=["sync","ssl"] }
 ```
 
-You can now use the sync `sync::TlsConnection` object.
+You can now use the async `sync::TlsConnection` object.
 
 ### Using TLS with async interfaces
 
 ```toml
-skytable = { version="0.6.0-alpha.1", features=["async","aio-ssl"], default-features=false }
+skytable = { version="0.6.0-alpha.2", features=["async","aio-ssl"], default-features=false }
 ```
 
 You can now use the async `aio::TlsConnection` object.

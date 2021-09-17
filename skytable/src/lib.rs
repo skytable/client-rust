@@ -194,6 +194,24 @@ pub(crate) use std::io::Result as IoResult;
 use types::IntoSkyhashAction;
 use types::IntoSkyhashBytes;
 
+// re-export derives and helper methods
+#[cfg(feature = "derive")]
+pub mod derive {
+    pub use sky_derive::json;
+    #[doc(hidden)]
+    pub fn into_json_bytes<T: serde::Serialize>(input: T) -> Vec<u8> {
+        serde_json::to_string(&input).unwrap().into_bytes()
+    }
+    #[doc(hidden)]
+    pub fn from_json_bytes<'de, T: 'de + serde::Deserialize<'de>>(
+        input: &'de str,
+    ) -> std::result::Result<T, serde_json::Error> {
+        serde_json::from_str(input)
+    }
+}
+
+// endof: re-export derives
+
 /// The default host address
 pub const DEFAULT_HOSTADDR: &str = "127.0.0.1";
 /// The default port

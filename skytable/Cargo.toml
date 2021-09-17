@@ -23,6 +23,7 @@ default = ["sync"]
 ssl = ["openssl"]
 sslv = ["openssl/vendored"]
 sync = []
+derive = ["sky-derive", "serde", "serde_json"]
 
 [dependencies]
 bytes = { version = "1.1.0", optional = true }
@@ -33,6 +34,10 @@ tokio = { version = "1.11.0", features = [
     "io-std",
 ], optional = true }
 tokio-openssl = { version = "0.6.2", optional = true }
+sky-derive = { optional = true, path = "../sky-derive" }
+serde = { optional = true, version = "*" }
+serde_json = { optional = true, version = "*" }
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]

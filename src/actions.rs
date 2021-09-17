@@ -38,7 +38,7 @@
 //! ```
 //!
 
-use crate::error::SkyhashError;
+use crate::error::{errorstring, SkyhashError};
 use crate::types::Array;
 use crate::types::FromSkyhashBytes;
 use crate::types::SnapshotResult;
@@ -54,11 +54,6 @@ use crate::SkyResult;
 cfg_async!(
     use core::{future::Future, pin::Pin};
 );
-
-/// The error string returned when the snapshot engine is busy
-pub const ERR_SNAPSHOT_BUSY: &str = "err-snapshot-busy";
-/// The error string returned when periodic snapshots are busy
-pub const ERR_SNAPSHOT_DISABLED: &str = "err-snapshot-disabled";
 
 cfg_async!(
     /// A special result that is returned when running actions (async)
@@ -222,8 +217,8 @@ implement_actions!(
        Element::RespCode(RespCode::Okay) => SnapshotResult::Okay,
        Element::RespCode(RespCode::ErrorString(er)) => {
            match er.as_str() {
-               ERR_SNAPSHOT_BUSY => SnapshotResult::Busy,
-               ERR_SNAPSHOT_DISABLED => SnapshotResult::Disabled,
+               errorstring::ERR_SNAPSHOT_BUSY => SnapshotResult::Busy,
+               errorstring::ERR_SNAPSHOT_DISABLED => SnapshotResult::Disabled,
                _ => return Err(SkyhashError::InvalidResponse.into())
            }
        }

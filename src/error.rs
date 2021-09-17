@@ -60,6 +60,10 @@ pub mod errorstring {
     pub const ERR_ALREADY_EXISTS: &str = "err-already-exists";
     /// The container is not ready
     pub const ERR_NOT_READY: &str = "not-ready";
+    /// The error string returned when the snapshot engine is busy
+    pub const ERR_SNAPSHOT_BUSY: &str = "err-snapshot-busy";
+    /// The error string returned when periodic snapshots are busy
+    pub const ERR_SNAPSHOT_DISABLED: &str = "err-snapshot-disabled";
 }
 
 #[derive(Debug)]

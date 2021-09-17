@@ -35,7 +35,7 @@
 //! struct CoolString(String);
 //!
 //! impl IntoSkyhashBytes for CoolString {
-//!     fn to_bytes(&self) -> Vec<u8> {
+//!     fn as_bytes(&self) -> Vec<u8> {
 //!         let mut st = self.0.to_string();
 //!         // add cool
 //!         st.push_str("cool");
@@ -49,7 +49,7 @@
 //! impl IntoSkyhashAction for CoolStringCollection {
 //!     fn push_into_query(&self, query: &mut Query) {
 //!         self.0.iter().for_each(|item| {
-//!             query.push(RawString::from(item.to_bytes()))
+//!             query.push(RawString::from(item.as_bytes()))
 //! });
 //!     }
 //!     fn incr_len_by(&self) -> usize {
@@ -109,22 +109,22 @@ const HAS_NULL_ELEMENTS: &str = "Array has null elements";
 /// struct MyStringWrapper(String);
 ///
 /// impl IntoSkyhashBytes for MyStringWrapper {
-///     fn to_bytes(&self) -> Vec<u8> {
+///     fn as_bytes(&self) -> Vec<u8> {
 ///         self.0.as_bytes().to_owned()
 ///     }
 /// }
 /// ```
 ///
 pub trait IntoSkyhashBytes: Send + Sync {
-    /// Turn `Self` into a [`Vec<u8>`]
-    fn to_bytes(&self) -> Vec<u8>;
+    /// Return the byte representation of Self
+    fn as_bytes(&self) -> Vec<u8>;
 }
 
 macro_rules! impl_skyhash_bytes {
     ($($ty:ty),*) => {
         $(
             impl IntoSkyhashBytes for $ty {
-                fn to_bytes(&self) -> Vec<u8> {
+                fn as_bytes(&self) -> Vec<u8> {
                     self.to_string().into_bytes()
                 }
             }
@@ -175,7 +175,7 @@ where
     T: IntoSkyhashBytes,
 {
     fn push_into_query(&self, q: &mut Query) {
-        q._push_arg(self.to_bytes());
+        q._push_arg(self.as_bytes());
     }
     fn incr_len_by(&self) -> usize {
         1
@@ -388,13 +388,13 @@ impl PartialEq<Vec<u8>> for RawString {
 impl Eq for RawString {}
 
 impl IntoSkyhashBytes for RawString {
-    fn to_bytes(&self) -> Vec<u8> {
+    fn as_bytes(&self) -> Vec<u8> {
         self.0.to_owned()
     }
 }
 
 impl<'a> IntoSkyhashBytes for &'a RawString {
-    fn to_bytes(&self) -> Vec<u8> {
+    fn as_bytes(&self) -> Vec<u8> {
         self.0.to_owned()
     }
 }

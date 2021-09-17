@@ -52,9 +52,13 @@ cfg_sync! {
 
 #[non_exhaustive]
 #[derive(Debug, PartialEq)]
+/// Data types for the Keymap data model
 pub enum KeymapType {
+    /// An unicode string
     Str,
+    /// A binary string
     Binstr,
+    /// A custom type
     Other(String),
 }
 

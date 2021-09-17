@@ -447,6 +447,10 @@ impl Query {
     /// ## Panics
     /// This method will panic if the passed `arg` is empty
     pub fn push(&mut self, arg: impl IntoSkyhashAction) {
+        assert!(
+            arg.incr_len_by() != 0,
+            "An argument passed to a query cannot be empty!"
+        );
         arg.push_into_query(self);
     }
     pub(in crate) fn _push_alt_iter<T, U>(
@@ -459,8 +463,8 @@ impl Query {
         U: IntoSkyhashBytes,
     {
         v1.get_iter().zip(v2.get_iter()).for_each(|(a, b)| {
-            self._push_arg(a.to_bytes());
-            self._push_arg(b.to_bytes());
+            self._push_arg(a.as_bytes());
+            self._push_arg(b.as_bytes());
         });
         self
     }

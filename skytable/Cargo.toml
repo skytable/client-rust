@@ -34,7 +34,7 @@ tokio = { version = "1.11.0", features = [
     "io-std",
 ], optional = true }
 tokio-openssl = { version = "0.6.2", optional = true }
-sky-derive = { optional = true, path = "../sky-derive" }
+sky-derive = { optional = true, version = "0.1.0" }
 serde = { optional = true, version = "*" }
 serde_json = { optional = true, version = "*" }
 

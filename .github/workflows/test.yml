@@ -13,13 +13,13 @@ jobs:
       - uses: actions/checkout@v2
       - name: Build
         run: |
-          cargo build --verbose --no-default-features --features sync
-          cargo build --verbose --no-default-features --features sync,ssl
-          cargo build --verbose --no-default-features --features sync,sslv
-          cargo build --verbose --no-default-features --features async
-          cargo build --verbose --no-default-features --features async,aio-ssl
-          cargo build --verbose --no-default-features --features async,aio-sslv
-          cargo build --verbose --no-default-features --features dbg
-          cargo build --verbose --no-default-features --features const-gen
+          cargo build -p skytable --verbose --no-default-features --features sync
+          cargo build -p skytable --verbose --no-default-features --features sync,ssl
+          cargo build -p skytable --verbose --no-default-features --features sync,sslv
+          cargo build -p skytable --verbose --no-default-features --features async
+          cargo build -p skytable --verbose --no-default-features --features async,aio-ssl
+          cargo build -p skytable --verbose --no-default-features --features async,aio-sslv
+          cargo build -p skytable --verbose --no-default-features --features dbg
+          cargo build -p skytable --verbose --no-default-features --features const-gen
       - name: Run tests
-        run: cargo test --all-features
+        run: cargo test -p skytable --all-features

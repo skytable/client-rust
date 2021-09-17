@@ -3,7 +3,7 @@ use skytable::actions::Actions;
 use skytable::derive;
 use skytable::Connection;
 
-#[derive(Serialize, Deserialize, derive::json)]
+#[derive(Serialize, Deserialize, derive::Skyjson)]
 pub struct User {
     name: String,
     verified: bool,

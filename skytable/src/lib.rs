@@ -197,7 +197,7 @@ use types::IntoSkyhashBytes;
 // re-export derives and helper methods
 #[cfg(feature = "derive")]
 pub mod derive {
-    pub use sky_derive::Skyjson;
+    pub use sky_derive::{Skybin, Skyjson};
     #[doc(hidden)]
     pub fn into_json_bytes<T: serde::Serialize>(input: T) -> Vec<u8> {
         serde_json::to_string(&input).unwrap().into_bytes()
@@ -208,7 +208,18 @@ pub mod derive {
     ) -> std::result::Result<T, serde_json::Error> {
         serde_json::from_str(input)
     }
+    #[doc(hidden)]
+    pub fn into_bin_bytes<T: serde::Serialize>(input: T) -> Vec<u8> {
+        bincode::serialize(&input).unwrap()
+    }
+    #[doc(hidden)]
+    pub fn from_bin_bytes<'de, T: 'de + serde::Deserialize<'de>>(
+        input: &'de [u8],
+    ) -> std::result::Result<T, bincode::Error> {
+        bincode::deserialize(input)
+    }
 }
+
 // endof: re-export derives
 
 /// The default host address

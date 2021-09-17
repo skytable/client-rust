@@ -486,6 +486,18 @@ impl FromSkyhashBytes for String {
     }
 }
 
+impl FromSkyhashBytes for Vec<u8> {
+    fn from_element(element: Element) -> SkyRawResult<Vec<u8>> {
+        let e = match element {
+            Element::Binstr(bstr) => bstr,
+            Element::String(st) => st.into_bytes(),
+            Element::UnsignedInt(int) => int.to_string().into_bytes(),
+            _ => return Err(Error::ParseError(BAD_ELEMENT.to_owned())),
+        };
+        Ok(e)
+    }
+}
+
 impl FromSkyhashBytes for Vec<String> {
     fn from_element(element: Element) -> SkyRawResult<Self> {
         let e = match element {

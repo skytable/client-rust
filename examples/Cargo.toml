@@ -1,2 +1,2 @@
 [workspace]
-members = ["basic", "actions", "aio", "custom-queries", "ddl"]
+members = ["basic", "actions", "aio", "custom-queries", "ddl", "custom-types"]

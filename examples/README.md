@@ -10,6 +10,7 @@ Example projects include:
 - The [`basic`](./basic) project provides basic usage of the sync API
 - The [`custom-queries`](./custom-queries) project provides examples of running custom queries
 - The [`ddl`](./ddl) project provides examples of using DDL queries
+- The [`custom-types`](./custom-types) project provides an example of using custom types (like `struct`s with the driver)
 
 ## Building
 

@@ -406,7 +406,7 @@ impl<'a> IntoSkyhashBytes for &'a RawString {
 /// ## Example implementation
 ///
 /// Say we have a key/value table that stores `(str, str)`. The value however contains comma
-/// separted values (CSV). Let's say it looks like: `(Name, E-mail, State)` with types
+/// separated values (CSV). Let's say it looks like: `(Name, E-mail, State)` with types
 /// `String`, `String` and `String` respectively. We'd represent our Rust struct and implement
 /// this trait like this:
 /// ```no_run

@@ -20,10 +20,11 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{Data, DeriveInput, Fields};
 
-#[proc_macro_derive(json)]
+#[proc_macro_derive(Skyjson)]
 pub fn derive_json(item: TokenStream) -> TokenStream {
     let x: DeriveInput = syn::parse_macro_input!(item);
     let struct_name = x.ident;
+
     match x.data {
         Data::Struct(st) => {
             if let Fields::Named(named_fields) = st.fields {
@@ -35,6 +36,7 @@ pub fn derive_json(item: TokenStream) -> TokenStream {
         }
         _ => panic!("`sky_derive::bin` is only implemented for structs"),
     }
+
     let tokens = quote! {
         impl skytable::types::IntoSkyhashBytes for &#struct_name {
             fn as_bytes(&self) -> Vec<u8> {

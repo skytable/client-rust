@@ -9,20 +9,24 @@ All changes in this project will be noted in this file.
 ### Added
 
 - Support for DDL queries
-- Support for directly getting types from actions. For example:
+- Support for directly getting types from actions (this is required to be passed for actions
+  that need them). For example:
   ```rust
-  let mut x: u64 = con.get("my integer key").unwrap();
+  let x: u64 = con.get("my integer key").unwrap();
+  let myval: Vec<String> = con.mget(["x", "y", "z"]).unwrap();
   ```
   All errors resulting from this parse are simply propagated into the `Error::ParseError`
   variant
 - Support for retrieval of custom types through the use of the `FromSkyhashBytes` trait
 
-### Broken
+### Breaking changes
 
 - Errors have been unified into a single error type
 - Some types have been removed to aid simplicity:
   - `types::Str`
   - `types::SimpleArray`
+- The trait method `IntoSkyhashBytes::into_bytes` was renamed to `IntoSkyhashBytes::as_bytes()` to
+  follow naming conventions
 
 ## Version 0.5.0
 

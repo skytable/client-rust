@@ -270,19 +270,13 @@ impl<T: IntoSkyhashBytes, const N: usize> GetIterator<T> for &'static [T; N] {
     }
 }
 
-impl<T: IntoSkyhashBytes> GetIterator<T> for &[T] {
+impl<'a, T: IntoSkyhashBytes> GetIterator<T> for &'a [T] {
     fn get_iter(&self) -> std::slice::Iter<'_, T> {
         self.iter()
     }
 }
 
 impl<T: IntoSkyhashBytes> GetIterator<T> for Vec<T> {
-    fn get_iter(&self) -> std::slice::Iter<'_, T> {
-        self.iter()
-    }
-}
-
-impl<T: IntoSkyhashBytes> GetIterator<T> for &Vec<T> {
     fn get_iter(&self) -> std::slice::Iter<'_, T> {
         self.iter()
     }

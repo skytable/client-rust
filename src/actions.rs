@@ -126,7 +126,7 @@ macro_rules! implement_actions {
     };
 }
 
-implement_actions!(
+implement_actions! {
     /// Get the number of keys present in the database
     fn dbsize() -> u64 {
         { Query::from("dbsize") }
@@ -203,6 +203,8 @@ implement_actions!(
     /// ```text
     /// MGET <k1> <k2> ...
     /// ```
+    ///
+    /// **This method expects either:** `[T; N]`, `&[T; N]` or anything that derefs to `&[T]`
     fn mget<T: FromSkyhashBytes>(keys: impl IntoSkyhashAction+ 's) -> T {
         { Query::from("mget").arg(keys)}
         x @ Element::Array(Array::Bin(_)) | x @ Element::Array(Array::Str(_)) => T::from_element(x)?
@@ -235,6 +237,8 @@ implement_actions!(
     ///
     /// ## Panics
     /// This method will panic if the number of keys and values are not equal
+    ///
+    /// **This method expects either:** `[T; N]`, `&[T; N]` or anything that derefs to `&[T]`
     fn mset<T: IntoSkyhashBytes + 's , U: IntoSkyhashBytes + 's>
     (
         keys: impl GetIterator<T> + 's,
@@ -257,6 +261,8 @@ implement_actions!(
     ///
     /// ## Panics
     /// This method will panic if the number of keys and values are not equal
+    ///
+    /// **This method expects either:** `[T; N]`, `&[T; N]` or anything that derefs to `&[T]`
     fn mupdate<T: IntoSkyhashBytes + 's , U: IntoSkyhashBytes + 's>
     (
         keys: impl GetIterator<T> + 's,
@@ -329,6 +335,8 @@ implement_actions!(
     ///
     /// ## Panics
     /// This method will panic if the number of keys and values are not equal
+    ///
+    /// **This method expects either:** `[T; N]`, `&[T; N]` or anything that derefs to `&[T]`
     fn sset<T: IntoSkyhashBytes + 's , U: IntoSkyhashBytes + 's>
     (
         keys: impl GetIterator<T> + 's,
@@ -353,8 +361,11 @@ implement_actions!(
     /// ```
     /// with the only difference that you have to pass in the keys and values as separate
     /// objects
+    ///
     /// ## Panics
     /// This method will panic if the number of keys and values are not equal
+    ///
+    /// **This method expects either:** `[T; N]`, `&[T; N]` or anything that derefs to `&[T]`
     fn supdate<T: IntoSkyhashBytes + 's , U: IntoSkyhashBytes + 's>
     (
         keys: impl GetIterator<T> + 's,
@@ -391,6 +402,8 @@ implement_actions!(
     ///
     /// ## Panics
     /// This method will panic if the number of keys is not equal to the number of values
+    ///
+    /// **This method expects either:** `[T; N]`, `&[T; N]` or anything that derefs to `&[T]`
     fn uset<T: IntoSkyhashBytes + 's , U: IntoSkyhashBytes + 's>
     (
         keys: impl GetIterator<T> + 's,
@@ -405,4 +418,4 @@ implement_actions!(
         }
         Element::UnsignedInt(int) => int as u64
     }
-);
+}

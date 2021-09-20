@@ -425,9 +425,6 @@ impl Query {
         self
     }
     pub(in crate) fn _push_arg(&mut self, arg: Vec<u8>) {
-        if arg.is_empty() {
-            panic!("Argument cannot be empty")
-        }
         // A data element will look like:
         // `<bytes_in_next_line>\n<data>`
         let bytes_in_next_line = arg.len().to_string().into_bytes();
@@ -447,10 +444,6 @@ impl Query {
     /// ## Panics
     /// This method will panic if the passed `arg` is empty
     pub fn push(&mut self, arg: impl IntoSkyhashAction) {
-        assert!(
-            arg.incr_len_by() != 0,
-            "An argument passed to a query cannot be empty!"
-        );
         arg.push_into_query(self);
     }
     pub(in crate) fn _push_alt_iter<T, U>(

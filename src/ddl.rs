@@ -76,7 +76,7 @@ impl KeymapType {
 /// A Keymap Model Table
 ///
 pub struct Keymap {
-    entity: Option<String>,
+    entity: String,
     ktype: Option<KeymapType>,
     vtype: Option<KeymapType>,
     volatile: bool,
@@ -87,7 +87,7 @@ impl Keymap {
     /// and the default volatility (by default a table is **not** volatile)
     pub fn new(entity: impl AsRef<str>) -> Self {
         Self {
-            entity: Some(entity.as_ref().to_owned()),
+            entity: entity.as_ref().to_owned(),
             ktype: None,
             vtype: None,
             volatile: false,
@@ -131,7 +131,7 @@ impl CreateTableIntoQuery for Keymap {
                 .unwrap_or(&KeymapType::Binstr)
                 .priv_to_string(),
         );
-        let q = Query::from("CREATE").arg("TABLE").arg(arg);
+        let q = Query::from("CREATE").arg("TABLE").arg(self.entity).arg(arg);
         if self.volatile {
             q.arg("volatile")
         } else {

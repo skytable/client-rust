@@ -2,6 +2,20 @@
 
 All changes in this project will be noted in this file.
 
+## Version 0.6.1
+
+> Breaking changes!
+
+### Fixes
+
+- Fixed missing entity name in query generation for DDL's `create_table` function
+
+### Breaking
+
+- The inner type of the `entity` field in `ddl::Keymap` was changed to `String` instead of `Option<String>`. Since this
+  was never a public field, it should not affect you. However, if you depend on `Debug` fmt implementations then you should
+  keep this in mind
+
 ## Version 0.6.0
 
 > Breaking changes

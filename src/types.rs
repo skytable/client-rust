@@ -436,10 +436,8 @@ impl<'a> IntoSkyhashBytes for &'a RawString {
 /// use skytable::sync::Connection;
 /// use skytable::actions::Actions;
 ///
-/// fn main() {
-///     let mut con = Connection::new("127.0.0.1", 2003).unwrap();
-///     let mycsv: MyCSV = con.get("mycsv").unwrap();
-/// }
+/// let mut con = Connection::new("127.0.0.1", 2003).unwrap();
+/// let mycsv: MyCSV = con.get("mycsv").unwrap();
 /// ```
 ///
 /// Now, you can use this as you like to turn [`Element`]s into your own (or primitive) types or

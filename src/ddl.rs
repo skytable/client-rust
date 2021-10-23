@@ -126,7 +126,7 @@ impl CreateTableIntoQuery for Keymap {
                 .unwrap_or(&KeymapType::Binstr)
                 .priv_to_string(),
             vtype = self
-                .ktype
+                .vtype
                 .as_ref()
                 .unwrap_or(&KeymapType::Binstr)
                 .priv_to_string(),
@@ -254,5 +254,19 @@ implement_ddl! {
             }
         }
         Element::RespCode(RespCode::Okay) => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CreateTableIntoQuery, Keymap, KeymapType};
+    #[test]
+    fn test_query_generation_from_keymap() {
+        let qgen = Keymap::new("mytbl")
+            .set_ktype(KeymapType::Str)
+            .set_vtype(KeymapType::Binstr)
+            .into_query();
+        let qman = crate::query!("CREATE", "TABLE", "mytbl", "keymap(str,binstr)");
+        assert_eq!(qgen, qman);
     }
 }

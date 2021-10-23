@@ -418,4 +418,11 @@ implement_actions! {
         }
         Element::UnsignedInt(int) => int as u64
     }
+    /// Creates a new list with the provided values
+    fn lset<T: IntoSkyhashBytes + 's>(listname: impl IntoSkyhashBytes + 's, values: impl GetIterator<T> + 's) -> () {
+        {
+            Query::from("LSET").arg(listname).arg(values)
+        }
+        Element::RespCode(RespCode::Okay) => ()
+    }
 }

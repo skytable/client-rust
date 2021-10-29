@@ -472,6 +472,14 @@ impl Query {
     fn get_holding_buffer(&self) -> &[u8] {
         &self.data
     }
+    fn write_query_to_writable(&self, buffer: &mut Vec<u8>) {
+        // Add the dataframe element
+        let number_of_items_in_datagroup = self.len().to_string().into_bytes();
+        buffer.extend([b'~']);
+        buffer.extend(&number_of_items_in_datagroup);
+        buffer.extend([b'\n']);
+        buffer.extend(self.get_holding_buffer());
+    }
     cfg_async!(
         /// Write a query to a given stream
         async fn write_query_to<T>(&self, stream: &mut T) -> IoResult<()>
@@ -564,3 +572,33 @@ cfg_dbg!(
         assert_eq!(ma_query_len, q_len);
     }
 );
+
+/// # Pipeline
+///
+/// A pipeline is a way of queing up multiple queries, sending them to the server at once instead of sending them individually, avoiding
+/// round-trip-times while also simplifying usage in several places. Responses are returned in the order they are sent
+pub struct Pipeline {
+    len: usize,
+    chain: Vec<u8>,
+}
+
+impl Pipeline {
+    /// Initializes a new empty pipeline
+    pub fn new() -> Self {
+        Self {
+            len: 0usize,
+            chain: Vec::new(),
+        }
+    }
+    /// Append a query (builder pattern)
+    pub fn add(mut self, query: Query) -> Self {
+        self.len += 1;
+        query.write_query_to_writable(&mut self.chain);
+        self
+    }
+    /// Append a query by taking reference
+    pub fn push(&mut self, query: Query) {
+        self.len += 1;
+        query.write_query_to_writable(&mut self.chain);
+    }
+}

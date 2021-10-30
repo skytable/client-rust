@@ -336,6 +336,74 @@ impl ConnectionBuilder {
     }
 }
 
+cfg_sync! {
+    trait WriteQuerySync {
+        fn write_sync(&self, b: &mut impl std::io::Write) -> IoResult<()>;
+    }
+
+    impl WriteQuerySync for Query {
+        fn write_sync(&self, stream: &mut impl std::io::Write) -> IoResult<()> {
+            // Write the metaframe
+            stream.write_all(b"*1\n")?;
+            // Add the dataframe
+            let number_of_items_in_datagroup = self.len().to_string().into_bytes();
+            stream.write_all(&[b'~'])?;
+            stream.write_all(&number_of_items_in_datagroup)?;
+            stream.write_all(&[b'\n'])?;
+            stream.write_all(self.get_holding_buffer())?;
+            stream.flush()?;
+            Ok(())
+        }
+    }
+
+    impl WriteQuerySync for Pipeline {
+        fn write_sync(&self, stream: &mut impl std::io::Write) -> IoResult<()> {
+            let len = self.len.to_string().into_bytes();
+            stream.write_all(b"*")?;
+            stream.write_all(&len)?;
+            stream.write_all(b"\n")?;
+            stream.write_all(&self.chain)
+        }
+    }
+}
+
+cfg_async! {
+    use core::pin::Pin;
+    use core::future::Future;
+    use tokio::io::AsyncWrite;
+    type FutureRet<'s> = Pin<Box<dyn Future<Output = IoResult<()>> + Send + Sync + 's>>;
+    trait WriteQueryAsync<T: AsyncWrite + Unpin + Send + Sync>: Unpin + Sync + Send {
+        fn write_async<'s>(&'s self, b: &'s mut T) -> FutureRet<'s>;
+    }
+    impl<T: AsyncWrite + Unpin + Send + Sync> WriteQueryAsync<T> for Query {
+        fn write_async<'s>(&'s self, stream: &'s mut T) -> FutureRet {
+            Box::pin(async move {
+                // Write the metaframe
+                stream.write_all(b"*1\n").await?;
+                // Add the dataframe
+                let number_of_items_in_datagroup = self.len().to_string().into_bytes();
+                stream.write_all(&[b'~']).await?;
+                stream.write_all(&number_of_items_in_datagroup).await?;
+                stream.write_all(&[b'\n']).await?;
+                stream.write_all(self.get_holding_buffer()).await?;
+                stream.flush().await?;
+                Ok(())
+            })
+        }
+    }
+    impl<T: AsyncWrite + Unpin + Send + Sync> WriteQueryAsync<T> for Pipeline {
+        fn write_async<'s>(&'s self, stream: &'s mut T) -> FutureRet {
+            Box::pin(async move {
+                let len = self.len.to_string().into_bytes();
+                stream.write_all(b"*").await?;
+                stream.write_all(&len).await?;
+                stream.write_all(b"\n").await?;
+                stream.write_all(&self.chain).await
+            })
+        }
+    }
+}
+
 #[macro_export]
 /// A macro that can be used to easily create queries with _almost_ variadic properties.
 /// Where you'd normally create queries like this:
@@ -480,42 +548,6 @@ impl Query {
         buffer.extend([b'\n']);
         buffer.extend(self.get_holding_buffer());
     }
-    cfg_async!(
-        /// Write a query to a given stream
-        async fn write_query_to<T>(&self, stream: &mut T) -> IoResult<()>
-        where
-            T: tokio::io::AsyncWrite + Unpin,
-        {
-            // Write the metaframe
-            stream.write_all(b"*1\n").await?;
-            // Add the dataframe
-            let number_of_items_in_datagroup = self.len().to_string().into_bytes();
-            stream.write_all(&[b'~']).await?;
-            stream.write_all(&number_of_items_in_datagroup).await?;
-            stream.write_all(&[b'\n']).await?;
-            stream.write_all(self.get_holding_buffer()).await?;
-            stream.flush().await?;
-            Ok(())
-        }
-    );
-    cfg_sync!(
-        /// Write a query to a given stream
-        fn write_query_to_sync<T>(&self, stream: &mut T) -> IoResult<()>
-        where
-            T: std::io::Write,
-        {
-            // Write the metaframe
-            stream.write_all(b"*1\n")?;
-            // Add the dataframe
-            let number_of_items_in_datagroup = self.len().to_string().into_bytes();
-            stream.write_all(&[b'~'])?;
-            stream.write_all(&number_of_items_in_datagroup)?;
-            stream.write_all(&[b'\n'])?;
-            stream.write_all(self.get_holding_buffer())?;
-            stream.flush()?;
-            Ok(())
-        }
-    );
     cfg_dbg!(
         /// Get the raw bytes of a query
         ///
@@ -600,5 +632,8 @@ impl Pipeline {
     pub fn push(&mut self, query: Query) {
         self.len += 1;
         query.write_query_to_writable(&mut self.chain);
+    }
+    pub fn len(&self) -> usize {
+        self.len
     }
 }

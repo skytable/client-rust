@@ -26,9 +26,13 @@
 
 use crate::deserializer::{ParseError, Parser, RawResponse};
 use crate::error::SkyhashError;
+use crate::Element;
 use crate::IoResult;
+use crate::Pipeline;
 use crate::Query;
+use crate::SkyRawResult;
 use crate::SkyResult;
+use crate::WriteQuerySync;
 use std::io::{Error as IoError, ErrorKind, Read, Write};
 use std::net::TcpStream;
 
@@ -41,11 +45,27 @@ macro_rules! impl_sync_methods {
             /// for any I/O errors that may occur
             ///
             /// ## Panics
-            /// This method will panic if the [`Query`] supplied is empty (i.e has no arguments)
+            /// This method will panic:
+            /// - if the [`Query`] supplied is empty (i.e has no arguments)
             /// This function is a subroutine of `run_query` used to parse the response packet
             pub fn run_simple_query(&mut self, query: &Query) -> SkyResult {
                 assert!(query.len() != 0, "A `Query` cannot be of zero length!");
-                query.write_query_to_sync(&mut self.stream)?;
+                match self._run_query(query)? {
+                    RawResponse::SimpleQuery(sq) => Ok(sq),
+                    RawResponse::PipelinedQuery(_) => Err(SkyhashError::InvalidResponse.into()),
+                }
+            }
+            /// This function will write a pipelined query to the stream and read the response from the server,
+            /// returning errors if they do occur.
+            pub fn run_pipeline(&mut self, pipeline: Pipeline) -> SkyRawResult<Vec<Element>> {
+                assert!(pipeline.len() != 0, "A `Pipeline` cannot be empty!");
+                match self._run_query(&pipeline)? {
+                    RawResponse::PipelinedQuery(pq) => Ok(pq),
+                    RawResponse::SimpleQuery(_) => Err(SkyhashError::InvalidResponse.into()),
+                }
+            }
+            fn _run_query<T: WriteQuerySync>(&mut self, query: &T) -> SkyRawResult<RawResponse> {
+                query.write_sync(&mut self.stream)?;
                 self.stream.flush()?;
                 loop {
                     let mut buffer = [0u8; 1024];
@@ -59,12 +79,7 @@ macro_rules! impl_sync_methods {
                     match self.try_response() {
                         Ok((query, forward_by)) => {
                             self.buffer.drain(..forward_by);
-                            match query {
-                                RawResponse::SimpleQuery(s) => return Ok(s),
-                                RawResponse::PipelinedQuery(_) => {
-                                    unimplemented!("Pipelined queries aren't implemented yet")
-                                }
-                            }
+                            return Ok(query);
                         }
                         Err(e) => match e {
                             ParseError::NotEnough => (),

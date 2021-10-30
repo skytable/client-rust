@@ -117,10 +117,10 @@ pub enum ParseError {
 }
 
 #[derive(Debug, PartialEq)]
-/// # Types of Response
+/// # Response types
 ///
-/// A simple response carries the data for one action while a complex response carries data for
-/// multiple actions
+/// A simple response carries the response for a simple query while a pipelined response carries the response
+/// for pipelined queries
 pub enum RawResponse {
     /// A simple query will just hold one element
     SimpleQuery(Element),

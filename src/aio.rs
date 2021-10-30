@@ -27,9 +27,13 @@
 use crate::deserializer::{ParseError, Parser, RawResponse};
 use crate::error::Error;
 use crate::error::SkyhashError;
+use crate::Element;
 use crate::IoResult;
+use crate::Pipeline;
 use crate::Query;
+use crate::SkyRawResult;
 use crate::SkyResult;
+use crate::WriteQueryAsync;
 use bytes::{Buf, BytesMut};
 use std::io::{Error as IoError, ErrorKind};
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufWriter};
@@ -39,7 +43,7 @@ use tokio::net::TcpStream;
 const BUF_CAP: usize = 4096;
 
 macro_rules! impl_async_methods {
-    ($ty:ty) => {
+    ($ty:ty, $inner:ty) => {
         impl $ty {
             /// This function will write a [`Query`] to the stream and read the response from the
             /// server. It will then determine if the returned response is complete or incomplete
@@ -49,8 +53,22 @@ macro_rules! impl_async_methods {
             /// ## Panics
             /// This method will panic if the [`Query`] supplied is empty (i.e has no arguments)
             pub async fn run_simple_query(&mut self, query: &Query) -> SkyResult {
-                assert!(query.len() != 0, "A `Query` cannot be of zero length!");
-                query.write_query_to(&mut self.stream).await?;
+                match self._run_query(query).await? {
+                    RawResponse::SimpleQuery(sq) => Ok(sq),
+                    RawResponse::PipelinedQuery(_) => Err(SkyhashError::InvalidResponse.into()),
+                }
+            }
+            pub async fn run_pipeline(&mut self, pipeline: Pipeline) -> SkyRawResult<Vec<Element>> {
+                match self._run_query(&pipeline).await? {
+                    RawResponse::PipelinedQuery(pq) => Ok(pq),
+                    RawResponse::SimpleQuery(_) => Err(SkyhashError::InvalidResponse.into()),
+                }
+            }
+            async fn _run_query<Q: WriteQueryAsync<$inner>>(
+                &mut self,
+                query: &Q,
+            ) -> SkyRawResult<RawResponse> {
+                query.write_async(&mut self.stream).await?;
                 self.stream.flush().await?;
                 loop {
                     if 0usize == self.stream.read_buf(&mut self.buffer).await? {
@@ -59,12 +77,7 @@ macro_rules! impl_async_methods {
                     match self.try_response() {
                         Ok((query, forward_by)) => {
                             self.buffer.advance(forward_by);
-                            match query {
-                                RawResponse::SimpleQuery(s) => return Ok(s),
-                                RawResponse::PipelinedQuery(_) => {
-                                    unimplemented!("Pipelined queries aren't implemented yet")
-                                }
-                            }
+                            return Ok(query);
                         }
                         Err(e) => match e {
                             ParseError::NotEnough => (),
@@ -119,7 +132,7 @@ cfg_async!(
             })
         }
     }
-    impl_async_methods!(Connection);
+    impl_async_methods!(Connection, BufWriter<TcpStream>);
 );
 
 cfg_async_ssl_any!(
@@ -148,5 +161,5 @@ cfg_async_ssl_any!(
             })
         }
     }
-    impl_async_methods!(TlsConnection);
+    impl_async_methods!(TlsConnection, SslStream<TcpStream>);
 );

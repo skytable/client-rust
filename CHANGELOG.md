@@ -2,6 +2,12 @@
 
 All changes in this project will be noted in this file.
 
+## Unreleased
+
+### Additions
+
+- Added support for pipelined queries
+
 ## Version 0.6.1
 
 > Breaking changes!

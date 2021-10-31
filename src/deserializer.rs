@@ -77,6 +77,8 @@ pub enum Element {
     UnsignedInt(u64),
     /// A response code
     RespCode(RespCode),
+    /// A floating point value
+    Float(f64),
 }
 
 impl Element {
@@ -370,6 +372,24 @@ impl<'a> Parser<'a> {
             Err(ParseError::UnexpectedByte)
         }
     }
+    fn parse_next_float(&mut self) -> ParseResult<f64> {
+        let our_float_chunk = self.__get_next_element()?;
+        match String::from_utf8_lossy(our_float_chunk).parse() {
+            Ok(f) => {
+                if self.will_cursor_give_linefeed()? {
+                    self.incr_cursor();
+                    Ok(f)
+                } else {
+                    println!("LF error");
+                    Err(ParseError::UnexpectedByte)
+                }
+            }
+            Err(e) => {
+                println!("Error: {}", e);
+                Err(ParseError::UnexpectedByte)
+            }
+        }
+    }
     /// The cursor should be **at the tsymbol**
     fn parse_next_element(&mut self) -> ParseResult<Element> {
         if let Some(tsymbol) = self.buffer.get(self.cursor) {
@@ -382,6 +402,7 @@ impl<'a> Parser<'a> {
                 b':' => Element::UnsignedInt(self.parse_next_u64()?),
                 b'&' => Element::Array(Array::Recursive(self.parse_next_array()?)),
                 b'!' => Element::RespCode(self.parse_next_respcode()?),
+                b'%' => Element::Float(self.parse_next_float()?),
                 b'@' => {
                     // hmmm, a typed array; let's check the tsymbol
                     if let Some(array_type) = self.buffer.get(self.cursor) {
@@ -593,4 +614,12 @@ fn test_typed_str_array_null() {
             None
         ])))
     );
+}
+
+#[test]
+fn test_parse_float() {
+    let packet = b"*1\n%3\n1.1\n";
+    let (parsed, forward) = Parser::new(packet).parse().unwrap();
+    assert_eq!(forward, packet.len());
+    assert_eq!(parsed, RawResponse::SimpleQuery(Element::Float(1.1)))
 }

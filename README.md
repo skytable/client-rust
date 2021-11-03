@@ -7,7 +7,7 @@ This library is the official client for the free and open-source NoSQL database
 following the instructions [here](https://docs.skytable.io/getting-started). This library supports
 all Skytable versions that work with the [Skyhash 1.1 Protocol](https://docs.skytable.io/protocol/skyhash).
 This version of the library was tested with the latest Skytable release
-(release [0.7](https://github.com/skytable/skytable/releases/v0.7.0)).
+(release [0.7.2-alpha.1](https://github.com/skytable/skytable/releases/v0.7.2-alpha.1)).
 
 ## Using this library
 
@@ -26,7 +26,7 @@ cargo new skyapp
 First add this to your `Cargo.toml` file:
 
 ```toml
-skytable = "0.6.1"
+skytable = "0.6.2-alpha.1"
 ```
 
 Now open up your `src/main.rs` file and establish a connection to the server while also adding some
@@ -118,7 +118,7 @@ You can also find the [latest examples here](https://github.com/skytable/client-
 If you need to use an `async` API, just change your import to:
 
 ```toml
-skytable = { version = "0.6.1", features=["async"], default-features = false }
+skytable = { version = "0.6.2-alpha.1", features=["async"], default-features = false }
 ```
 
 You can now establish a connection by using `skytable::AsyncConnection::new()`, adding `.await`s wherever
@@ -130,7 +130,7 @@ With this client driver, it is possible to use both sync and `async` APIs **at t
 this, simply change your import to:
 
 ```toml
-skytable = { version="0.6.1", features=["sync", "async"] }
+skytable = { version="0.6.2-alpha.1", features=["sync", "async"] }
 ```
 
 ## TLS
@@ -140,7 +140,7 @@ If you need to use TLS features, this crate will let you do so with OpenSSL.
 ### Using TLS with sync interfaces
 
 ```toml
-skytable = { version="0.6.1", features=["sync","ssl"] }
+skytable = { version="0.6.2-alpha.1", features=["sync","ssl"] }
 ```
 
 You can now use the async `sync::TlsConnection` object.
@@ -148,7 +148,7 @@ You can now use the async `sync::TlsConnection` object.
 ### Using TLS with async interfaces
 
 ```toml
-skytable = { version="0.6.1", features=["async","aio-ssl"], default-features=false }
+skytable = { version="0.6.2-alpha.1", features=["async","aio-ssl"], default-features=false }
 ```
 
 You can now use the async `aio::TlsConnection` object.

@@ -197,8 +197,6 @@ implement_actions! {
     }
     /// Get multiple keys
     ///
-    /// This returns a [`SimpleArray`] of values for the provided keys
-    ///
     /// This is equivalent to:
     /// ```text
     /// MGET <k1> <k2> ...

@@ -58,6 +58,8 @@ macro_rules! impl_async_methods {
                     RawResponse::PipelinedQuery(_) => Err(SkyhashError::InvalidResponse.into()),
                 }
             }
+            /// Runs a pipelined query. See the [`Pipeline`](Pipeline) documentation for a guide on
+            /// usage
             pub async fn run_pipeline(&mut self, pipeline: Pipeline) -> SkyRawResult<Vec<Element>> {
                 match self._run_query(&pipeline).await? {
                     RawResponse::PipelinedQuery(pq) => Ok(pq),

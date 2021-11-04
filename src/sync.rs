@@ -55,8 +55,8 @@ macro_rules! impl_sync_methods {
                     RawResponse::PipelinedQuery(_) => Err(SkyhashError::InvalidResponse.into()),
                 }
             }
-            /// This function will write a pipelined query to the stream and read the response from the server,
-            /// returning errors if they do occur.
+            /// Runs a pipelined query. See the [`Pipeline`](Pipeline) documentation for a guide on
+            /// usage
             pub fn run_pipeline(&mut self, pipeline: Pipeline) -> SkyRawResult<Vec<Element>> {
                 assert!(pipeline.len() != 0, "A `Pipeline` cannot be empty!");
                 match self._run_query(&pipeline)? {

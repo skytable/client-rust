@@ -232,12 +232,12 @@ pub type SkyResult = SkyRawResult<Element>;
 /// ```
 ///
 /// ## Example (async)
-/// ```no_test
+/// ```no_run
 /// use skytable::ConnectionBuilder;
-/// async fn main() {
+/// async fn run() {
 ///     let con =
 ///         ConnectionBuilder::new()
-///         .set_host("127.0.0.1")
+///         .set_host("127.0.0.1".to_string())
 ///         .set_port(2003)
 ///         .set_entity("mykeyspace:mytable".to_string())
 ///         .get_async_connection()

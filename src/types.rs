@@ -286,7 +286,7 @@ impl<T: IntoSkyhashBytes> GetIterator<T> for Vec<T> {
 #[derive(Debug, PartialEq)]
 #[non_exhaustive]
 pub enum Array {
-    //// A binary array (typed array tsymbol `?`, `@` base tsymbol)
+    /// A binary array (typed array tsymbol `?`, `@` base tsymbol)
     Bin(Vec<Option<Vec<u8>>>),
     /// An unicode string array (typed array tsymbol `+`, `@` base tsymbol)
     Str(Vec<Option<String>>),

@@ -682,4 +682,32 @@ impl Pipeline {
     pub fn len(&self) -> usize {
         self.len
     }
+    cfg_dbg! {
+        /// Returns the query packet representation of this pipeline
+        ///
+        /// ## Panics
+        ///
+        /// This function will panic if the query is empty
+        pub fn into_raw_query(self) -> Vec<u8> {
+            if self.len == 0 {
+                panic!("The pipeline is empty")
+            } else {
+                let mut v = Vec::with_capacity(self.chain.len() + 4);
+                v.push(b'*');
+                v.extend(self.len.to_string().as_bytes());
+                v.push(b'\n');
+                v.extend(self.chain);
+                v
+            }
+        }
+    }
+}
+
+cfg_dbg! {
+#[test]
+    fn test_pipeline_dbg() {
+        let bytes = b"*2\n~1\n5\nhello\n~1\n5\nworld\n";
+        let pipe = Pipeline::new().add(query!("hello")).add(query!("world"));
+        assert_eq!(pipe.into_raw_query(), bytes);
+    }
 }

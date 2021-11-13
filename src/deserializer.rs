@@ -403,6 +403,26 @@ impl<'a> Parser<'a> {
                 b'&' => Element::Array(Array::Recursive(self.parse_next_array()?)),
                 b'!' => Element::RespCode(self.parse_next_respcode()?),
                 b'%' => Element::Float(self.parse_next_float()?),
+                b'^' => {
+                    // hmm, a typed non-null array; let's check the tsymbol
+                    if let Some(array_type) = self.buffer.get(self.cursor) {
+                        // got tsymbol, let's skip it
+                        self.incr_cursor();
+                        match array_type {
+                            b'+' => {
+                                Element::Array(Array::NonNullStr(self.parse_next_nonnull_str()?))
+                            }
+                            b'?' => {
+                                Element::Array(Array::NonNullBin(self.parse_next_nonnull_bin()?))
+                            }
+                            _ => return Err(ParseError::UnknownDatatype),
+                        }
+                    } else {
+                        // if we couldn't fetch a tsymbol, there wasn't enough
+                        // data left
+                        return Err(ParseError::NotEnough);
+                    }
+                }
                 b'@' => {
                     // hmmm, a typed array; let's check the tsymbol
                     if let Some(array_type) = self.buffer.get(self.cursor) {
@@ -436,6 +456,24 @@ impl<'a> Parser<'a> {
             Ok(Some(Self::parse_into_usize(inp)?))
         }
     }
+
+    /// The cursor should have passed the `@+` chars
+    fn parse_next_nonnull_str(&mut self) -> ParseResult<Vec<String>> {
+        let (start, stop) = self.read_line();
+        if let Some(our_size_chunk) = self.buffer.get(start..stop) {
+            // so we have a size chunk; let's get the size
+            let array_size = Self::parse_into_usize(our_size_chunk)?;
+            let mut array = Vec::with_capacity(array_size);
+            for _ in 0..array_size {
+                // no tsymbol, just elements and their sizes
+                array.push(self.parse_next_string()?);
+            }
+            Ok(array)
+        } else {
+            Err(ParseError::NotEnough)
+        }
+    }
+
     /// The cursor should have passed the `@+` chars
     fn parse_next_typed_array_str(&mut self) -> ParseResult<Vec<Option<String>>> {
         let (start, stop) = self.read_line();
@@ -467,6 +505,24 @@ impl<'a> Parser<'a> {
             Err(ParseError::NotEnough)
         }
     }
+
+    /// The cursor should have passed the `@+` chars
+    fn parse_next_nonnull_bin(&mut self) -> ParseResult<Vec<Vec<u8>>> {
+        let (start, stop) = self.read_line();
+        if let Some(our_size_chunk) = self.buffer.get(start..stop) {
+            // so we have a size chunk; let's get the size
+            let array_size = Self::parse_into_usize(our_size_chunk)?;
+            let mut array = Vec::with_capacity(array_size);
+            for _ in 0..array_size {
+                // no tsymbol, just elements and their sizes
+                array.push(self.parse_next_binstr()?);
+            }
+            Ok(array)
+        } else {
+            Err(ParseError::NotEnough)
+        }
+    }
+
     /// The cursor should have passed the tsymbol
     fn parse_next_flat_array(&mut self) -> ParseResult<Vec<FlatElement>> {
         let (start, stop) = self.read_line();
@@ -622,4 +678,32 @@ fn test_parse_float() {
     let (parsed, forward) = Parser::new(packet).parse().unwrap();
     assert_eq!(forward, packet.len());
     assert_eq!(parsed, RawResponse::SimpleQuery(Element::Float(1.1)))
+}
+
+#[test]
+fn test_parse_nonnull_str() {
+    let packet = b"*1\n^+2\n2\nhi\n5\nthere\n";
+    let (parsed, forward) = Parser::new(packet).parse().unwrap();
+    assert_eq!(forward, packet.len());
+    assert_eq!(
+        parsed,
+        RawResponse::SimpleQuery(Element::Array(Array::NonNullStr(vec![
+            "hi".to_owned(),
+            "there".to_owned()
+        ])))
+    )
+}
+
+#[test]
+fn test_parse_nonnull_bin() {
+    let packet = b"*1\n^?2\n2\nhi\n5\nthere\n";
+    let (parsed, forward) = Parser::new(packet).parse().unwrap();
+    assert_eq!(forward, packet.len());
+    assert_eq!(
+        parsed,
+        RawResponse::SimpleQuery(Element::Array(Array::NonNullBin(vec![
+            "hi".as_bytes().to_owned(),
+            "there".as_bytes().to_owned()
+        ])))
+    )
 }

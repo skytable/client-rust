@@ -34,7 +34,8 @@
 //! ```
 //!
 
-use crate::error::errorstring;
+use crate::error::{errorstring, SkyhashError};
+use crate::types::{Array, FlatElement};
 use crate::Element;
 use crate::IntoSkyhashBytes;
 use crate::Query;
@@ -60,6 +61,28 @@ pub enum KeymapType {
     Binstr,
     /// A custom type
     Other(String),
+}
+
+/// A convenient representation for the `whereami` action
+pub enum WhereAmI {
+    /// The ID of the keyspace
+    Keyspace(String),
+    /// The ID of the keyspace (element 0) and the ID of the table (element 1)
+    Table(String, String),
+}
+
+impl WhereAmI {
+    /// Returns an entity group formatted string for this instance. For example:
+    /// - if your connection level entity is just a keyspace, say `default`, then you'll get a string with "default"
+    /// - Now, if you're in a table, say table `default` in the `default` keyspace, then you'll get a string with "default:default"
+    pub fn into_entity_repr(self) -> String {
+        match self {
+            Self::Keyspace(ks) => ks,
+            Self::Table(ks, tbl) => {
+                format!("{ks}:{tbl}", ks = ks, tbl = tbl)
+            }
+        }
+    }
 }
 
 impl KeymapType {
@@ -254,6 +277,37 @@ implement_ddl! {
             }
         }
         Element::RespCode(RespCode::Okay) => {}
+    }
+    /// Check what keyspace this connection is currently connected to
+    fn whereami() -> WhereAmI {
+        {
+            Query::from("whereami")
+        }
+        Element::Array(
+            Array::Flat(mut frr)
+        ) => {
+            if frr.iter().all(|v| matches!(v, FlatElement::String(_))) {
+                return Err(SkyhashError::InvalidResponse.into());
+            }
+            match frr.len() {
+                1 => WhereAmI::Keyspace(match frr.swap_remove(0) {
+                    FlatElement::String(st) => st,
+                    _ => unsafe {
+                        core::hint::unreachable_unchecked()
+                    }
+                }),
+                2 => {
+                    let (ks, tbl) = match (frr.swap_remove(0), frr.swap_remove(1)) {
+                        (FlatElement::String(ks),FlatElement::String(tbl)) => (ks, tbl),
+                        _ => unsafe {
+                            core::hint::unreachable_unchecked()
+                        }
+                    };
+                    WhereAmI::Table(ks, tbl)
+                }
+                _ => return Err(SkyhashError::InvalidResponse.into()),
+            }
+        }
     }
 }
 

@@ -7,6 +7,7 @@ All changes in this project will be noted in this file.
 ### Additions
 
 - Added support for pipelined queries
+- Added support for the `whereami` action
 
 ## Version 0.6.1
 

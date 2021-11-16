@@ -2,12 +2,11 @@
 
 All changes in this project will be noted in this file.
 
-## Unreleased
-
-### Additions
+## Version 0.6.2
 
 - Added support for pipelined queries
 - Added support for the `whereami` action
+- Added support for non-null typed arrays
 
 ## Version 0.6.1
 

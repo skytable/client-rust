@@ -27,7 +27,7 @@ sync = []
 [dependencies]
 bytes = { version = "1.1.0", optional = true }
 openssl = { version = "0.10.38", optional = true }
-tokio = { version = "1.13.1", features = [
+tokio = { version = "1.15.0", features = [
     "net",
     "io-util",
     "io-std",

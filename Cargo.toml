@@ -14,15 +14,22 @@ version = "0.6.2"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-aio-ssl = ["tokio-openssl", "openssl"]
-aio-sslv = ["tokio-openssl", "openssl/vendored"]
-async = ["bytes", "tokio"]
-const-gen = []
-dbg = []
 default = ["sync"]
+# sync
+sync = ["pool"]
+pool = ["r2d2"]
+# sync TLS
 ssl = ["openssl"]
 sslv = ["openssl/vendored"]
-sync = []
+# async
+async = ["bytes", "tokio", "aio-pool"]
+aio-pool = ["bb8"]
+# async TLS
+aio-ssl = ["tokio-openssl", "openssl"]
+aio-sslv = ["tokio-openssl", "openssl/vendored"]
+# utilities
+const-gen = []
+dbg = []
 
 [dependencies]
 bytes = { version = "1.1.0", optional = true }
@@ -33,6 +40,9 @@ tokio = { version = "1.15.0", features = [
     "io-std",
 ], optional = true }
 tokio-openssl = { version = "0.6.3", optional = true }
+r2d2 = { version = "0.8.9", optional = true }
+bb8 = { version = "0.7.1", optional = true }
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]

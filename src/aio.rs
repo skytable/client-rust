@@ -110,7 +110,7 @@ macro_rules! impl_async_methods {
             }
         }
         impl crate::actions::AsyncSocket for $ty {
-            fn run(&mut self, q: Query) -> crate::actions::AsyncResult<SkyQueryResult> {
+            fn run(&mut self, q: Query) -> crate::AsyncResult<SkyQueryResult> {
                 Box::pin(async move { self.run_simple_query(&q).await })
             }
         }

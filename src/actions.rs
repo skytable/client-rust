@@ -52,12 +52,10 @@ use crate::SkyQueryResult;
 use crate::SkyResult;
 
 cfg_async!(
-    use core::{future::Future, pin::Pin};
+    use crate::AsyncResult;
 );
 
 cfg_async!(
-    /// A special result that is returned when running actions (async)
-    pub type AsyncResult<'s, T> = Pin<Box<dyn Future<Output = T> + Send + Sync + 's>>;
     #[doc(hidden)]
     /// A raw async connection to the database server
     pub trait AsyncSocket: Send + Sync {

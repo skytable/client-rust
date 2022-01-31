@@ -43,7 +43,7 @@ use crate::RespCode;
 use crate::SkyResult;
 
 cfg_async! {
-    use crate::actions::AsyncResult;
+    use crate::AsyncResult;
     use crate::actions::AsyncSocket;
 }
 

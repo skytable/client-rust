@@ -181,6 +181,13 @@ mod util;
 pub mod actions;
 pub mod ddl;
 pub mod error;
+#[cfg(any(
+    feature = "sync",
+    feature = "pool",
+    feature = "async",
+    feature = "aio-pool"
+))]
+pub mod pool;
 pub mod types;
 // endof public mods
 // private mods
@@ -202,10 +209,14 @@ pub const DEFAULT_PORT: u16 = 2003;
 pub const DEFAULT_ENTITY: &str = "default:default";
 
 cfg_async!(
+    use core::{future::Future, pin::Pin};
     pub mod aio;
     pub use aio::Connection as AsyncConnection;
     use tokio::io::AsyncWriteExt;
+    /// A special result that is returned when running actions (async)
+    pub type AsyncResult<'s, T> = Pin<Box<dyn Future<Output = T> + Send + Sync + 's>>;
 );
+
 cfg_sync!(
     pub mod sync;
     pub use sync::Connection;
@@ -364,8 +375,6 @@ cfg_sync! {
 }
 
 cfg_async! {
-    use core::pin::Pin;
-    use core::future::Future;
     use tokio::io::AsyncWrite;
     type FutureRet<'s> = Pin<Box<dyn Future<Output = IoResult<()>> + Send + Sync + 's>>;
     trait WriteQueryAsync<T: AsyncWrite + Unpin + Send + Sync>: Unpin + Sync + Send {

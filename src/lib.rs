@@ -216,7 +216,6 @@ pub type SkyResult<T> = Result<T, self::error::Error>;
 /// A result type for queries
 pub type SkyQueryResult = SkyResult<Element>;
 
-#[derive(Debug, Clone)]
 /// A connection builder for easily building connections
 ///
 /// ## Example (sync)
@@ -245,10 +244,11 @@ pub type SkyQueryResult = SkyResult<Element>;
 ///         .unwrap();
 /// }
 /// ```
+#[derive(Debug, Clone)]
 pub struct ConnectionBuilder {
-    port: Option<u16>,
-    host: Option<String>,
-    entity: Option<String>,
+    port: u16,
+    host: String,
+    entity: String,
 }
 
 impl Default for ConnectionBuilder {
@@ -260,25 +260,21 @@ impl Default for ConnectionBuilder {
 impl ConnectionBuilder {
     /// Create an empty connection builder
     pub fn new() -> Self {
-        Self {
-            port: None,
-            host: None,
-            entity: None,
-        }
+        Self::default()
     }
     /// Set the port (defaults to `2003`)
     pub fn set_port(mut self, port: u16) -> Self {
-        self.port = Some(port);
+        self.port = port;
         self
     }
     /// Set the host (defaults to `localhost`)
     pub fn set_host(mut self, host: String) -> Self {
-        self.host = Some(host);
+        self.host = host;
         self
     }
     /// Set the entity (defaults to `default:default`)
     pub fn set_entity(mut self, entity: String) -> Self {
-        self.entity = Some(entity);
+        self.entity = entity;
         self
     }
     cfg_sync! {
@@ -286,8 +282,8 @@ impl ConnectionBuilder {
         pub fn get_connection(&self) -> SkyResult<sync::Connection> {
             use crate::ddl::Ddl;
             let mut con =
-                sync::Connection::new(self.host.as_ref().unwrap_or(&DEFAULT_HOSTADDR.to_owned()), self.port.unwrap_or(2003))?;
-            con.switch(self.entity.as_ref().unwrap_or(&DEFAULT_ENTITY.to_owned()))?;
+                sync::Connection::new(&self.host, self.port)?;
+            con.switch(&self.entity)?;
             Ok(con)
         }
         cfg_sync_ssl_any! {
@@ -298,11 +294,11 @@ impl ConnectionBuilder {
             ) -> SkyResult<sync::TlsConnection> {
                 use crate::ddl::Ddl;
                 let mut con = sync::TlsConnection::new(
-                    self.host.as_ref().unwrap_or(&DEFAULT_HOSTADDR.to_owned()),
-                    self.port.unwrap_or(2003),
+                    &self.host,
+                    self.port,
                     &sslcert,
                 )?;
-                con.switch(self.entity.as_ref().unwrap_or(&DEFAULT_ENTITY.to_owned()))?;
+                con.switch(&self.entity)?;
                 Ok(con)
             }
         }
@@ -311,9 +307,9 @@ impl ConnectionBuilder {
         /// Get an [async connection](aio::Connection) to the database
         pub async fn get_async_connection(&self) -> SkyResult<aio::Connection> {
             use crate::ddl::AsyncDdl;
-            let mut con = aio::Connection::new(self.host.as_ref().unwrap_or(&DEFAULT_HOSTADDR.to_owned()), self.port.unwrap_or(2003))
+            let mut con = aio::Connection::new(&self.host, self.port)
                 .await?;
-            con.switch(self.entity.as_ref().unwrap_or(&DEFAULT_ENTITY.to_owned())).await?;
+            con.switch(&self.entity).await?;
             Ok(con)
         }
         cfg_async_ssl_any! {
@@ -324,12 +320,12 @@ impl ConnectionBuilder {
             ) -> SkyResult<aio::TlsConnection> {
                 use crate::ddl::AsyncDdl;
                 let mut con = aio::TlsConnection::new(
-                    self.host.as_ref().unwrap_or(&DEFAULT_HOSTADDR.to_owned()),
-                    self.port.unwrap_or(2003),
+                    &self.host,
+                    self.port,
                     &sslcert,
                 )
                 .await?;
-                con.switch(self.entity.as_ref().unwrap_or(&DEFAULT_ENTITY.to_owned())).await?;
+                con.switch(&self.entity).await?;
                 Ok(con)
             }
         }

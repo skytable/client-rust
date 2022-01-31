@@ -30,7 +30,7 @@ use crate::Element;
 use crate::IoResult;
 use crate::Pipeline;
 use crate::Query;
-use crate::SkyRawResult;
+use crate::SkyQueryResult;
 use crate::SkyResult;
 use crate::WriteQuerySync;
 use std::io::{Error as IoError, ErrorKind, Read, Write};
@@ -48,7 +48,7 @@ macro_rules! impl_sync_methods {
             /// This method will panic:
             /// - if the [`Query`] supplied is empty (i.e has no arguments)
             /// This function is a subroutine of `run_query` used to parse the response packet
-            pub fn run_simple_query(&mut self, query: &Query) -> SkyResult {
+            pub fn run_simple_query(&mut self, query: &Query) -> SkyQueryResult {
                 assert!(query.len() != 0, "A `Query` cannot be of zero length!");
                 match self._run_query(query)? {
                     RawResponse::SimpleQuery(sq) => Ok(sq),
@@ -57,14 +57,14 @@ macro_rules! impl_sync_methods {
             }
             /// Runs a pipelined query. See the [`Pipeline`](Pipeline) documentation for a guide on
             /// usage
-            pub fn run_pipeline(&mut self, pipeline: Pipeline) -> SkyRawResult<Vec<Element>> {
+            pub fn run_pipeline(&mut self, pipeline: Pipeline) -> SkyResult<Vec<Element>> {
                 assert!(pipeline.len() != 0, "A `Pipeline` cannot be empty!");
                 match self._run_query(&pipeline)? {
                     RawResponse::PipelinedQuery(pq) => Ok(pq),
                     RawResponse::SimpleQuery(_) => Err(SkyhashError::InvalidResponse.into()),
                 }
             }
-            fn _run_query<T: WriteQuerySync>(&mut self, query: &T) -> SkyRawResult<RawResponse> {
+            fn _run_query<T: WriteQuerySync>(&mut self, query: &T) -> SkyResult<RawResponse> {
                 query.write_sync(&mut self.stream)?;
                 self.stream.flush()?;
                 loop {
@@ -109,7 +109,7 @@ macro_rules! impl_sync_methods {
             }
         }
         impl crate::actions::SyncSocket for $ty {
-            fn run(&mut self, q: Query) -> SkyResult {
+            fn run(&mut self, q: Query) -> SkyQueryResult {
                 self.run_simple_query(&q)
             }
         }

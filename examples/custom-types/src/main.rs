@@ -5,7 +5,7 @@ use skytable::sync::Connection;
 use skytable::types::FromSkyhashBytes;
 use skytable::types::IntoSkyhashBytes;
 use skytable::Element;
-use skytable::SkyRawResult;
+use skytable::SkyResult;
 
 /// Our custom user type
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -34,7 +34,7 @@ impl IntoSkyhashBytes for &User {
 
 // Implement this for our type so that we can directly use it with actions/queries
 impl FromSkyhashBytes for User {
-    fn from_element(e: Element) -> SkyRawResult<Self> {
+    fn from_element(e: Element) -> SkyResult<Self> {
         // we want our JSON as a string
         let my_value_as_string: String = e.try_element_into()?;
         // now let us convert it into our struct

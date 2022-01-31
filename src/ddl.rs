@@ -40,7 +40,7 @@ use crate::Element;
 use crate::IntoSkyhashBytes;
 use crate::Query;
 use crate::RespCode;
-use crate::SkyRawResult;
+use crate::SkyResult;
 
 cfg_async! {
     use crate::actions::AsyncResult;
@@ -182,7 +182,7 @@ macro_rules! implement_ddl {
             $(
                 $(#[$attr])*
                 #[inline]
-                fn $name<'s, $($($tyargs: $ty $(+$tye)*, )*)?>(&'s mut self $(, $argname: $argty)*) -> SkyRawResult<$ret> {
+                fn $name<'s, $($($tyargs: $ty $(+$tye)*, )*)?>(&'s mut self $(, $argname: $argty)*) -> SkyResult<$ret> {
                     gen_match!(self.run($($block)?), $($($mtch)+, $expect),*)
                 }
             )*
@@ -195,7 +195,7 @@ macro_rules! implement_ddl {
             $(
                 $(#[$attr])*
                 #[inline]
-                fn $name<'s, $($($tyargs: $ty $(+$tye)*, )*)?>(&'s mut self $(, $argname: $argty)*) -> AsyncResult<SkyRawResult<$ret>> {
+                fn $name<'s, $($($tyargs: $ty $(+$tye)*, )*)?>(&'s mut self $(, $argname: $argty)*) -> AsyncResult<SkyResult<$ret>> {
                     Box::pin(async move {gen_match!(self.run($($block)?).await, $($($mtch)+, $expect),*)})
                 }
             )*

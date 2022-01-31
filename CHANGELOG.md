@@ -2,6 +2,13 @@
 
 All changes in this project will be noted in this file.
 
+## Unreleased
+
+### Breaking changes
+
+- `SkyRawResult` is now `SkyResult`
+- `SkyResult` is now `SkyQueryResult`
+
 ## Version 0.6.2
 
 - Added support for pipelined queries

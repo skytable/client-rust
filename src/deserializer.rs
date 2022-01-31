@@ -31,7 +31,7 @@ use crate::types::Array;
 use crate::types::FlatElement;
 use crate::types::FromSkyhashBytes;
 use crate::RespCode;
-use crate::SkyRawResult;
+use crate::SkyResult;
 use std::hint::unreachable_unchecked;
 
 #[derive(Debug)]
@@ -83,7 +83,7 @@ pub enum Element {
 
 impl Element {
     /// Try to convert an element to a type that implements [`FromSkyhashBytes`]
-    pub fn try_element_into<T: FromSkyhashBytes>(self) -> SkyRawResult<T> {
+    pub fn try_element_into<T: FromSkyhashBytes>(self) -> SkyResult<T> {
         T::from_element(self)
     }
 }

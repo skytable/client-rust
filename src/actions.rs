@@ -48,7 +48,7 @@ use crate::IntoSkyhashAction;
 use crate::IntoSkyhashBytes;
 use crate::Query;
 use crate::RespCode;
-use crate::SkyRawResult;
+use crate::SkyQueryResult;
 use crate::SkyResult;
 
 cfg_async!(
@@ -62,7 +62,7 @@ cfg_async!(
     /// A raw async connection to the database server
     pub trait AsyncSocket: Send + Sync {
         /// Run the query
-        fn run(&mut self, q: Query) -> AsyncResult<SkyResult>;
+        fn run(&mut self, q: Query) -> AsyncResult<SkyQueryResult>;
     }
     impl<T> AsyncActions for T where T: AsyncSocket {}
 );
@@ -72,7 +72,7 @@ cfg_sync!(
     /// A raw synchronous connection to the database server
     pub trait SyncSocket {
         /// Run the query
-        fn run(&mut self, q: Query) -> SkyResult;
+        fn run(&mut self, q: Query) -> SkyQueryResult;
     }
     impl<T> Actions for T where T: SyncSocket {}
 );
@@ -106,7 +106,7 @@ macro_rules! implement_actions {
             $(
                 $(#[$attr])*
                 #[inline]
-                fn $name<'s, $($($tyargs$(: $ty $(+$tye)*,)* )*)?>(&'s mut self $(, $argname: $argty)*) -> SkyRawResult<$ret> {
+                fn $name<'s, $($($tyargs$(: $ty $(+$tye)*,)* )*)?>(&'s mut self $(, $argname: $argty)*) -> SkyResult<$ret> {
                     gen_match!(self.run($($block)?), $($($mtch)+, $expect),*)
                 }
             )*
@@ -118,7 +118,7 @@ macro_rules! implement_actions {
             $(
                 $(#[$attr])*
                 #[inline]
-                fn $name<'s, $($($tyargs$(: $ty $(+$tye)*,)* )*)?>(&'s mut self $(, $argname: $argty)*) -> AsyncResult<SkyRawResult<$ret>> {
+                fn $name<'s, $($($tyargs$(: $ty $(+$tye)*,)* )*)?>(&'s mut self $(, $argname: $argty)*) -> AsyncResult<SkyResult<$ret>> {
                     Box::pin(async move {gen_match!(self.run($($block)?).await, $($($mtch)+, $expect),*)})
                 }
             )*

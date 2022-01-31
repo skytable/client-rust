@@ -212,9 +212,9 @@ cfg_sync!(
 );
 
 /// A generic result type
-pub type SkyRawResult<T> = Result<T, self::error::Error>;
-/// A specialized error type for queries
-pub type SkyResult = SkyRawResult<Element>;
+pub type SkyResult<T> = Result<T, self::error::Error>;
+/// A result type for queries
+pub type SkyQueryResult = SkyResult<Element>;
 
 #[derive(Debug, Clone)]
 /// A connection builder for easily building connections
@@ -283,7 +283,7 @@ impl ConnectionBuilder {
     }
     cfg_sync! {
         /// Get a [sync connection](sync::Connection) to the database
-        pub fn get_connection(&self) -> SkyRawResult<sync::Connection> {
+        pub fn get_connection(&self) -> SkyResult<sync::Connection> {
             use crate::ddl::Ddl;
             let mut con =
                 sync::Connection::new(self.host.as_ref().unwrap_or(&DEFAULT_HOSTADDR.to_owned()), self.port.unwrap_or(2003))?;
@@ -295,7 +295,7 @@ impl ConnectionBuilder {
             pub fn get_tls_connection(
                 &self,
                 sslcert: String,
-            ) -> SkyRawResult<sync::TlsConnection> {
+            ) -> SkyResult<sync::TlsConnection> {
                 use crate::ddl::Ddl;
                 let mut con = sync::TlsConnection::new(
                     self.host.as_ref().unwrap_or(&DEFAULT_HOSTADDR.to_owned()),
@@ -309,7 +309,7 @@ impl ConnectionBuilder {
     }
     cfg_async! {
         /// Get an [async connection](aio::Connection) to the database
-        pub async fn get_async_connection(&self) -> SkyRawResult<aio::Connection> {
+        pub async fn get_async_connection(&self) -> SkyResult<aio::Connection> {
             use crate::ddl::AsyncDdl;
             let mut con = aio::Connection::new(self.host.as_ref().unwrap_or(&DEFAULT_HOSTADDR.to_owned()), self.port.unwrap_or(2003))
                 .await?;
@@ -321,7 +321,7 @@ impl ConnectionBuilder {
             pub async fn get_async_tls_connection(
                 &self,
                 sslcert: String,
-            ) -> SkyRawResult<aio::TlsConnection> {
+            ) -> SkyResult<aio::TlsConnection> {
                 use crate::ddl::AsyncDdl;
                 let mut con = aio::TlsConnection::new(
                     self.host.as_ref().unwrap_or(&DEFAULT_HOSTADDR.to_owned()),

@@ -31,7 +31,7 @@ use crate::Element;
 use crate::IoResult;
 use crate::Pipeline;
 use crate::Query;
-use crate::SkyRawResult;
+use crate::SkyQueryResult;
 use crate::SkyResult;
 use crate::WriteQueryAsync;
 use bytes::{Buf, BytesMut};
@@ -52,7 +52,7 @@ macro_rules! impl_async_methods {
             ///
             /// ## Panics
             /// This method will panic if the [`Query`] supplied is empty (i.e has no arguments)
-            pub async fn run_simple_query(&mut self, query: &Query) -> SkyResult {
+            pub async fn run_simple_query(&mut self, query: &Query) -> SkyQueryResult {
                 match self._run_query(query).await? {
                     RawResponse::SimpleQuery(sq) => Ok(sq),
                     RawResponse::PipelinedQuery(_) => Err(SkyhashError::InvalidResponse.into()),
@@ -60,7 +60,7 @@ macro_rules! impl_async_methods {
             }
             /// Runs a pipelined query. See the [`Pipeline`](Pipeline) documentation for a guide on
             /// usage
-            pub async fn run_pipeline(&mut self, pipeline: Pipeline) -> SkyRawResult<Vec<Element>> {
+            pub async fn run_pipeline(&mut self, pipeline: Pipeline) -> SkyResult<Vec<Element>> {
                 match self._run_query(&pipeline).await? {
                     RawResponse::PipelinedQuery(pq) => Ok(pq),
                     RawResponse::SimpleQuery(_) => Err(SkyhashError::InvalidResponse.into()),
@@ -69,7 +69,7 @@ macro_rules! impl_async_methods {
             async fn _run_query<Q: WriteQueryAsync<$inner>>(
                 &mut self,
                 query: &Q,
-            ) -> SkyRawResult<RawResponse> {
+            ) -> SkyResult<RawResponse> {
                 query.write_async(&mut self.stream).await?;
                 self.stream.flush().await?;
                 loop {
@@ -110,7 +110,7 @@ macro_rules! impl_async_methods {
             }
         }
         impl crate::actions::AsyncSocket for $ty {
-            fn run(&mut self, q: Query) -> crate::actions::AsyncResult<SkyResult> {
+            fn run(&mut self, q: Query) -> crate::actions::AsyncResult<SkyQueryResult> {
                 Box::pin(async move { self.run_simple_query(&q).await })
             }
         }

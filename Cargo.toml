@@ -23,7 +23,7 @@ ssl = ["openssl"]
 sslv = ["openssl/vendored"]
 # async
 async = ["bytes", "tokio", "aio-pool"]
-aio-pool = ["bb8"]
+aio-pool = ["bb8", "async-trait"]
 # async TLS
 aio-ssl = ["tokio-openssl", "openssl"]
 aio-sslv = ["tokio-openssl", "openssl/vendored"]
@@ -42,6 +42,10 @@ tokio = { version = "1.15.0", features = [
 tokio-openssl = { version = "0.6.3", optional = true }
 r2d2 = { version = "0.8.9", optional = true }
 bb8 = { version = "0.7.1", optional = true }
+async-trait = { version = "0.1.52", optional = true }
+
+[dev-dependencies]
+tokio = { version = "1.16.1", features = ["test-util", "macros"] }
 
 [package.metadata.docs.rs]
 all-features = true

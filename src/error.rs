@@ -93,7 +93,7 @@ pub enum Error {
     SkyError(SkyhashError),
     /// An application level parse error occurred
     ParseError(String),
-    /// An error occurred in the configuration of the connection
+    /// A configuration error
     ConfigurationError(&'static str),
 }
 
@@ -163,7 +163,7 @@ impl fmt::Display for Error {
                     write!(f, "Server sent unknown data type for this client version")
                 }
             },
-            Self::ConfigurationError(e) => write!(f, "Connection setup error: {}", e),
+            Self::ConfigurationError(e) => write!(f, "Configuration error: {}", e),
         }
     }
 }

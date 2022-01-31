@@ -33,14 +33,14 @@
 //! use skytable::sync::{Connection, TlsConnection};
 //!
 //! // non-TLS (TCP pool)
-//! let notls_manager = ConnectionManager::<Connection>::new_notls("127.0.0.1".into(), 2003);
+//! let notls_manager = ConnectionManager::new_notls("127.0.0.1".into(), 2003);
 //! let notls_pool = Pool::builder()
 //!    .max_size(10)
 //!    .build(notls_manager)
 //!    .unwrap();
 //!
 //! // TLS pool
-//! let tls_manager = ConnectionManager::<TlsConnection>::new_tls(
+//! let tls_manager = ConnectionManager::new_tls(
 //!     "127.0.0.1".into(), 2003, "cert.pem".into()
 //! );
 //! let notls_pool = TlsPool::builder()
@@ -58,7 +58,7 @@
 //! use skytable::aio::{Connection, TlsConnection};
 //! async fn run() {
 //!     // non-TLS (TCP pool)
-//!     let notls_manager = ConnectionManager::<Connection>::new_notls("127.0.0.1".into(), 2003);
+//!     let notls_manager = ConnectionManager::new_notls("127.0.0.1".into(), 2003);
 //!     let notls_pool = AsyncPool::builder()
 //!        .max_size(10)
 //!        .build(notls_manager)
@@ -66,7 +66,7 @@
 //!        .unwrap();
 //!
 //!     // TLS pool
-//!     let tls_manager = ConnectionManager::<TlsConnection>::new_tls(
+//!     let tls_manager = ConnectionManager::new_tls(
 //!         "127.0.0.1".into(), 2003, "cert.pem".into()
 //!     );
 //!     let notls_pool = AsyncTlsPool::builder()
@@ -114,6 +114,15 @@ impl<C> ConnectionManager<C> {
     }
 }
 
+impl<C> ConnectionManager<C> {
+    pub fn new_notls(host: String, port: u16) -> ConnectionManager<C> {
+        Self::_new(host, port, None)
+    }
+    pub fn new_tls(host: String, port: u16, cert: String) -> ConnectionManager<C> {
+        Self::_new(host, port, Some(cert))
+    }
+}
+
 #[cfg(any(feature = "sync", feature = "pool"))]
 mod sync_impls {
     use super::ConnectionManager;
@@ -126,17 +135,6 @@ mod sync_impls {
 
     pub type Pool = r2d2::Pool<ConnectionManager<SyncConnection>>;
     pub type TlsPool = r2d2::Pool<ConnectionManager<SyncTlsConnection>>;
-
-    impl ConnectionManager<SyncConnection> {
-        pub fn new_notls(host: String, port: u16) -> Self {
-            Self::_new(host, port, None)
-        }
-    }
-    impl ConnectionManager<SyncTlsConnection> {
-        pub fn new_tls(host: String, port: u16, cert: String) -> Self {
-            Self::_new(host, port, Some(cert))
-        }
-    }
 
     pub trait PoolableConnection: Send + Sync + Sized {
         fn get_connection(host: &str, port: u16, tls_cert: Option<&String>) -> SkyResult<Self>;
@@ -245,17 +243,6 @@ mod async_impls {
         }
         async fn run_query(&mut self, q: Query) -> SkyQueryResult {
             self.run_simple_query(&q).await
-        }
-    }
-
-    impl ConnectionManager<AsyncConnection> {
-        pub fn new_notls(host: String, port: u16) -> Self {
-            Self::_new(host, port, None)
-        }
-    }
-    impl ConnectionManager<AsyncTlsConnection> {
-        pub fn new_tls(host: String, port: u16, cert: String) -> Self {
-            Self::_new(host, port, Some(cert))
         }
     }
 

@@ -41,7 +41,7 @@
 //! Now open up your `src/main.rs` file and establish a connection to the server while also adding some
 //! imports:
 //! 
-//! ```norun
+//! ```no_run
 //! use skytable::{Connection, Query, Element};
 //! fn main() -> std::io::Result<()> {
 //!     let mut con = Connection::new("127.0.0.1", 2003)?;
@@ -51,7 +51,7 @@
 //! 
 //! Now let's run a `Query`! Change the previous code block to:
 //! 
-//! ```norun
+//! ```no_run
 //! use skytable::{error, Connection, Query, Element};
 //! fn main() -> Result<(), error::Error> {
 //!     let mut con = Connection::new("127.0.0.1", 2003)?;
@@ -70,7 +70,7 @@
 //! 
 //! ### `SET`ting a key
 //! 
-//! ```norun
+//! ```no_run
 //! use skytable::actions::Actions;
 //! use skytable::sync::Connection;
 //! 
@@ -82,7 +82,7 @@
 //! 
 //! ### `GET`ting a key
 //! 
-//! ```norun
+//! ```no_run
 //! use skytable::actions::Actions;
 //! use skytable::sync::Connection;
 //! 
@@ -105,7 +105,7 @@
 //! you wanted to `SET` the value of a key called `bindata` to some binary data stored
 //! in a `Vec<u8>`. You can achieve this with the `RawString` type:
 //! 
-//! ```norun
+//! ```no_run
 //! use skytable::actions::Actions;
 //! use skytable::sync::Connection;
 //! use skytable::types::RawString;

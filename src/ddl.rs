@@ -43,7 +43,7 @@ use crate::RespCode;
 use crate::SkyResult;
 
 cfg_async! {
-    use crate::actions::AsyncResult;
+    use crate::AsyncResult;
     use crate::actions::AsyncSocket;
 }
 
@@ -187,8 +187,8 @@ macro_rules! implement_ddl {
                 }
             )*
         }
-        #[cfg(feature = "async")]
-        #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
+        #[cfg(feature = "aio")]
+        #[cfg_attr(docsrs, doc(cfg(feature = "aio")))]
         /// [DDL queries](https://docs.skytable.io/ddl) that can be run on async socket
         /// connections
         pub trait AsyncDdl: AsyncSocket {

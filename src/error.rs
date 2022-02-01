@@ -93,6 +93,8 @@ pub enum Error {
     SkyError(SkyhashError),
     /// An application level parse error occurred
     ParseError(String),
+    /// A configuration error
+    ConfigurationError(&'static str),
 }
 
 impl PartialEq for Error {
@@ -118,6 +120,7 @@ impl PartialEq for Error {
                 )))
             )]
             (SslError(a), SslError(b)) => a.to_string() == b.to_string(),
+            (ConfigurationError(a), ConfigurationError(b)) => a == b,
             _ => false,
         }
     }
@@ -160,6 +163,7 @@ impl fmt::Display for Error {
                     write!(f, "Server sent unknown data type for this client version")
                 }
             },
+            Self::ConfigurationError(e) => write!(f, "Configuration error: {}", e),
         }
     }
 }
@@ -219,3 +223,5 @@ impl From<std::string::FromUtf8Error> for Error {
         Self::ParseError(e.to_string())
     }
 }
+
+impl std::error::Error for Error {}

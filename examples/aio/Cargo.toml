@@ -8,6 +8,6 @@ edition = "2018"
 [dependencies]
 skytable = { git="https://github.com/skytable/client-rust.git", features = [
     "const-gen",
-    "async",
+    "aio",
 ], default-features = false }
 tokio = { version = "1.10.0", features = ["full"] }

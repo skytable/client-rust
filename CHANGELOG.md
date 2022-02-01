@@ -2,12 +2,18 @@
 
 All changes in this project will be noted in this file.
 
-## Unreleased
+## 0.7.0
+
+### New features
+
+- Sync connection pooling
+- Async connection pooling
 
 ### Breaking changes
 
 - `SkyRawResult` is now `SkyResult`
 - `SkyResult` is now `SkyQueryResult`
+- The feature `async` is now `aio`
 
 ## Version 0.6.2
 

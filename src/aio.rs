@@ -25,7 +25,6 @@
 //!
 
 use crate::deserializer::{ParseError, Parser, RawResponse};
-use crate::error::Error;
 use crate::error::SkyhashError;
 use crate::Element;
 use crate::IoResult;
@@ -110,7 +109,7 @@ macro_rules! impl_async_methods {
             }
         }
         impl crate::actions::AsyncSocket for $ty {
-            fn run(&mut self, q: Query) -> crate::actions::AsyncResult<SkyQueryResult> {
+            fn run(&mut self, q: Query) -> crate::AsyncResult<SkyQueryResult> {
                 Box::pin(async move { self.run_simple_query(&q).await })
             }
         }
@@ -141,6 +140,7 @@ cfg_async_ssl_any!(
     use tokio_openssl::SslStream;
     use openssl::ssl::{SslContext, SslMethod, Ssl};
     use core::pin::Pin;
+    use crate::error::Error;
 
     /// An asynchronous database connection over Skyhash/TLS
     pub struct TlsConnection {

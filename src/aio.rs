@@ -25,7 +25,6 @@
 //!
 
 use crate::deserializer::{ParseError, Parser, RawResponse};
-use crate::error::Error;
 use crate::error::SkyhashError;
 use crate::Element;
 use crate::IoResult;
@@ -141,6 +140,7 @@ cfg_async_ssl_any!(
     use tokio_openssl::SslStream;
     use openssl::ssl::{SslContext, SslMethod, Ssl};
     use core::pin::Pin;
+    use crate::error::Error;
 
     /// An asynchronous database connection over Skyhash/TLS
     pub struct TlsConnection {

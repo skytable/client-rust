@@ -97,7 +97,7 @@ Way to go &mdash; you're all set! Now go ahead and run more advanced queries!
 
 The `default:default` keyspace has the following declaration:
 
-```
+```text
 Keymap { data:(binstr,binstr), volatile:false }
 ```
 

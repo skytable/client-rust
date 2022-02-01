@@ -1,0 +1,12 @@
+name: Publish crate
+on: [release]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Publish
+        run: |
+          cargo login ${{ secrets.CARGO_TOKEN }}
+          cargo publish

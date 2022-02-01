@@ -35,7 +35,7 @@
 //! First add this to your `Cargo.toml` file:
 //!
 //! ```toml
-//! skytable = "0.7.0-alpha.3"
+//! skytable = "0.7.0-alpha.4"
 //! ```
 //!
 //! Now open up your `src/main.rs` file and establish a connection to the server while also adding some
@@ -120,7 +120,7 @@
 //! Now that you know how you can run basic queries, check out the [`actions`] module documentation for learning
 //! to use actions and the [`types`] module documentation for implementing your own Skyhash serializable
 //! types. Need to meddle with DDL queries like creating and dropping tables? Check out the [`ddl`] module.
-//! You can also find some [examples here](https://github.com/skytable/client-rust/tree/v0.7.0-alpha.3/examples)
+//! You can also find some [examples here](https://github.com/skytable/client-rust/tree/v0.7.0-alpha.4/examples)
 //!
 //! ## Connection pooling
 //!
@@ -132,7 +132,7 @@
 //! If you need to use an `async` API, just change your import to:
 //!
 //! ```toml
-//! skytable = { version = "0.7.0-alpha.3", features=["aio"], default-features = false }
+//! skytable = { version = "0.7.0-alpha.4", features=["aio"], default-features = false }
 //! ```
 //!
 //! You can now establish a connection by using `skytable::AsyncConnection::new()`, adding `.await`s wherever
@@ -144,7 +144,7 @@
 //! this, simply change your import to:
 //!
 //! ```toml
-//! skytable = { version="0.7.0-alpha.3", features=["sync", "aio"] }
+//! skytable = { version="0.7.0-alpha.4", features=["sync", "aio"] }
 //! ```
 //!
 //! ## TLS
@@ -154,7 +154,7 @@
 //! ### Using TLS with sync interfaces
 //!
 //! ```toml
-//! skytable = { version="0.7.0-alpha.3", features=["sync","ssl"] }
+//! skytable = { version="0.7.0-alpha.4", features=["sync","ssl"] }
 //! ```
 //!
 //! You can now use the async `sync::TlsConnection` object.
@@ -162,7 +162,7 @@
 //! ### Using TLS with async interfaces
 //!
 //! ```toml
-//! skytable = { version="0.7.0-alpha.3", features=["aio","aio-ssl"], default-features=false }
+//! skytable = { version="0.7.0-alpha.4", features=["aio","aio-ssl"], default-features=false }
 //! ```
 //!
 //! You can now use the async `aio::TlsConnection` object.

@@ -81,26 +81,20 @@
 
 // re-exports
 // sync
-cfg_sync! {
-    #[cfg(feature = "pool")]
-    /// [`r2d2`](https://docs.rs/r2d2)'s error type// async
+cfg_sync_pool! {
+    /// [`r2d2`](https://docs.rs/r2d2)'s error type
     pub use r2d2::Error as r2d2Error;
-    #[cfg(feature = "pool")]
     pub use self::sync_impls::Pool;
     cfg_sync_ssl_any! {
-        #[cfg(feature = "pool")]
         pub use self::sync_impls::TlsPool;
     }
 }
 // async
-cfg_async! {
-    #[cfg(feature = "aio-pool")]
+cfg_async_pool! {
     /// [`bb8`](https://docs.rs/bb8)'s error type
     pub use bb8::RunError as bb8Error;
-    #[cfg(feature = "aio-pool")]
     pub use self::async_impls::Pool as AsyncPool;
     cfg_async_ssl_any! {
-        #[cfg(feature = "aio-pool")]
         pub use self::async_impls::TlsPool as AsyncTlsPool;
     }
 }

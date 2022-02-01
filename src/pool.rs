@@ -25,7 +25,54 @@
 //! To provide connection pooling, we use [`r2d2`] for a sync connection pool while we use
 //! [`bb8`](https://docs.rs/bb8) to provide an async connection pool.
 //!
-//! ## Sync usage
+//! ## Basic usage
+//!
+//! For your convenience, we have provided defaults for you to build connection pools.
+//! - [`get()`]: Returns a sync TCP pool
+//! - [`get_tls()`]: Returns a sync TLS pool
+//! - [`get_async()`]: Returns an async TCP pool
+//! - [`get_tls_async()`]: Returns an async TLS pool
+//!
+//! Below, we have created TCP/TLS pools with a size of 10 (you can choose anything that you need)
+//! and run some actions for demonstration.
+//!
+//! ### Sync Usage
+//!
+//! ```no_run
+//! use skytable::{pool, actions::Actions};
+//!
+//! let notls_pool = pool::get("127.0.0.1", 2003, 10).unwrap();
+//! notls_pool.get().unwrap().set("x", "100").unwrap();
+//!
+//! let tls_pool = pool::get_tls("127.0.0.1", 2004, "cert.pem", 10).unwrap();
+//! let ret: u8 = tls_pool.get().unwrap().get("x").unwrap();
+//!
+//! assert_eq!(ret, 100);
+//! ```
+//!
+//! ### Async Usage
+//!
+//! ```no_run
+//! use skytable::pool;
+//! use skytable::actions::AsyncActions;
+//!
+//! async fn run() {
+//!     let notls_pool = pool::get_async("127.0.0.1", 2003, 10).await.unwrap();
+//!     notls_pool.get().await.unwrap().set("x", "100").await.unwrap();
+//!
+//!     let tls_pool = pool::get_tls_async("127.0.0.1", 2004, "cert.pem", 10).await.unwrap();
+//!     let ret: u8 = tls_pool.get().await.unwrap().get("x").await.unwrap();
+//!
+//!     assert_eq!(ret, 100);
+//! }
+//! ```
+//!
+//! ## Advanced usage
+//! If you want to configure a pool with custom settings, then you can use
+//! [r2d2's `Builder`](https://docs.rs/r2d2/0.8.9/r2d2/struct.Builder.html) or
+//! [bb8's `Builder`](https://docs.rs/bb8/0.7.1/bb8/struct.Builder.html) to configure your pool.
+//!
+//! ### Sync usage
 //!
 //! Example usage for TLS and non-TLS connection pools are given below.
 //!
@@ -34,23 +81,21 @@
 //! use skytable::sync::{Connection, TlsConnection};
 //!
 //! // non-TLS (TCP pool)
-//! let notls_manager = ConnectionManager::new_notls("127.0.0.1".into(), 2003);
+//! let notls_manager = ConnectionManager::new_notls("127.0.0.1", 2003);
 //! let notls_pool = Pool::builder()
 //!    .max_size(10)
 //!    .build(notls_manager)
 //!    .unwrap();
 //!
 //! // TLS pool
-//! let tls_manager = ConnectionManager::new_tls(
-//!     "127.0.0.1".into(), 2003, "cert.pem".into()
-//! );
+//! let tls_manager = ConnectionManager::new_tls("127.0.0.1", 2003, "cert.pem");
 //! let notls_pool = TlsPool::builder()
 //!    .max_size(10)
 //!    .build(tls_manager)
 //!    .unwrap();
 //!```
 //!
-//! ## Async usage
+//! ### Async usage
 //!
 //! Example usage for TLS and non-TLS connection pools are given below.
 //!
@@ -59,7 +104,7 @@
 //! use skytable::aio::{Connection, TlsConnection};
 //! async fn run() {
 //!     // non-TLS (TCP pool)
-//!     let notls_manager = ConnectionManager::new_notls("127.0.0.1".into(), 2003);
+//!     let notls_manager = ConnectionManager::new_notls("127.0.0.1", 2003);
 //!     let notls_pool = AsyncPool::builder()
 //!        .max_size(10)
 //!        .build(notls_manager)
@@ -67,9 +112,7 @@
 //!        .unwrap();
 //!
 //!     // TLS pool
-//!     let tls_manager = ConnectionManager::new_tls(
-//!         "127.0.0.1".into(), 2003, "cert.pem".into()
-//!     );
+//!     let tls_manager = ConnectionManager::new_tls("127.0.0.1", 2003, "cert.pem");
 //!     let notls_pool = AsyncTlsPool::builder()
 //!        .max_size(10)
 //!        .build(tls_manager)
@@ -85,8 +128,22 @@ cfg_sync_pool! {
     /// [`r2d2`](https://docs.rs/r2d2)'s error type
     pub use r2d2::Error as r2d2Error;
     pub use self::sync_impls::Pool;
+    /// Returns a TCP pool of the specified size and provided settings
+    pub fn get(host: impl ToString, port: u16, max_size: u32) -> Result<Pool, r2d2Error> {
+        Pool::builder()
+            .max_size(max_size)
+            .build(ConnectionManager::new_notls(host.to_string(), port))
+    }
     cfg_sync_ssl_any! {
         pub use self::sync_impls::TlsPool;
+        /// Returns a TLS pool of the specified size and provided settings
+        pub fn get_tls(host: impl ToString, port: u16, cert: impl ToString, max_size: u32) -> Result<TlsPool, r2d2Error> {
+            TlsPool::builder()
+                .max_size(max_size)
+                .build(
+                    ConnectionManager::new_tls(host.to_string(), port, cert)
+                )
+        }
     }
 }
 // async
@@ -94,8 +151,21 @@ cfg_async_pool! {
     /// [`bb8`](https://docs.rs/bb8)'s error type
     pub use bb8::RunError as bb8Error;
     pub use self::async_impls::Pool as AsyncPool;
+    use crate::error::Error;
+    /// Returns an async TCP pool of the specified size and provided settings
+    pub async fn get_async(host: impl ToString, port: u16, max_size: u32) -> Result<AsyncPool, Error> {
+        AsyncPool::builder()
+            .max_size(max_size)
+            .build(ConnectionManager::new_notls(host.to_string(), port)).await
+    }
     cfg_async_ssl_any! {
         pub use self::async_impls::TlsPool as AsyncTlsPool;
+        /// Returns an async TLS pool of the specified size and provided settings
+        pub async fn get_tls_async(host: impl ToString, port: u16, cert: impl ToString, max_size: u32) -> Result<AsyncTlsPool, Error> {
+            AsyncTlsPool::builder()
+                .max_size(max_size)
+                .build(ConnectionManager::new_tls(host.to_string(), port, cert)).await
+        }
     }
 }
 
@@ -124,12 +194,12 @@ impl<C> ConnectionManager<C> {
 
 impl<C> ConnectionManager<C> {
     /// Create a new `ConnectionManager` that can be used to configure a non-TLS connection pool
-    pub fn new_notls(host: String, port: u16) -> ConnectionManager<C> {
-        Self::_new(host, port, None)
+    pub fn new_notls(host: impl ToString, port: u16) -> ConnectionManager<C> {
+        Self::_new(host.to_string(), port, None)
     }
     /// Create a new `ConnectionManager` that can be used to configure a TLS connection pool
-    pub fn new_tls(host: String, port: u16, cert: String) -> ConnectionManager<C> {
-        Self::_new(host, port, Some(cert))
+    pub fn new_tls(host: impl ToString, port: u16, cert: impl ToString) -> ConnectionManager<C> {
+        Self::_new(host.to_string(), port, Some(cert.to_string()))
     }
 }
 

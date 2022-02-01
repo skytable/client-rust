@@ -81,19 +81,30 @@
 
 // re-exports
 // sync
-#[cfg(any(feature = "sync", feature = "pool"))]
-pub use self::sync_impls::{Pool, TlsPool};
-#[cfg(any(feature = "sync", feature = "pool"))]
-/// [`r2d2`](https://docs.rs/r2d2)'s error type
-pub use r2d2::Error as r2d2Error;
+cfg_sync! {
+    #[cfg(feature = "pool")]
+    /// [`r2d2`](https://docs.rs/r2d2)'s error type// async
+    pub use r2d2::Error as r2d2Error;
+    #[cfg(feature = "pool")]
+    pub use self::sync_impls::Pool;
+    cfg_sync_ssl_any! {
+        #[cfg(feature = "pool")]
+        pub use self::sync_impls::TlsPool;
+    }
+}
 // async
-#[cfg(any(feature = "aio", feature = "aio-pool"))]
-pub use self::async_impls::{Pool as AsyncPool, TlsPool as AsyncTlsPool};
-#[cfg(any(feature = "aio", feature = "aio-pool"))]
-/// [`bb8`](https://docs.rs/bb8)'s error type
-pub use bb8::RunError as bb8Error;
+cfg_async! {
+    #[cfg(feature = "aio-pool")]
+    /// [`bb8`](https://docs.rs/bb8)'s error type
+    pub use bb8::RunError as bb8Error;
+    #[cfg(feature = "aio-pool")]
+    pub use self::async_impls::Pool as AsyncPool;
+    cfg_async_ssl_any! {
+        #[cfg(feature = "aio-pool")]
+        pub use self::async_impls::TlsPool as AsyncTlsPool;
+    }
+}
 
-// imports
 use core::marker::PhantomData;
 
 #[derive(Debug, Clone)]

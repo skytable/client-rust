@@ -117,10 +117,15 @@ assert!(con.set("bindata", mybinarydata).unwrap());
 
 ## Going advanced
 
-Now that you know how you can run basic queries, check out the `actions` module documentation for learning
-to use actions and the `types` module documentation for implementing your own Skyhash serializable
-types. Need to meddle with DDL queries like creating and dropping tables? Check out the `ddl` module.
-You can also find the [latest examples here](https://github.com/skytable/client-rust/tree/next/examples)
+Now that you know how you can run basic queries, check out the [`actions`] module documentation for learning
+to use actions and the [`types`] module documentation for implementing your own Skyhash serializable
+types. Need to meddle with DDL queries like creating and dropping tables? Check out the [`ddl`] module.
+You can also find some [examples here](https://github.com/skytable/client-rust/tree/v0.7.0-alpha.1/examples)
+
+## Connection pooling
+
+This library supports using sync/async connection pools. See the [`pool`] module-level documentation for examples
+and information.
 
 ## Async API
 

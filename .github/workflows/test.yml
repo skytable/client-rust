@@ -16,9 +16,9 @@ jobs:
           cargo build --verbose --no-default-features --features sync
           cargo build --verbose --no-default-features --features sync,ssl
           cargo build --verbose --no-default-features --features sync,sslv
-          cargo build --verbose --no-default-features --features async
-          cargo build --verbose --no-default-features --features async,aio-ssl
-          cargo build --verbose --no-default-features --features async,aio-sslv
+          cargo build --verbose --no-default-features --features aio
+          cargo build --verbose --no-default-features --features aio,aio-ssl
+          cargo build --verbose --no-default-features --features aio,aio-sslv
           cargo build --verbose --no-default-features --features dbg
           cargo build --verbose --no-default-features --features const-gen
       - name: Run tests

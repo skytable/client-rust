@@ -16,14 +16,12 @@ version = "0.7.0-alpha.3"
 [features]
 default = ["sync"]
 # sync
-sync = ["pool"]
-pool = ["r2d2"]
+sync = ["r2d2"]
 # sync TLS
 ssl = ["openssl"]
 sslv = ["openssl/vendored"]
 # async
-aio = ["bytes", "tokio", "aio-pool"]
-aio-pool = ["bb8", "async-trait"]
+aio = ["bytes", "tokio", "bb8", "async-trait"]
 # async TLS
 aio-ssl = ["tokio-openssl", "openssl"]
 aio-sslv = ["tokio-openssl", "openssl/vendored"]

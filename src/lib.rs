@@ -217,9 +217,7 @@ mod util;
 pub mod actions;
 pub mod ddl;
 pub mod error;
-cfg_pool_any! {
-    pub mod pool;
-}
+pub mod pool;
 pub mod types;
 // endof public mods
 // private mods

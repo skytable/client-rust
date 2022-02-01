@@ -81,16 +81,6 @@ macro_rules! cfg_sync {
     };
 }
 
-macro_rules! cfg_sync_pool {
-    ($($body:item)*) => {
-        $(
-            #[cfg(all(feature = "sync", feature= "pool"))]
-            #[cfg_attr(docsrs, doc(cfg(all(feature = "sync", feature = "pool"))))]
-            $body
-        )*
-    };
-}
-
 macro_rules! cfg_async {
     ($($body:item)*) => {
         $(
@@ -101,44 +91,11 @@ macro_rules! cfg_async {
     };
 }
 
-macro_rules! cfg_async_pool {
-    ($($body:item)*) => {
-        $(
-            #[cfg(all(feature = "aio", feature= "aio-pool"))]
-            #[cfg_attr(docsrs, doc(cfg(all(feature = "aio", feature = "aio-pool"))))]
-            $body
-        )*
-    };
-}
-
 macro_rules! cfg_dbg {
     ($($body:item)*) => {
         $(
             #[cfg(feature = "dbg")]
             #[cfg_attr(docsrs, doc(cfg(feature = "dbg")))]
-            $body
-        )*
-    };
-}
-
-macro_rules! cfg_pool_any {
-    ($($body:item)*) => {
-        $(
-            #[cfg(any(
-                feature = "sync",
-                feature = "pool",
-                feature = "aio",
-                feature = "aio-pool"
-            ))]
-            #[cfg_attr(
-                docsrs,
-                doc(cfg(any(
-                    feature = "sync",
-                    feature = "pool",
-                    feature = "aio",
-                    feature = "aio-pool"
-                )))
-            )]
             $body
         )*
     };

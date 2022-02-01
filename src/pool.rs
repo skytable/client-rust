@@ -124,7 +124,7 @@
 
 // re-exports
 // sync
-cfg_sync_pool! {
+cfg_sync! {
     /// [`r2d2`](https://docs.rs/r2d2)'s error type
     pub use r2d2::Error as r2d2Error;
     pub use self::sync_impls::Pool;
@@ -134,20 +134,21 @@ cfg_sync_pool! {
             .max_size(max_size)
             .build(ConnectionManager::new_notls(host.to_string(), port))
     }
-    cfg_sync_ssl_any! {
-        pub use self::sync_impls::TlsPool;
-        /// Returns a TLS pool of the specified size and provided settings
-        pub fn get_tls(host: impl ToString, port: u16, cert: impl ToString, max_size: u32) -> Result<TlsPool, r2d2Error> {
-            TlsPool::builder()
-                .max_size(max_size)
-                .build(
-                    ConnectionManager::new_tls(host.to_string(), port, cert)
-                )
-        }
+}
+cfg_sync_ssl_any! {
+    pub use self::sync_impls::TlsPool;
+    /// Returns a TLS pool of the specified size and provided settings
+    pub fn get_tls(host: impl ToString, port: u16, cert: impl ToString, max_size: u32) -> Result<TlsPool, r2d2Error> {
+        TlsPool::builder()
+            .max_size(max_size)
+            .build(
+                ConnectionManager::new_tls(host.to_string(), port, cert)
+            )
     }
 }
+
 // async
-cfg_async_pool! {
+cfg_async! {
     /// [`bb8`](https://docs.rs/bb8)'s error type
     pub use bb8::RunError as bb8Error;
     pub use self::async_impls::Pool as AsyncPool;
@@ -158,14 +159,14 @@ cfg_async_pool! {
             .max_size(max_size)
             .build(ConnectionManager::new_notls(host.to_string(), port)).await
     }
-    cfg_async_ssl_any! {
-        pub use self::async_impls::TlsPool as AsyncTlsPool;
-        /// Returns an async TLS pool of the specified size and provided settings
-        pub async fn get_tls_async(host: impl ToString, port: u16, cert: impl ToString, max_size: u32) -> Result<AsyncTlsPool, Error> {
-            AsyncTlsPool::builder()
-                .max_size(max_size)
-                .build(ConnectionManager::new_tls(host.to_string(), port, cert)).await
-        }
+}
+cfg_async_ssl_any! {
+    pub use self::async_impls::TlsPool as AsyncTlsPool;
+    /// Returns an async TLS pool of the specified size and provided settings
+    pub async fn get_tls_async(host: impl ToString, port: u16, cert: impl ToString, max_size: u32) -> Result<AsyncTlsPool, Error> {
+        AsyncTlsPool::builder()
+            .max_size(max_size)
+            .build(ConnectionManager::new_tls(host.to_string(), port, cert)).await
     }
 }
 
@@ -203,7 +204,8 @@ impl<C> ConnectionManager<C> {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "pool"))]
+#[cfg(feature = "sync")]
+#[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
 mod sync_impls {
     use super::ConnectionManager;
     use crate::sync::Connection as SyncConnection;
@@ -274,7 +276,8 @@ mod sync_impls {
     }
 }
 
-#[cfg(any(feature = "aio", feature = "aio-pool"))]
+#[cfg(feature = "aio")]
+#[cfg_attr(docsrs, doc(cfg(feature = "aio")))]
 mod async_impls {
     use super::ConnectionManager;
     use crate::aio::Connection as AsyncConnection;

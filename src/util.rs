@@ -64,8 +64,8 @@ macro_rules! cfg_ssl_any {
 macro_rules! cfg_async_ssl_any {
     ($($body:item)*) => {
         $(
-            #[cfg(all(feature = "async", any(feature = "aio-ssl", feature = "aio-sslv")))]
-            #[cfg_attr(docsrs, doc(cfg(all(feature="async", any(feature = "aio-ssl", feature = "aio-sslv")))))]
+            #[cfg(all(feature = "aio", any(feature = "aio-ssl", feature = "aio-sslv")))]
+            #[cfg_attr(docsrs, doc(cfg(all(feature="aio", any(feature = "aio-ssl", feature = "aio-sslv")))))]
             $body
         )*
     };
@@ -84,8 +84,8 @@ macro_rules! cfg_sync {
 macro_rules! cfg_async {
     ($($body:item)*) => {
         $(
-            #[cfg(feature = "async")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
+            #[cfg(feature = "aio")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "aio")))]
             $body
         )*
     };

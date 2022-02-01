@@ -9,7 +9,7 @@ license = "Apache-2.0"
 name = "skytable"
 readme = "README.md"
 repository = "https://github.com/skytable/client-rust"
-version = "0.6.2"
+version = "0.6.3"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -22,7 +22,7 @@ pool = ["r2d2"]
 ssl = ["openssl"]
 sslv = ["openssl/vendored"]
 # async
-async = ["bytes", "tokio", "aio-pool"]
+aio = ["bytes", "tokio", "aio-pool"]
 aio-pool = ["bb8", "async-trait"]
 # async TLS
 aio-ssl = ["tokio-openssl", "openssl"]

@@ -109,8 +109,8 @@ macro_rules! implement_actions {
                 }
             )*
         }
-        #[cfg(feature = "async")]
-        #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
+        #[cfg(feature = "aio")]
+        #[cfg_attr(docsrs, doc(cfg(feature = "aio")))]
         /// Actions that can be run on an [`AsyncSocket`] connection
         pub trait AsyncActions: AsyncSocket {
             $(

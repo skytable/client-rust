@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
 */
+
 //! # Connection pooling
 //!
 //! This module provides utilities to use connection pooling. As we already know, it is far more
@@ -21,8 +22,8 @@
 //! a worker receives a task is slow while maintaining a connection per worker might be cumbersome
 //! to implement.
 //!
-//! To provide connection pooling, we use [`r2d2`] for a sync connection pool while we use [`bb8`]
-//! to provide an async connection pool.
+//! To provide connection pooling, we use [`r2d2`] for a sync connection pool while we use
+//! [`bb8`](https://docs.rs/bb8) to provide an async connection pool.
 //!
 //! ## Sync usage
 //!
@@ -86,16 +87,16 @@ pub use self::sync_impls::{Pool, TlsPool};
 /// [`r2d2`](https://docs.rs/r2d2)'s error type
 pub use r2d2::Error as r2d2Error;
 // async
-#[cfg(any(feature = "async", feature = "aio-pool"))]
+#[cfg(any(feature = "aio", feature = "aio-pool"))]
 pub use self::async_impls::{Pool as AsyncPool, TlsPool as AsyncTlsPool};
-#[cfg(any(feature = "async", feature = "aio-pool"))]
+#[cfg(any(feature = "aio", feature = "aio-pool"))]
 /// [`bb8`](https://docs.rs/bb8)'s error type
 pub use bb8::RunError as bb8Error;
 
 // imports
 use core::marker::PhantomData;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConnectionManager<C> {
     host: String,
     port: u16,
@@ -185,7 +186,7 @@ mod sync_impls {
     }
 }
 
-#[cfg(any(feature = "async", feature = "aio-pool"))]
+#[cfg(any(feature = "aio", feature = "aio-pool"))]
 mod async_impls {
     use super::ConnectionManager;
     use crate::aio::{Connection as AsyncConnection, TlsConnection as AsyncTlsConnection};

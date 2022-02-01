@@ -97,6 +97,8 @@ pub use bb8::RunError as bb8Error;
 use core::marker::PhantomData;
 
 #[derive(Debug, Clone)]
+/// A [`ConnectionManager`] for connection pools. See the [module level documentation](crate::pool)
+/// for examples and more information
 pub struct ConnectionManager<C> {
     host: String,
     port: u16,
@@ -116,9 +118,11 @@ impl<C> ConnectionManager<C> {
 }
 
 impl<C> ConnectionManager<C> {
+    /// Create a new `ConnectionManager` that can be used to configure a non-TLS connection pool
     pub fn new_notls(host: String, port: u16) -> ConnectionManager<C> {
         Self::_new(host, port, None)
     }
+    /// Create a new `ConnectionManager` that can be used to configure a TLS connection pool
     pub fn new_tls(host: String, port: u16, cert: String) -> ConnectionManager<C> {
         Self::_new(host, port, Some(cert))
     }
@@ -127,15 +131,22 @@ impl<C> ConnectionManager<C> {
 #[cfg(any(feature = "sync", feature = "pool"))]
 mod sync_impls {
     use super::ConnectionManager;
-    use crate::sync::{Connection as SyncConnection, TlsConnection as SyncTlsConnection};
+    use crate::sync::Connection as SyncConnection;
+    cfg_sync_ssl_any! {
+        use crate::sync::TlsConnection as SyncTlsConnection;
+    }
     use crate::{
         error::{Error, SkyhashError},
         Element, Query, SkyQueryResult, SkyResult,
     };
     use r2d2::ManageConnection;
 
+    /// A non-TLS connection pool to Skytable
     pub type Pool = r2d2::Pool<ConnectionManager<SyncConnection>>;
-    pub type TlsPool = r2d2::Pool<ConnectionManager<SyncTlsConnection>>;
+    cfg_sync_ssl_any! {
+        /// A TLS connection pool to Skytable
+        pub type TlsPool = r2d2::Pool<ConnectionManager<SyncTlsConnection>>;
+    }
 
     pub trait PoolableConnection: Send + Sync + Sized {
         fn get_connection(host: &str, port: u16, tls_cert: Option<&String>) -> SkyResult<Self>;
@@ -152,19 +163,21 @@ mod sync_impls {
         }
     }
 
-    impl PoolableConnection for SyncTlsConnection {
-        fn get_connection(host: &str, port: u16, tls_cert: Option<&String>) -> SkyResult<Self> {
-            let c = Self::new(
-                &host,
-                port,
-                tls_cert.ok_or(Error::ConfigurationError(
-                    "Expected TLS certificate in `ConnectionManager`",
-                ))?,
-            )?;
-            Ok(c)
-        }
-        fn run_query(&mut self, q: Query) -> SkyQueryResult {
-            self.run_simple_query(&q)
+    cfg_sync_ssl_any! {
+        impl PoolableConnection for SyncTlsConnection {
+            fn get_connection(host: &str, port: u16, tls_cert: Option<&String>) -> SkyResult<Self> {
+                let c = Self::new(
+                    &host,
+                    port,
+                    tls_cert.ok_or(Error::ConfigurationError(
+                        "Expected TLS certificate in `ConnectionManager`",
+                    ))?,
+                )?;
+                Ok(c)
+            }
+            fn run_query(&mut self, q: Query) -> SkyQueryResult {
+                self.run_simple_query(&q)
+            }
         }
     }
     impl<C: PoolableConnection + 'static> ManageConnection for ConnectionManager<C> {
@@ -189,7 +202,10 @@ mod sync_impls {
 #[cfg(any(feature = "aio", feature = "aio-pool"))]
 mod async_impls {
     use super::ConnectionManager;
-    use crate::aio::{Connection as AsyncConnection, TlsConnection as AsyncTlsConnection};
+    use crate::aio::Connection as AsyncConnection;
+    cfg_async_ssl_any! {
+        use crate::aio::TlsConnection as AsyncTlsConnection;
+    }
     use crate::{
         error::{Error, SkyhashError},
         Element, Query, SkyQueryResult, SkyResult,
@@ -197,9 +213,12 @@ mod async_impls {
     use async_trait::async_trait;
     use bb8::{ManageConnection, PooledConnection};
 
+    /// An asynchronous non-TLS connection pool to Skytable
     pub type Pool = bb8::Pool<ConnectionManager<AsyncConnection>>;
-    pub type TlsPool = bb8::Pool<ConnectionManager<AsyncTlsConnection>>;
-
+    cfg_async_ssl_any! {
+        /// An asynchronous TLS connection pool to Skytable
+        pub type TlsPool = bb8::Pool<ConnectionManager<AsyncTlsConnection>>;
+    }
     #[async_trait]
     pub trait PoolableConnection: Send + Sync + Sized {
         async fn get_connection(
@@ -225,25 +244,27 @@ mod async_impls {
         }
     }
 
-    #[async_trait]
-    impl PoolableConnection for AsyncTlsConnection {
-        async fn get_connection(
-            host: &str,
-            port: u16,
-            tls_cert: Option<&String>,
-        ) -> SkyResult<Self> {
-            let con = AsyncTlsConnection::new(
-                &host,
-                port,
-                tls_cert.ok_or(Error::ConfigurationError(
-                    "Expected TLS certificate in `ConnectionManager`",
-                ))?,
-            )
-            .await?;
-            Ok(con)
-        }
-        async fn run_query(&mut self, q: Query) -> SkyQueryResult {
-            self.run_simple_query(&q).await
+    cfg_async_ssl_any! {
+        #[async_trait]
+        impl PoolableConnection for AsyncTlsConnection {
+            async fn get_connection(
+                host: &str,
+                port: u16,
+                tls_cert: Option<&String>,
+            ) -> SkyResult<Self> {
+                let con = AsyncTlsConnection::new(
+                    &host,
+                    port,
+                    tls_cert.ok_or(Error::ConfigurationError(
+                        "Expected TLS certificate in `ConnectionManager`",
+                    ))?,
+                )
+                .await?;
+                Ok(con)
+            }
+            async fn run_query(&mut self, q: Query) -> SkyQueryResult {
+                self.run_simple_query(&q).await
+            }
         }
     }
 

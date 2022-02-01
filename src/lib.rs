@@ -24,7 +24,16 @@
 //! This version of the library was tested with the latest Skytable release
 //! (release [0.7](https://github.com/skytable/skytable/releases/v0.7.0)).
 //!
-//! ## Using this library
+//! ## Features
+//!
+//! - Sync API
+//! - Async API
+//! - TLS in both sync/async APIs
+//! - Connection pooling for sync/async
+//! - Use both sync/async APIs at the same time
+//! - Always up-to-date
+//!
+//!  ## Using this library
 //!
 //! This library only ships with the bare minimum that is required for interacting with Skytable. Once you have
 //! Skytable installed and running, you're ready to follow this guide!

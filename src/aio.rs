@@ -26,6 +26,7 @@
 
 use crate::deserializer::{ParseError, Parser, RawResponse};
 use crate::error::SkyhashError;
+use crate::types::FromSkyhashBytes;
 use crate::Element;
 use crate::IoResult;
 use crate::Pipeline;
@@ -44,6 +45,10 @@ const BUF_CAP: usize = 4096;
 macro_rules! impl_async_methods {
     ($ty:ty, $inner:ty) => {
         impl $ty {
+            /// Runs a query using [`Self::run_query_raw`] and attempts to return a type provided by the user
+            pub async fn run_query<T: FromSkyhashBytes, Q: AsRef<Query>>(&mut self, query: Q) -> SkyResult<T> {
+                self.run_query_raw(query).await?.try_element_into()
+            }
             /// This function will write a [`Query`] to the stream and read the response from the
             /// server. It will then determine if the returned response is complete or incomplete
             /// or invalid and return an appropriate variant of [`Error`](crate::error::Error) wrapped in [`IoResult`]
@@ -51,11 +56,18 @@ macro_rules! impl_async_methods {
             ///
             /// ## Panics
             /// This method will panic if the [`Query`] supplied is empty (i.e has no arguments)
-            pub async fn run_simple_query(&mut self, query: &Query) -> SkyQueryResult {
-                match self._run_query(query).await? {
+            pub async fn run_query_raw<Q: AsRef<Query>>(&mut self, query: Q) -> SkyResult<Element> {
+                match self._run_query(query.as_ref()).await? {
                     RawResponse::SimpleQuery(sq) => Ok(sq),
                     RawResponse::PipelinedQuery(_) => Err(SkyhashError::InvalidResponse.into()),
                 }
+            }
+            #[deprecated(
+                since = "0.7",
+                note = "this will be removed in a future release. consider using `run_query_raw` instead")
+            ]
+            pub async fn run_simple_query(&mut self, query: &Query) -> SkyQueryResult {
+                self.run_query_raw(query).await
             }
             /// Runs a pipelined query. See the [`Pipeline`](Pipeline) documentation for a guide on
             /// usage
@@ -110,7 +122,7 @@ macro_rules! impl_async_methods {
         }
         impl crate::actions::AsyncSocket for $ty {
             fn run(&mut self, q: Query) -> crate::AsyncResult<SkyQueryResult> {
-                Box::pin(async move { self.run_simple_query(&q).await })
+                Box::pin(async move { self.run_query_raw(&q).await })
             }
         }
     };

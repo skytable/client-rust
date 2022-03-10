@@ -56,8 +56,8 @@ use skytable::{error, Connection, Query, Element};
 fn main() -> Result<(), error::Error> {
     let mut con = Connection::new("127.0.0.1", 2003)?;
     let query = Query::from("heya");
-    let res = con.run_simple_query(&query)?;
-    assert_eq!(res, Element::String("HEY".to_owned()));
+    let res: String = con.run_query(&query)?;
+    assert_eq!(res, "HEY!");
     Ok(())
 }
 ```

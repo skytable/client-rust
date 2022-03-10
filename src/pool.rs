@@ -236,7 +236,7 @@ mod sync_impls {
             Ok(c)
         }
         fn run_query(&mut self, q: Query) -> SkyQueryResult {
-            self.run_simple_query(&q)
+            self.run_query_raw(&q)
         }
     }
 
@@ -253,7 +253,7 @@ mod sync_impls {
                 Ok(c)
             }
             fn run_query(&mut self, q: Query) -> SkyQueryResult {
-                self.run_simple_query(&q)
+                self.run_query_raw(&q)
             }
         }
     }
@@ -318,7 +318,7 @@ mod async_impls {
             Ok(con)
         }
         async fn run_query(&mut self, q: Query) -> SkyQueryResult {
-            self.run_simple_query(&q).await
+            self.run_query_raw(&q).await
         }
     }
 
@@ -341,7 +341,7 @@ mod async_impls {
                 Ok(con)
             }
             async fn run_query(&mut self, q: Query) -> SkyQueryResult {
-                self.run_simple_query(&q).await
+                self.run_query_raw(&q).await
             }
         }
     }

@@ -26,6 +26,7 @@
 
 use crate::deserializer::{ParseError, Parser, RawResponse};
 use crate::error::SkyhashError;
+use crate::types::FromSkyhashBytes;
 use crate::Element;
 use crate::IoResult;
 use crate::Pipeline;
@@ -39,6 +40,10 @@ use std::net::TcpStream;
 macro_rules! impl_sync_methods {
     ($ty:ty) => {
         impl $ty {
+            /// Runs a query using [`Self::run_query_raw`] and attempts to return a type provided by the user
+            pub fn run_query<T: FromSkyhashBytes, Q: AsRef<Query>>(&mut self, query: Q) -> SkyResult<T> {
+                self.run_query_raw(query)?.try_element_into()
+            }
             /// This function will write a [`Query`] to the stream and read the response from the
             /// server. It will then determine if the returned response is complete or incomplete
             /// or invalid and return an appropriate variant of [`Error`](crate::error::Error) wrapped in [`IoResult`]
@@ -48,12 +53,18 @@ macro_rules! impl_sync_methods {
             /// This method will panic:
             /// - if the [`Query`] supplied is empty (i.e has no arguments)
             /// This function is a subroutine of `run_query` used to parse the response packet
-            pub fn run_simple_query(&mut self, query: &Query) -> SkyQueryResult {
-                assert!(query.len() != 0, "A `Query` cannot be of zero length!");
-                match self._run_query(query)? {
+            pub fn run_query_raw<Q: AsRef<Query>>(&mut self, query: Q) -> SkyResult<Element> {
+                match self._run_query(query.as_ref())? {
                     RawResponse::SimpleQuery(sq) => Ok(sq),
                     RawResponse::PipelinedQuery(_) => Err(SkyhashError::InvalidResponse.into()),
                 }
+            }
+            #[deprecated(
+                since = "0.7",
+                note = "this will be removed in a future release. consider using `run_query_raw` instead")
+            ]
+            pub fn run_simple_query(&mut self, query: &Query) -> SkyQueryResult {
+                self.run_query_raw(query)
             }
             /// Runs a pipelined query. See the [`Pipeline`](Pipeline) documentation for a guide on
             /// usage
@@ -110,7 +121,7 @@ macro_rules! impl_sync_methods {
         }
         impl crate::actions::SyncSocket for $ty {
             fn run(&mut self, q: Query) -> SkyQueryResult {
-                self.run_simple_query(&q)
+                self.run_query_raw(&q)
             }
         }
     };

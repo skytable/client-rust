@@ -27,3 +27,5 @@ All the examples are part of a workspace and can be simply built by running `car
 > ```toml
 > skytable = { version="*", features = ["const-gen"] }
 > ```
+>
+> (or the version you want to use)

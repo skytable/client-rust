@@ -8,6 +8,13 @@ All changes in this project will be noted in this file.
 
 - Sync connection pooling
 - Async connection pooling
+- Added `run_query_raw` and `run_query` that lets you specify custom types:
+  ```rust
+  use skytable::{query, sync::Connection};
+  let mut con = Connection::new("127.0.0.1", "2003").unwrap();
+  let string: String = con.run_query(query!("heya")).unwrap();
+  let number: usize = con.run_query(query!("dbsize")).unwrap();
+  ```
 
 ### Breaking changes
 

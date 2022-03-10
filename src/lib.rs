@@ -14,6 +14,8 @@
 //! - Sync API
 //! - Async API
 //! - TLS in both sync/async APIs
+//! - Query pipelining
+//! - Easy conversion from Skyhash types into Rust types
 //! - Connection pooling for sync/async
 //! - Use both sync/async APIs at the same time
 //! - Always up-to-date
@@ -56,8 +58,8 @@
 //! fn main() -> Result<(), error::Error> {
 //!     let mut con = Connection::new("127.0.0.1", 2003)?;
 //!     let query = Query::from("heya");
-//!     let res = con.run_simple_query(&query)?;
-//!     assert_eq!(res, Element::String("HEY".to_owned()));
+//!     let res: String = con.run_query(&query)?;
+//!     assert_eq!(res, "HEY!");
 //!     Ok(())
 //! }
 //! ```
@@ -117,10 +119,18 @@
 //!
 //! ## Going advanced
 //!
-//! Now that you know how you can run basic queries, check out the [`actions`] module documentation for learning
-//! to use actions and the [`types`] module documentation for implementing your own Skyhash serializable
-//! types. Need to meddle with DDL queries like creating and dropping tables? Check out the [`ddl`] module.
-//! You can also find some [examples here](https://github.com/skytable/client-rust/tree/v0.7.0-alpha.4/examples)
+//! Now that you know how you can run basic queries, check out:
+//! - the [`actions`] module documentation for learning to use actions
+//! - the [`Pipeline`] documentation for using pipelines
+//! - the [`pool`] module documentation for using sync/async connection pools
+//! - the [`types`] module documentation for implementing your own Skyhash serializable types.
+//! - the [`ddl`] module for DDL queries like `create` and `drop`
+//!
+//! You can also find some [examples here](https://github.com/skytable/client-rust/tree/v0.7.0-alpha.4/examples).
+//!
+//! ## Pipelining
+//!
+//! Check out the documentation for [`Pipeline`].
 //!
 //! ## Connection pooling
 //!
@@ -504,6 +514,12 @@ where
     }
 }
 
+impl AsRef<Query> for Query {
+    fn as_ref(&self) -> &Query {
+        self
+    }
+}
+
 impl Default for Query {
     fn default() -> Self {
         Query {
@@ -576,6 +592,7 @@ impl Query {
         &self.data
     }
     fn write_query_to_writable(&self, buffer: &mut Vec<u8>) {
+        assert!(self.len() != 0, "Query cannot be empty");
         // Add the dataframe element
         let number_of_items_in_datagroup = self.len().to_string().into_bytes();
         buffer.extend([b'~']);

@@ -14,7 +14,7 @@ fn main() {
     // run it: you will either get a binary array if you declared your table
     // to have the `binstr` type for values or you'll get a string array if
     // you declared your table to have the `str` type for values
-    match con.run_simple_query(&query) {
+    match con.run_query_raw(&query) {
         Ok(Element::Array(Array::Bin(binarr))) => {
             println!("Got a binary array!");
             for element in binarr {

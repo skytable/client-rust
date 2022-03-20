@@ -45,6 +45,10 @@ pub enum RespCode {
     UnknownDataType,
     /// `9`: Encoding error
     EncodingError,
+    /// `10`: Bad authn credentials
+    AuthBadCredentials,
+    /// `11`: Permission error
+    AuthPermissionError,
 }
 
 impl RespCode {
@@ -62,6 +66,8 @@ impl RespCode {
                 7 => Wrongtype,
                 8 => UnknownDataType,
                 9 => EncodingError,
+                10 => AuthBadCredentials,
+                11 => AuthPermissionError,
                 _ => Self::ErrorString(st.to_owned()),
             },
             Err(_) => ErrorString(st.to_owned()),
@@ -83,6 +89,8 @@ impl From<RespCode> for u8 {
             Wrongtype => 7,
             UnknownDataType => 8,
             EncodingError => 9,
+            AuthBadCredentials => 10,
+            AuthPermissionError => 11,
         }
     }
 }
@@ -101,6 +109,8 @@ impl fmt::Display for RespCode {
             Wrongtype => write!(f, "Response code: 7 (wrongtype error)"),
             UnknownDataType => write!(f, "Response code: 8 (unknown data type error)"),
             EncodingError => write!(f, "Response code: 9 (encoding error)"),
+            AuthBadCredentials => write!(f, "Response code: 10 (bad auth credentials)"),
+            AuthPermissionError => write!(f, "Response code: 11 (auth permission error)"),
             ErrorString(estr) => write!(f, "Error: {}", estr),
         }
     }

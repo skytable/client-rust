@@ -507,6 +507,14 @@ impl FromSkyhashBytes for Vec<String> {
                 }
                 new_arr
             }
+            Element::Array(Array::NonNullStr(strarr)) => strarr,
+            Element::Array(Array::NonNullBin(binarr)) => {
+                let mut ret = Vec::with_capacity(binarr.len());
+                for item in binarr {
+                    ret.push(String::from_utf8(item)?);
+                }
+                ret
+            }
             _ => return Err(Error::ParseError(BAD_ELEMENT.to_owned())),
         };
         Ok(e)
@@ -538,6 +546,10 @@ impl FromSkyhashBytes for Vec<Vec<u8>> {
                 }
                 newarr
             }
+            Element::Array(Array::NonNullStr(strarr)) => {
+                strarr.into_iter().map(|v| v.into_bytes()).collect()
+            }
+            Element::Array(Array::NonNullBin(brr)) => brr,
             _ => return Err(Error::ParseError(BAD_ELEMENT.to_owned())),
         };
         Ok(e)

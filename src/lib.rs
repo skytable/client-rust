@@ -500,6 +500,7 @@ macro_rules! query {
 /// }
 /// ```
 ///
+#[derive(Default)]
 pub struct Query {
     size_count: usize,
     data: Vec<u8>,
@@ -517,15 +518,6 @@ where
 impl AsRef<Query> for Query {
     fn as_ref(&self) -> &Query {
         self
-    }
-}
-
-impl Default for Query {
-    fn default() -> Self {
-        Query {
-            size_count: 0,
-            data: Vec::new(),
-        }
     }
 }
 
@@ -592,7 +584,7 @@ impl Query {
         &self.data
     }
     fn write_query_to_writable(&self, buffer: &mut Vec<u8>) {
-        assert!(self.len() != 0, "Query cannot be empty");
+        assert!(!self.is_empty(), "Query cannot be empty");
         // Add the dataframe element
         let number_of_items_in_datagroup = self.len().to_string().into_bytes();
         buffer.extend([b'~']);
@@ -711,6 +703,12 @@ pub struct Pipeline {
     chain: Vec<u8>,
 }
 
+impl Default for Pipeline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Pipeline {
     /// Initializes a new empty pipeline
     pub fn new() -> Self {
@@ -720,7 +718,7 @@ impl Pipeline {
         }
     }
     /// Append a query (builder pattern)
-    pub fn add(mut self, query: Query) -> Self {
+    pub fn append(mut self, query: Query) -> Self {
         self.len += 1;
         query.write_query_to_writable(&mut self.chain);
         self
@@ -733,6 +731,10 @@ impl Pipeline {
     /// Returns the number of queries in the pipeline
     pub fn len(&self) -> usize {
         self.len
+    }
+    /// Checks if the pipeline is empty or not
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
     }
     cfg_dbg! {
         /// Returns the query packet representation of this pipeline
@@ -759,7 +761,7 @@ cfg_dbg! {
 #[test]
     fn test_pipeline_dbg() {
         let bytes = b"*2\n~1\n5\nhello\n~1\n5\nworld\n";
-        let pipe = Pipeline::new().add(query!("hello")).add(query!("world"));
+        let pipe = Pipeline::new().append(query!("hello")).append(query!("world"));
         assert_eq!(pipe.into_raw_query(), bytes);
     }
 }

@@ -186,8 +186,8 @@ impl<T> IntoSkyhashAction for Vec<T>
 where
     T: IntoSkyhashBytes,
 {
-    fn push_into_query(&self, mut data: &mut Query) {
-        self.iter().for_each(|elem| elem.push_into_query(&mut data));
+    fn push_into_query(&self, data: &mut Query) {
+        self.iter().for_each(|elem| elem.push_into_query(data));
     }
     fn incr_len_by(&self) -> usize {
         self.len()
@@ -198,8 +198,8 @@ impl<T> IntoSkyhashAction for &Vec<T>
 where
     T: IntoSkyhashBytes,
 {
-    fn push_into_query(&self, mut data: &mut Query) {
-        self.iter().for_each(|elem| elem.push_into_query(&mut data));
+    fn push_into_query(&self, data: &mut Query) {
+        self.iter().for_each(|elem| elem.push_into_query(data));
     }
     fn incr_len_by(&self) -> usize {
         self.len()
@@ -210,8 +210,8 @@ impl<T> IntoSkyhashAction for &[T]
 where
     T: IntoSkyhashBytes,
 {
-    fn push_into_query(&self, mut data: &mut Query) {
-        self.iter().for_each(|elem| elem.push_into_query(&mut data));
+    fn push_into_query(&self, data: &mut Query) {
+        self.iter().for_each(|elem| elem.push_into_query(data));
     }
     fn incr_len_by(&self) -> usize {
         self.len()
@@ -220,8 +220,8 @@ where
 
 #[cfg(feature = "const-gen")]
 impl<T: IntoSkyhashBytes, const N: usize> IntoSkyhashAction for [T; N] {
-    fn push_into_query(&self, mut data: &mut Query) {
-        self.iter().for_each(|elem| elem.push_into_query(&mut data));
+    fn push_into_query(&self, data: &mut Query) {
+        self.iter().for_each(|elem| elem.push_into_query(data));
     }
     fn incr_len_by(&self) -> usize {
         self.len()
@@ -230,8 +230,8 @@ impl<T: IntoSkyhashBytes, const N: usize> IntoSkyhashAction for [T; N] {
 
 #[cfg(feature = "const-gen")]
 impl<T: IntoSkyhashBytes, const N: usize> IntoSkyhashAction for &'static [T; N] {
-    fn push_into_query(&self, mut data: &mut Query) {
-        self.iter().for_each(|elem| elem.push_into_query(&mut data));
+    fn push_into_query(&self, data: &mut Query) {
+        self.iter().for_each(|elem| elem.push_into_query(data));
     }
     fn incr_len_by(&self) -> usize {
         N

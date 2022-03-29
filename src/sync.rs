@@ -60,7 +60,7 @@ macro_rules! impl_sync_methods {
                 }
             }
             #[deprecated(
-                since = "0.7",
+                since = "0.7.0",
                 note = "this will be removed in a future release. consider using `run_query_raw` instead")
             ]
             pub fn run_simple_query(&mut self, query: &Query) -> SkyQueryResult {

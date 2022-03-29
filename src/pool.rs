@@ -244,7 +244,7 @@ mod sync_impls {
         impl PoolableConnection for SyncTlsConnection {
             fn get_connection(host: &str, port: u16, tls_cert: Option<&String>) -> SkyResult<Self> {
                 let c = Self::new(
-                    &host,
+                    host,
                     port,
                     tls_cert.ok_or(Error::ConfigurationError(
                         "Expected TLS certificate in `ConnectionManager`",
@@ -314,7 +314,7 @@ mod async_impls {
             port: u16,
             _tls_cert: Option<&String>,
         ) -> SkyResult<Self> {
-            let con = AsyncConnection::new(&host, port).await?;
+            let con = AsyncConnection::new(host, port).await?;
             Ok(con)
         }
         async fn run_query(&mut self, q: Query) -> SkyQueryResult {
@@ -331,7 +331,7 @@ mod async_impls {
                 tls_cert: Option<&String>,
             ) -> SkyResult<Self> {
                 let con = AsyncTlsConnection::new(
-                    &host,
+                    host,
                     port,
                     tls_cert.ok_or(Error::ConfigurationError(
                         "Expected TLS certificate in `ConnectionManager`",

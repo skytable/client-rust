@@ -21,6 +21,7 @@ All changes in this project will be noted in this file.
 - `SkyRawResult` is now `SkyResult`
 - `SkyResult` is now `SkyQueryResult`
 - The feature `async` is now `aio`
+- `Query::add` is now `Query::append` to avoid confusion with the `core::ops::Add` trait
 
 ## Version 0.6.2
 

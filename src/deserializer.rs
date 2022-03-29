@@ -77,8 +77,8 @@ pub enum Element {
     UnsignedInt(u64),
     /// A response code
     RespCode(RespCode),
-    /// A floating point value
-    Float(f64),
+    /// A 32-bit floating point value
+    Float(f32),
 }
 
 impl Element {
@@ -372,7 +372,7 @@ impl<'a> Parser<'a> {
             Err(ParseError::UnexpectedByte)
         }
     }
-    fn parse_next_float(&mut self) -> ParseResult<f64> {
+    fn parse_next_float(&mut self) -> ParseResult<f32> {
         let our_float_chunk = self.__get_next_element()?;
         match String::from_utf8_lossy(our_float_chunk).parse() {
             Ok(f) => {

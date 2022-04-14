@@ -280,16 +280,16 @@ mod sync_impls {
 #[cfg_attr(docsrs, doc(cfg(feature = "aio")))]
 mod async_impls {
     use super::ConnectionManager;
-    use crate::aio::Connection as AsyncConnection;
     cfg_async_ssl_any! {
         use crate::aio::TlsConnection as AsyncTlsConnection;
     }
     use crate::{
+        aio::Connection as AsyncConnection,
         error::{Error, SkyhashError},
         Element, Query, SkyQueryResult, SkyResult,
     };
     use async_trait::async_trait;
-    use bb8::{ManageConnection, PooledConnection};
+    use bb8::ManageConnection;
 
     /// An asynchronous non-TLS connection pool to Skytable
     pub type Pool = bb8::Pool<ConnectionManager<AsyncConnection>>;
@@ -353,7 +353,7 @@ mod async_impls {
         async fn connect(&self) -> Result<Self::Connection, Self::Error> {
             C::get_connection(&self.host, self.port, self.cert.as_ref()).await
         }
-        async fn is_valid(&self, con: &mut PooledConnection<'_, Self>) -> Result<(), Self::Error> {
+        async fn is_valid(&self, con: &mut Self::Connection) -> Result<(), Self::Error> {
             match con.run_query(crate::query!("HEYA")).await? {
                 Element::String(st) if st.eq("HEY!") => Ok(()),
                 _ => Err(Error::SkyError(SkyhashError::UnexpectedResponse)),

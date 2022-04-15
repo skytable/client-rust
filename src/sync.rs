@@ -28,7 +28,6 @@ use crate::deserializer::{ParseError, Parser, RawResponse};
 use crate::error::SkyhashError;
 use crate::types::FromSkyhashBytes;
 use crate::Element;
-use crate::IoResult;
 use crate::Pipeline;
 use crate::Query;
 use crate::SkyQueryResult;
@@ -140,7 +139,7 @@ cfg_sync!(
 
     impl Connection {
         /// Create a new connection to a Skytable instance hosted on `host` and running on `port`
-        pub fn new(host: &str, port: u16) -> IoResult<Self> {
+        pub fn new(host: &str, port: u16) -> SkyResult<Self> {
             let stream = TcpStream::connect((host, port))?;
             Ok(Connection {
                 stream,

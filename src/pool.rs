@@ -22,7 +22,7 @@
 //! a worker receives a task is slow while maintaining a connection per worker might be cumbersome
 //! to implement.
 //!
-//! To provide connection pooling, we use [`r2d2`] for a sync connection pool while we use
+//! To provide connection pooling, we use [`r2d2`](https://docs.rs/r2d2) for a sync connection pool while we use
 //! [`bb8`](https://docs.rs/bb8) to provide an async connection pool.
 //!
 //! ## Basic usage
@@ -121,6 +121,9 @@
 //! }
 //!```
 //!
+
+/// The default connection pool size
+pub const DEFAULT_POOL_SIZE: usize = 10;
 
 // re-exports
 // sync

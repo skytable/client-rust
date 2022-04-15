@@ -662,8 +662,8 @@ cfg_dbg!(
 ///
 /// let mut con = Connection::new("127.0.0.1", 2003).unwrap();
 /// let pipe = Pipeline::new()
-///     .add(query!("set", "x", "100"))
-///     .add(query!("heya", "echo me!"));
+///     .append(query!("set", "x", "100"))
+///     .append(query!("heya", "echo me!"));
 ///
 /// let ret = con.run_pipeline(pipe).unwrap();
 /// assert_eq!(
@@ -684,8 +684,8 @@ cfg_dbg!(
 /// async fn run() {
 ///     let mut con = Connection::new("127.0.0.1", 2003).await.unwrap();
 ///     let pipe = Pipeline::new()
-///         .add(query!("set", "x", "100"))
-///         .add(query!("heya", "echo me!"));
+///         .append(query!("set", "x", "100"))
+///         .append(query!("heya", "echo me!"));
 ///
 ///     let ret = con.run_pipeline(pipe).await.unwrap();
 ///     assert_eq!(

@@ -562,6 +562,22 @@ impl FromSkyhashBytes for Element {
     }
 }
 
+macro_rules! impl_fsb_element {
+    ($($ty:ty => $variant:ident),*) => {
+        $(impl FromSkyhashBytes for $ty {
+            fn from_element(e: Element) -> SkyResult<$ty> {
+                if let Element::$variant(rc) = e {
+                    Ok(rc)
+                } else {
+                    Err(Error::ParseError(BAD_ELEMENT.to_owned()))
+                }
+            }
+        })*
+    };
+}
+
+impl_fsb_element!(RespCode => RespCode, Array => Array);
+
 #[test]
 fn test_arr_from_str_to_vecstr() {
     let arr = Element::Array(Array::Str(vec![

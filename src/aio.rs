@@ -50,7 +50,7 @@ macro_rules! impl_async_methods {
             }
             /// This function will write a [`Query`] to the stream and read the response from the
             /// server. It will then determine if the returned response is complete or incomplete
-            /// or invalid and return an appropriate variant of [`Error`](crate::error::Error) wrapped in [`IoResult`]
+            /// or invalid and return an appropriate variant of [`Error`](crate::error::Error)
             /// for any I/O errors that may occur
             ///
             /// ## Panics
@@ -65,6 +65,7 @@ macro_rules! impl_async_methods {
                 since = "0.7.0",
                 note = "this will be removed in a future release. consider using `run_query_raw` instead")
             ]
+            /// Run a simple query. This will return an [`Element`]
             pub async fn run_simple_query(&mut self, query: &Query) -> SkyQueryResult {
                 self.run_query_raw(query).await
             }

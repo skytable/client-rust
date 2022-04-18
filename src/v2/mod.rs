@@ -178,11 +178,12 @@ impl<'a> Parser<'a> {
             self.incr_cursor();
         }
         let len = self.cursor - cursor;
-        let has_lf = unsafe {
-            // UNSAFE(@ohsayan): The first condition ensures
-            // that the current byte is present in the allocation
-            self.get_byte_at_cursor()
-        } == b'\n';
+        let has_lf = self.not_exhausted()
+            && unsafe {
+                // UNSAFE(@ohsayan): The first condition ensures
+                // that the current byte is present in the allocation
+                self.get_byte_at_cursor()
+            } == b'\n';
         if self.not_exhausted() && has_lf && len != 0 {
             self.incr_cursor(); // skip LF
             Ok(unsafe {
@@ -310,6 +311,30 @@ impl<'a> Parser<'a> {
         };
         Ok(r)
     }
+    fn read_typed_nonnull_array_string(&mut self) -> ParseResult<Vec<String>> {
+        let size = self.read_usize()?;
+        let mut data = Vec::with_capacity(size);
+        for _ in 0..size {
+            data.push(self.read_string()?);
+        }
+        Ok(data)
+    }
+    fn read_typed_nonnull_array_binary(&mut self) -> ParseResult<Vec<Vec<u8>>> {
+        let size = self.read_usize()?;
+        let mut data = Vec::with_capacity(size);
+        for _ in 0..size {
+            data.push(self.read_binary()?);
+        }
+        Ok(data)
+    }
+    fn read_typed_nonnull_array(&mut self) -> ParseResult<Element> {
+        let r = match self.try_read_cursor()? {
+            b'+' => Element::Array(Array::NonNullStr(self.read_typed_nonnull_array_string()?)),
+            b'?' => Element::Array(Array::NonNullBin(self.read_typed_nonnull_array_binary()?)),
+            _ => return Err(ParseError::UnknownDatatype),
+        };
+        Ok(r)
+    }
 }
 
 // response methods
@@ -322,6 +347,7 @@ impl<'a> Parser<'a> {
             b':' => Element::UnsignedInt(self.read_u64()?),
             b'%' => Element::Float(self.read_float()?),
             b'@' => self.read_typed_array()?,
+            b'^' => self.read_typed_nonnull_array()?,
             b'_' => Element::Array(Array::Flat(self.read_flat_array()?)),
             _ => return Err(ParseError::UnknownDatatype),
         };
@@ -338,14 +364,17 @@ impl<'a> Parser<'a> {
         }
         Ok(resps)
     }
-    pub fn parse(buffer: &'a [u8]) -> ParseResult<RawResponse> {
-        let mut slf = Self::new(buffer);
-        let ret = match slf.try_read_cursor()? {
-            b'*' => RawResponse::SimpleQuery(slf.read_simple_resp()?),
-            b'$' => RawResponse::PipelinedQuery(slf.read_pipeline_resp()?),
+    fn _parse(&mut self) -> ParseResult<RawResponse> {
+        let r = match self.try_read_cursor()? {
+            b'*' => RawResponse::SimpleQuery(self.read_simple_resp()?),
+            b'$' => RawResponse::PipelinedQuery(self.read_pipeline_resp()?),
             _ => return Err(ParseError::BadPacket),
         };
-        Ok(ret)
+        Ok(r)
+    }
+    pub fn parse(buffer: &'a [u8]) -> ParseResult<RawResponse> {
+        let mut slf = Self::new(buffer);
+        slf._parse()
     }
 }
 
@@ -388,4 +417,17 @@ fn pipe_resp() {
             ]))
         ])
     )
+}
+
+#[test]
+fn lskeys_resp() {
+    let resp = b"*^+3\n5\nsayan2\nis8\nthinking".to_vec();
+    assert_eq!(
+        Parser::parse(&resp).unwrap(),
+        RawResponse::SimpleQuery(Element::Array(Array::NonNullStr(vec![
+            "sayan".to_string(),
+            "is".to_string(),
+            "thinking".to_string()
+        ])))
+    );
 }

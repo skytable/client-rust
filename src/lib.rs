@@ -229,6 +229,7 @@ pub mod ddl;
 pub mod error;
 pub mod pool;
 pub mod types;
+pub mod v2;
 // endof public mods
 // private mods
 mod deserializer;

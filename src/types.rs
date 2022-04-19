@@ -313,6 +313,8 @@ pub enum FlatElement {
     RespCode(RespCode),
     /// An unsigned integer
     UnsignedInt(u64),
+    // A float
+    Float(f32),
 }
 
 /// A raw string

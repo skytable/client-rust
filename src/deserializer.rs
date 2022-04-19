@@ -27,12 +27,16 @@
 //! by Sayan Nandan and this is the first client implementation of the protocol
 //!
 
-use crate::types::Array;
-use crate::types::FlatElement;
-use crate::types::FromSkyhashBytes;
-use crate::RespCode;
-use crate::SkyResult;
-use std::hint::unreachable_unchecked;
+use crate::{
+    types::FromSkyhashBytes,
+    types::{Array, FlatElement},
+    RespCode, SkyResult,
+};
+use core::{
+    num::{ParseFloatError, ParseIntError},
+    slice,
+    str::{self, Utf8Error},
+};
 
 #[derive(Debug)]
 /// # Skyhash Deserializer (Parser)
@@ -58,7 +62,7 @@ pub(super) struct Parser<'a> {
     /// Do not even think of touching this externally
     cursor: usize,
     /// The buffer slice
-    buffer: &'a [u8],
+    slice: &'a [u8],
 }
 
 #[derive(Debug, PartialEq)]
@@ -87,35 +91,61 @@ impl Element {
         T::from_element(self)
     }
 }
+/*
+ * Copyright 2022, Sayan Nandan <nandansayan@outlook.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+*/
+
+/// A generic result to indicate parsing errors thorugh the [`ParseError`] enum
+pub type ParseResult<T> = Result<T, ParseError>;
 
 #[derive(Debug, PartialEq)]
 #[non_exhaustive]
+#[repr(u8)]
 /// # Parser Errors
 ///
 /// Several errors can arise during parsing and this enum accounts for them
 pub enum ParseError {
     /// Didn't get the number of expected bytes
     NotEnough,
-    /// The query contains an unexpected byte
-    UnexpectedByte,
     /// The packet simply contains invalid data
-    ///
-    /// This is rarely returned and only in the special cases where a bad client sends `0` as
-    /// the query count
     BadPacket,
     /// A data type was given but the parser failed to serialize it into this type
-    ///
-    /// This can happen not just for elements but can also happen for their sizes ([`Self::parse_into_u64`])
     DataTypeError,
     /// A data type that the client doesn't know was passed into the query
     ///
     /// This is a frequent problem that can arise between different server editions as more data types
     /// can be added with changing server versions
     UnknownDatatype,
-    /// The query is empty
-    ///
-    /// The **parser will never return this**, but instead it is provided for convenience with [`dbnet`]
-    Empty,
+}
+
+impl From<ParseIntError> for ParseError {
+    fn from(_: ParseIntError) -> Self {
+        Self::DataTypeError
+    }
+}
+
+impl From<Utf8Error> for ParseError {
+    fn from(_: Utf8Error) -> Self {
+        Self::DataTypeError
+    }
+}
+
+impl From<ParseFloatError> for ParseError {
+    fn from(_: ParseFloatError) -> Self {
+        Self::DataTypeError
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -130,580 +160,361 @@ pub enum RawResponse {
     PipelinedQuery(Vec<Element>),
 }
 
-/// A generic result to indicate parsing errors thorugh the [`ParseError`] enum
-pub type ParseResult<T> = Result<T, ParseError>;
-
 impl<'a> Parser<'a> {
-    /// Initialize a new parser instance
-    pub const fn new(buffer: &'a [u8]) -> Self {
-        Parser {
+    pub fn new(slice: &'a [u8]) -> Self {
+        Self {
+            slice,
             cursor: 0usize,
-            buffer,
         }
     }
-    /// Read from the current cursor position to `until` number of positions ahead
-    /// This **will forward the cursor itself** if the bytes exist or it will just return a `NotEnough` error
-    fn read_until(&mut self, until: usize) -> ParseResult<&[u8]> {
-        if let Some(b) = self.buffer.get(self.cursor..self.cursor + until) {
-            self.cursor += until;
-            Ok(b)
-        } else {
-            Err(ParseError::NotEnough)
-        }
+    fn remaining(&self) -> usize {
+        self.slice.len() - self.cursor
     }
-    /// This returns the position at which the line parsing began and the position at which the line parsing
-    /// stopped, in other words, you should be able to do self.buffer[started_at..stopped_at] to get a line
-    /// and do it unchecked. This **will move the internal cursor ahead** and place it **at the `\n` byte**
-    fn read_line(&mut self) -> (usize, usize) {
-        let started_at = self.cursor;
-        let mut stopped_at = self.cursor;
-        while self.cursor < self.buffer.len() {
-            if self.buffer[self.cursor] == b'\n' {
-                // Oh no! Newline reached, time to break the loop
-                // But before that ... we read the newline, so let's advance the cursor
-                self.incr_cursor();
-                break;
-            }
-            // So this isn't an LF, great! Let's forward the stopped_at position
-            stopped_at += 1;
-            self.incr_cursor();
-        }
-        (started_at, stopped_at)
+    fn has_remaining(&self, c: usize) -> bool {
+        self.remaining() >= c
     }
-    /// Push the internal cursor ahead by one
+    fn not_exhausted(&self) -> bool {
+        self.cursor < self.slice.len()
+    }
+    unsafe fn direct_read(&self, s: usize, c: usize) -> &[u8] {
+        slice::from_raw_parts(self.slice.as_ptr().add(s), c)
+    }
+    // mut refs
+    fn incr_cursor_by(&mut self, by: usize) {
+        debug_assert!(self.has_remaining(by), "Buffer overflow");
+        self.cursor += by;
+    }
+    fn decr_cursor_by(&mut self, by: usize) {
+        debug_assert!(
+            self.cursor != 0 && self.cursor.checked_sub(by).is_some(),
+            "Size underflow"
+        );
+        self.cursor -= 1;
+    }
+    fn decr_cursor(&mut self) {
+        self.decr_cursor_by(1)
+    }
     fn incr_cursor(&mut self) {
-        self.cursor += 1;
+        self.incr_cursor_by(1)
     }
-    /// This function will evaluate if the byte at the current cursor position equals the `ch` argument, i.e
-    /// the expression `*v == ch` is evaluated. However, if no element is present ahead, then the function
-    /// will return `Ok(_this_if_nothing_ahead_)`
-    fn will_cursor_give_char(&self, ch: u8, this_if_nothing_ahead: bool) -> ParseResult<bool> {
-        self.buffer.get(self.cursor).map_or(
-            if this_if_nothing_ahead {
-                Ok(true)
-            } else {
-                Err(ParseError::NotEnough)
-            },
-            |v| Ok(*v == ch),
-        )
+    unsafe fn get_byte_at_cursor(&self) -> u8 {
+        debug_assert!(self.not_exhausted(), "Buffer overflow");
+        *self.slice.as_ptr().add(self.cursor)
     }
-    /// Will the current cursor position give a linefeed? This will return `ParseError::NotEnough` if
-    /// the current cursor points at a non-existent index in `self.buffer`
-    fn will_cursor_give_linefeed(&self) -> ParseResult<bool> {
-        self.will_cursor_give_char(b'\n', false)
-    }
-    /// Parse a stream of bytes into [`usize`]
-    fn parse_into_usize(bytes: &[u8]) -> ParseResult<usize> {
-        if bytes.is_empty() {
-            return Err(ParseError::NotEnough);
-        }
-        let byte_iter = bytes.iter();
-        let mut item_usize = 0usize;
-        for dig in byte_iter {
-            if !dig.is_ascii_digit() {
-                // dig has to be an ASCII digit
-                return Err(ParseError::DataTypeError);
-            }
-            // 48 is the ASCII code for 0, and 57 is the ascii code for 9
-            // so if 0 is given, the subtraction should give 0; similarly
-            // if 9 is given, the subtraction should give us 9!
-            let curdig: usize = dig
-                .checked_sub(48)
-                .unwrap_or_else(|| unsafe { unreachable_unchecked() })
-                .into();
-            // The usize can overflow; check that case
-            let product = match item_usize.checked_mul(10) {
-                Some(not_overflowed) => not_overflowed,
-                None => return Err(ParseError::DataTypeError),
+    fn read_until(&mut self, c: usize) -> ParseResult<&[u8]> {
+        if self.has_remaining(c) {
+            let cursor = self.cursor;
+            self.incr_cursor_by(c);
+            let slice = unsafe {
+                // UNSAFE(@ohsayan): Just verified length
+                self.direct_read(cursor, c)
             };
-            let sum = match product.checked_add(curdig) {
-                Some(not_overflowed) => not_overflowed,
-                None => return Err(ParseError::DataTypeError),
-            };
-            item_usize = sum;
-        }
-        Ok(item_usize)
-    }
-    /// Pasre a stream of bytes into an [`u64`]
-    fn parse_into_u64(bytes: &[u8]) -> ParseResult<u64> {
-        if bytes.is_empty() {
-            return Err(ParseError::NotEnough);
-        }
-        let byte_iter = bytes.iter();
-        let mut item_u64 = 0u64;
-        for dig in byte_iter {
-            if !dig.is_ascii_digit() {
-                // dig has to be an ASCII digit
-                return Err(ParseError::DataTypeError);
-            }
-            // 48 is the ASCII code for 0, and 57 is the ascii code for 9
-            // so if 0 is given, the subtraction should give 0; similarly
-            // if 9 is given, the subtraction should give us 9!
-            let curdig: u64 = dig
-                .checked_sub(48)
-                .unwrap_or_else(|| unsafe { unreachable_unchecked() })
-                .into();
-            // Now the entire u64 can overflow, so let's attempt to check it
-            let product = match item_u64.checked_mul(10) {
-                Some(not_overflowed) => not_overflowed,
-                None => return Err(ParseError::DataTypeError),
-            };
-            let sum = match product.checked_add(curdig) {
-                Some(not_overflowed) => not_overflowed,
-                None => return Err(ParseError::DataTypeError),
-            };
-            item_u64 = sum;
-        }
-        Ok(item_u64)
-    }
-    /// This will return the number of datagroups present in this query packet
-    ///
-    /// This **will forward the cursor itself**
-    fn parse_metaframe_get_datagroup_count(&mut self) -> ParseResult<usize> {
-        // the smallest query we can have is: *1\n or 3 chars
-        if self.buffer.len() < 3 {
-            return Err(ParseError::NotEnough);
-        }
-        // Now we want to read `*<n>\n`
-        let (start, stop) = self.read_line();
-        if let Some(our_chunk) = self.buffer.get(start..stop) {
-            if our_chunk[0] == b'*' {
-                // Good, this will tell us the number of actions
-                // Let us attempt to read the usize from this point onwards
-                // that is excluding the '*' (so 1..)
-                let ret = Self::parse_into_usize(&our_chunk[1..])?;
-                Ok(ret)
-            } else {
-                Err(ParseError::UnexpectedByte)
-            }
+            Ok(slice)
         } else {
             Err(ParseError::NotEnough)
         }
     }
-    /// Get the next element **without** the tsymbol
-    ///
-    /// This function **does not forward the newline**
-    fn __get_next_element(&mut self) -> ParseResult<&[u8]> {
-        let string_sizeline = self.read_line();
-        if let Some(line) = self.buffer.get(string_sizeline.0..string_sizeline.1) {
-            let string_size = Self::parse_into_usize(line)?;
-            let our_chunk = self.read_until(string_size)?;
-            Ok(our_chunk)
-        } else {
-            Err(ParseError::NotEnough)
-        }
-    }
-    /// The cursor should have passed the `?` tsymbol
-    fn parse_next_binstr(&mut self) -> ParseResult<Vec<u8>> {
-        let our_string_chunk = self.__get_next_element()?.to_owned();
-        if self.will_cursor_give_linefeed()? {
-            // there is a lf after the end of the binary string; great!
-            // let's skip that now
+    fn read_line(&mut self) -> ParseResult<&[u8]> {
+        let cursor = self.cursor;
+        while self.not_exhausted()
+            && unsafe {
+                // UNSAFE(@ohsayan): The first condition ensures
+                // that the current byte is present in the allocation
+                self.get_byte_at_cursor()
+            } != b'\n'
+        {
             self.incr_cursor();
-            // let's return our string
-            Ok(our_string_chunk)
+        }
+        if self.not_exhausted()
+            && unsafe {
+                // UNSAFE(@ohsayan): The first condition ensures
+                // that the current byte is present in the allocation
+                self.get_byte_at_cursor()
+            } == b'\n'
+        {
+            let len = self.cursor - cursor;
+            self.incr_cursor(); // skip LF
+            Ok(unsafe {
+                // UNSAFE(@ohsayan): Just verified length
+                self.direct_read(cursor, len)
+            })
         } else {
-            Err(ParseError::UnexpectedByte)
+            Err(ParseError::NotEnough)
         }
     }
-    /// Parse the next null checked element
-    fn parse_next_chunk_nullck(&mut self) -> ParseResult<Option<&[u8]>> {
-        // we have the chunk
-        let (start, stop) = self.read_line();
-        if let Some(sizeline) = self.buffer.get(start..stop) {
-            let string_size = Self::parse_into_usize_nullck(sizeline)?;
-            if let Some(size) = string_size {
-                // so it isn't null
-                let our_chunk = self.read_until(size)?;
-                Ok(Some(our_chunk))
+    fn read_line_pedantic(&mut self) -> ParseResult<&[u8]> {
+        let cursor = self.cursor;
+        while self.not_exhausted()
+            && unsafe {
+                // UNSAFE(@ohsayan): The first condition ensures
+                // that the current byte is present in the allocation
+                self.get_byte_at_cursor()
+            } != b'\n'
+        {
+            self.incr_cursor();
+        }
+        let len = self.cursor - cursor;
+        let has_lf = self.not_exhausted()
+            && unsafe {
+                // UNSAFE(@ohsayan): The first condition ensures
+                // that the current byte is present in the allocation
+                self.get_byte_at_cursor()
+            } == b'\n';
+        if self.not_exhausted() && has_lf && len != 0 {
+            self.incr_cursor(); // skip LF
+            Ok(unsafe {
+                // UNSAFE(@ohsayan): Just verified lengths
+                self.direct_read(cursor, len)
+            })
+        } else {
+            let r = if has_lf {
+                ParseError::BadPacket
             } else {
+                ParseError::NotEnough
+            };
+            Err(r)
+        }
+    }
+    fn try_read_cursor(&mut self) -> ParseResult<u8> {
+        if self.not_exhausted() {
+            let r = unsafe {
+                // UNSAFE(@ohsayan): Just checked len
+                self.get_byte_at_cursor()
+            };
+            self.incr_cursor();
+            Ok(r)
+        } else {
+            Err(ParseError::NotEnough)
+        }
+    }
+}
+
+// higher level abstractions
+impl<'a> Parser<'a> {
+    fn read_u64(&mut self) -> ParseResult<u64> {
+        let line = self.read_line_pedantic()?;
+        let r = str::from_utf8(line)?.parse()?;
+        Ok(r)
+    }
+    fn read_usize(&mut self) -> ParseResult<usize> {
+        let line = self.read_line_pedantic()?;
+        let r = str::from_utf8(line)?.parse()?;
+        Ok(r)
+    }
+    fn read_usize_nullck(&mut self) -> ParseResult<Option<usize>> {
+        match self.try_read_cursor()? {
+            b'\0' => {
+                // null
                 Ok(None)
             }
-        } else {
-            Err(ParseError::NotEnough)
+            _ => {
+                self.decr_cursor();
+                let usz = self.read_usize()?;
+                Ok(Some(usz))
+            }
         }
     }
-    /// The cursor should have passed the `+` tsymbol
-    fn parse_next_string(&mut self) -> ParseResult<String> {
-        Ok(String::from_utf8_lossy(&self.parse_next_binstr()?).to_string())
+    fn read_string(&mut self) -> ParseResult<String> {
+        let size = self.read_usize()?;
+        let line = self.read_until(size)?;
+        let r = str::from_utf8(line)?.to_owned();
+        Ok(r)
     }
-    fn parse_next_binstr_nullck(&mut self) -> ParseResult<Option<Vec<u8>>> {
-        let our_chunk = self.parse_next_chunk_nullck()?;
-        if let Some(chunk) = our_chunk {
-            let our_chunk = chunk.to_owned();
-            if self.will_cursor_give_linefeed()? {
-                // there is a lf after the end of the binary string; great!
-                // let's skip that now
-                self.incr_cursor();
-                Ok(Some(our_chunk))
-            } else {
-                Err(ParseError::UnexpectedByte)
-            }
+    fn read_string_nullck(&mut self) -> ParseResult<Option<String>> {
+        if let Some(size) = self.read_usize_nullck()? {
+            Ok(Some(str::from_utf8(self.read_until(size)?)?.to_owned()))
         } else {
             Ok(None)
         }
     }
-    fn parse_next_str_nullck(&mut self) -> ParseResult<Option<String>> {
-        match self.parse_next_binstr_nullck()? {
-            Some(chunk) => Ok(Some(String::from_utf8_lossy(&chunk).to_string())),
-            None => Ok(None),
-        }
-    }
-    /// The cursor should have passed the `:` tsymbol
-    fn parse_next_u64(&mut self) -> ParseResult<u64> {
-        let our_u64_chunk = self.__get_next_element()?;
-        let our_u64 = Self::parse_into_u64(our_u64_chunk)?;
-        if self.will_cursor_give_linefeed()? {
-            // line feed after u64; heck yeah!
-            self.incr_cursor();
-            // return it
-            Ok(our_u64)
+    fn read_binary_nullck(&mut self) -> ParseResult<Option<Vec<u8>>> {
+        if let Some(size) = self.read_usize_nullck()? {
+            Ok(Some(self.read_until(size)?.to_owned()))
         } else {
-            Err(ParseError::UnexpectedByte)
+            Ok(None)
         }
     }
-    fn parse_next_respcode(&mut self) -> ParseResult<RespCode> {
-        let our_respcode_chunk = self.__get_next_element()?;
-        let our_respcode = RespCode::from_str(&String::from_utf8_lossy(our_respcode_chunk));
-        if self.will_cursor_give_linefeed()? {
-            self.incr_cursor();
-            Ok(our_respcode)
-        } else {
-            Err(ParseError::UnexpectedByte)
-        }
+    fn read_binary(&mut self) -> ParseResult<Vec<u8>> {
+        let size = self.read_usize()?;
+        Ok(self.read_until(size)?.to_owned())
     }
-    fn parse_next_float(&mut self) -> ParseResult<f32> {
-        let our_float_chunk = self.__get_next_element()?;
-        match String::from_utf8_lossy(our_float_chunk).parse() {
-            Ok(f) => {
-                if self.will_cursor_give_linefeed()? {
-                    self.incr_cursor();
-                    Ok(f)
-                } else {
-                    println!("LF error");
-                    Err(ParseError::UnexpectedByte)
-                }
-            }
-            Err(e) => {
-                println!("Error: {}", e);
-                Err(ParseError::UnexpectedByte)
-            }
-        }
+    fn read_respcode(&mut self) -> ParseResult<RespCode> {
+        let line = self.read_line()?;
+        let st = str::from_utf8(line)?;
+        Ok(RespCode::from_str(st))
     }
-    /// The cursor should be **at the tsymbol**
-    fn parse_next_element(&mut self) -> ParseResult<Element> {
-        if let Some(tsymbol) = self.buffer.get(self.cursor) {
-            // so we have a tsymbol; nice, let's match it
-            // but advance the cursor before doing that (skip)
-            self.incr_cursor();
-            let ret = match *tsymbol {
-                b'?' => Element::Binstr(self.parse_next_binstr()?),
-                b'+' => Element::String(self.parse_next_string()?),
-                b':' => Element::UnsignedInt(self.parse_next_u64()?),
-                b'&' => Element::Array(Array::Recursive(self.parse_next_array()?)),
-                b'!' => Element::RespCode(self.parse_next_respcode()?),
-                b'%' => Element::Float(self.parse_next_float()?),
-                b'^' => {
-                    // hmm, a typed non-null array; let's check the tsymbol
-                    if let Some(array_type) = self.buffer.get(self.cursor) {
-                        // got tsymbol, let's skip it
-                        self.incr_cursor();
-                        match array_type {
-                            b'+' => {
-                                Element::Array(Array::NonNullStr(self.parse_next_nonnull_str()?))
-                            }
-                            b'?' => {
-                                Element::Array(Array::NonNullBin(self.parse_next_nonnull_bin()?))
-                            }
-                            _ => return Err(ParseError::UnknownDatatype),
-                        }
-                    } else {
-                        // if we couldn't fetch a tsymbol, there wasn't enough
-                        // data left
-                        return Err(ParseError::NotEnough);
-                    }
-                }
-                b'@' => {
-                    // hmmm, a typed array; let's check the tsymbol
-                    if let Some(array_type) = self.buffer.get(self.cursor) {
-                        // got tsymbol, let's skip it
-                        self.incr_cursor();
-                        match array_type {
-                            b'+' => Element::Array(Array::Str(self.parse_next_typed_array_str()?)),
-                            b'?' => Element::Array(Array::Bin(self.parse_next_typed_array_bin()?)),
-                            _ => return Err(ParseError::UnknownDatatype),
-                        }
-                    } else {
-                        // if we couldn't fetch a tsymbol, there wasn't enough
-                        // data left
-                        return Err(ParseError::NotEnough);
-                    }
-                }
-                b'_' => Element::Array(Array::Flat(self.parse_next_flat_array()?)),
+    fn read_float(&mut self) -> ParseResult<f32> {
+        let line = self.read_line()?;
+        let st = str::from_utf8(line)?;
+        Ok(st.parse()?)
+    }
+    fn read_flat_array(&mut self) -> ParseResult<Vec<FlatElement>> {
+        let array_len = self.read_usize()?;
+        let mut data = Vec::with_capacity(array_len);
+        for _ in 0..array_len {
+            match self.try_read_cursor()? {
+                b'+' => data.push(FlatElement::String(self.read_string()?)),
+                b'?' => data.push(FlatElement::Binstr(self.read_binary()?)),
+                b'!' => data.push(FlatElement::RespCode(self.read_respcode()?)),
+                b':' => data.push(FlatElement::UnsignedInt(self.read_u64()?)),
+                b'%' => data.push(FlatElement::Float(self.read_float()?)),
                 _ => return Err(ParseError::UnknownDatatype),
-            };
-            Ok(ret)
-        } else {
-            // Not enough bytes to read an element
-            Err(ParseError::NotEnough)
+            }
         }
+        Ok(data)
     }
-    /// Parse the next null checked usize
-    fn parse_into_usize_nullck(inp: &[u8]) -> ParseResult<Option<usize>> {
-        if inp == [0] {
-            Ok(None)
-        } else {
-            Ok(Some(Self::parse_into_usize(inp)?))
+    fn read_typed_array_string(&mut self) -> ParseResult<Vec<Option<String>>> {
+        let size = self.read_usize()?;
+        let mut data = Vec::with_capacity(size);
+        for _ in 0..size {
+            data.push(self.read_string_nullck()?);
         }
+        Ok(data)
     }
+    fn read_typed_array_binary(&mut self) -> ParseResult<Vec<Option<Vec<u8>>>> {
+        let size = self.read_usize()?;
+        let mut data = Vec::with_capacity(size);
+        for _ in 0..size {
+            data.push(self.read_binary_nullck()?);
+        }
+        Ok(data)
+    }
+    fn read_typed_array(&mut self) -> ParseResult<Element> {
+        let r = match self.try_read_cursor()? {
+            b'+' => Element::Array(Array::Str(self.read_typed_array_string()?)),
+            b'?' => Element::Array(Array::Bin(self.read_typed_array_binary()?)),
+            _ => return Err(ParseError::UnknownDatatype),
+        };
+        Ok(r)
+    }
+    fn read_typed_nonnull_array_string(&mut self) -> ParseResult<Vec<String>> {
+        let size = self.read_usize()?;
+        let mut data = Vec::with_capacity(size);
+        for _ in 0..size {
+            data.push(self.read_string()?);
+        }
+        Ok(data)
+    }
+    fn read_typed_nonnull_array_binary(&mut self) -> ParseResult<Vec<Vec<u8>>> {
+        let size = self.read_usize()?;
+        let mut data = Vec::with_capacity(size);
+        for _ in 0..size {
+            data.push(self.read_binary()?);
+        }
+        Ok(data)
+    }
+    fn read_typed_nonnull_array(&mut self) -> ParseResult<Element> {
+        let r = match self.try_read_cursor()? {
+            b'+' => Element::Array(Array::NonNullStr(self.read_typed_nonnull_array_string()?)),
+            b'?' => Element::Array(Array::NonNullBin(self.read_typed_nonnull_array_binary()?)),
+            _ => return Err(ParseError::UnknownDatatype),
+        };
+        Ok(r)
+    }
+    fn consumed(&self) -> usize {
+        self.cursor
+    }
+}
 
-    /// The cursor should have passed the `@+` chars
-    fn parse_next_nonnull_str(&mut self) -> ParseResult<Vec<String>> {
-        let (start, stop) = self.read_line();
-        if let Some(our_size_chunk) = self.buffer.get(start..stop) {
-            // so we have a size chunk; let's get the size
-            let array_size = Self::parse_into_usize(our_size_chunk)?;
-            let mut array = Vec::with_capacity(array_size);
-            for _ in 0..array_size {
-                // no tsymbol, just elements and their sizes
-                array.push(self.parse_next_string()?);
-            }
-            Ok(array)
-        } else {
-            Err(ParseError::NotEnough)
-        }
+// response methods
+impl<'a> Parser<'a> {
+    fn _read_simple_resp(&mut self) -> ParseResult<Element> {
+        let r = match self.try_read_cursor()? {
+            b'+' => Element::String(self.read_string()?),
+            b'?' => Element::Binstr(self.read_binary()?),
+            b'!' => Element::RespCode(self.read_respcode()?),
+            b':' => Element::UnsignedInt(self.read_u64()?),
+            b'%' => Element::Float(self.read_float()?),
+            b'@' => self.read_typed_array()?,
+            b'^' => self.read_typed_nonnull_array()?,
+            b'_' => Element::Array(Array::Flat(self.read_flat_array()?)),
+            _ => return Err(ParseError::UnknownDatatype),
+        };
+        Ok(r)
     }
-
-    /// The cursor should have passed the `@+` chars
-    fn parse_next_typed_array_str(&mut self) -> ParseResult<Vec<Option<String>>> {
-        let (start, stop) = self.read_line();
-        if let Some(our_size_chunk) = self.buffer.get(start..stop) {
-            // so we have a size chunk; let's get the size
-            let array_size = Self::parse_into_usize(our_size_chunk)?;
-            let mut array = Vec::with_capacity(array_size);
-            for _ in 0..array_size {
-                // no tsymbol, just elements and their sizes
-                array.push(self.parse_next_str_nullck()?);
-            }
-            Ok(array)
-        } else {
-            Err(ParseError::NotEnough)
-        }
+    fn read_simple_resp(&mut self) -> ParseResult<Element> {
+        self._read_simple_resp()
     }
-    /// The cursor should have passed the `@?` chars
-    fn parse_next_typed_array_bin(&mut self) -> ParseResult<Vec<Option<Vec<u8>>>> {
-        let (start, stop) = self.read_line();
-        if let Some(our_size_chunk) = self.buffer.get(start..stop) {
-            // got size chunk, let's get the size
-            let array_size = Self::parse_into_usize(our_size_chunk)?;
-            let mut array = Vec::with_capacity(array_size);
-            for _ in 0..array_size {
-                array.push(self.parse_next_binstr_nullck()?);
-            }
-            Ok(array)
-        } else {
-            Err(ParseError::NotEnough)
+    fn read_pipeline_resp(&mut self) -> ParseResult<Vec<Element>> {
+        let size = self.read_usize()?;
+        let mut resps = Vec::with_capacity(size);
+        for _ in 0..size {
+            resps.push(self._read_simple_resp()?);
         }
+        Ok(resps)
     }
-
-    /// The cursor should have passed the `@+` chars
-    fn parse_next_nonnull_bin(&mut self) -> ParseResult<Vec<Vec<u8>>> {
-        let (start, stop) = self.read_line();
-        if let Some(our_size_chunk) = self.buffer.get(start..stop) {
-            // so we have a size chunk; let's get the size
-            let array_size = Self::parse_into_usize(our_size_chunk)?;
-            let mut array = Vec::with_capacity(array_size);
-            for _ in 0..array_size {
-                // no tsymbol, just elements and their sizes
-                array.push(self.parse_next_binstr()?);
-            }
-            Ok(array)
-        } else {
-            Err(ParseError::NotEnough)
-        }
+    fn _parse(&mut self) -> ParseResult<RawResponse> {
+        let r = match self.try_read_cursor()? {
+            b'*' => RawResponse::SimpleQuery(self.read_simple_resp()?),
+            b'$' => RawResponse::PipelinedQuery(self.read_pipeline_resp()?),
+            _ => return Err(ParseError::BadPacket),
+        };
+        Ok(r)
     }
-
-    /// The cursor should have passed the tsymbol
-    fn parse_next_flat_array(&mut self) -> ParseResult<Vec<FlatElement>> {
-        let (start, stop) = self.read_line();
-        if let Some(our_size_chunk) = self.buffer.get(start..stop) {
-            let array_size = Self::parse_into_usize(our_size_chunk)?;
-            let mut array = Vec::with_capacity(array_size);
-            for _ in 0..array_size {
-                if let Some(tsymbol) = self.buffer.get(self.cursor) {
-                    // good, there is a tsymbol; move the cursor ahead
-                    self.incr_cursor();
-                    let ret = match *tsymbol {
-                        b'+' => FlatElement::String(self.parse_next_string()?),
-                        b'?' => FlatElement::Binstr(self.parse_next_binstr()?),
-                        b'!' => FlatElement::RespCode(self.parse_next_respcode()?),
-                        b':' => FlatElement::UnsignedInt(self.parse_next_u64()?),
-                        _ => return Err(ParseError::UnknownDatatype),
-                    };
-                    array.push(ret);
-                } else {
-                    return Err(ParseError::NotEnough);
-                }
-            }
-            Ok(array)
-        } else {
-            Err(ParseError::NotEnough)
-        }
-    }
-    /// The tsymbol `&` should have been passed!
-    fn parse_next_array(&mut self) -> ParseResult<Vec<Element>> {
-        let (start, stop) = self.read_line();
-        if let Some(our_size_chunk) = self.buffer.get(start..stop) {
-            let array_size = Self::parse_into_usize(our_size_chunk)?;
-            let mut array = Vec::with_capacity(array_size);
-            for _ in 0..array_size {
-                array.push(self.parse_next_element()?);
-            }
-            Ok(array)
-        } else {
-            Err(ParseError::NotEnough)
-        }
-    }
-    /// Parse a query and return the [`Query`] and an `usize` indicating the number of bytes that
-    /// can be safely discarded from the buffer. It will otherwise return errors if they are found.
-    ///
-    /// This object will drop `Self`
-    pub fn parse(mut self) -> Result<(RawResponse, usize), ParseError> {
-        let number_of_queries = self.parse_metaframe_get_datagroup_count()?;
-        if number_of_queries == 0 {
-            // how on earth do you expect us to execute 0 queries? waste of bandwidth
-            return Err(ParseError::BadPacket);
-        }
-        if number_of_queries == 1 {
-            // This is a simple query
-            let single_group = self.parse_next_element()?;
-            // The below line defaults to false if no item is there in the buffer
-            // or it checks if the next time is a \r char; if it is, then it is the beginning
-            // of the next query
-            #[allow(clippy::blocks_in_if_conditions)]
-            // this lint is pointless here, just some optimizations
-            if self
-                .will_cursor_give_char(b'*', true)
-                .unwrap_or_else(|_| unsafe {
-                    // This will never be the case because we'll always get a result and no error value
-                    // as we've passed true which will yield Ok(true) even if there is no byte ahead
-                    unreachable_unchecked()
-                })
-            {
-                Ok((RawResponse::SimpleQuery(single_group), self.cursor))
-            } else {
-                // the next item isn't the beginning of a query but something else?
-                // that doesn't look right!
-                Err(ParseError::UnexpectedByte)
-            }
-        } else {
-            // This is a pipelined query
-            // We'll first make space for all the actiongroups
-            let mut queries = Vec::with_capacity(number_of_queries);
-            for _ in 0..number_of_queries {
-                queries.push(self.parse_next_element()?);
-            }
-            if self.will_cursor_give_char(b'*', true)? {
-                Ok((RawResponse::PipelinedQuery(queries), self.cursor))
-            } else {
-                Err(ParseError::UnexpectedByte)
-            }
-        }
+    pub fn parse(buffer: &'a [u8]) -> ParseResult<(RawResponse, usize)> {
+        let mut slf = Self::new(buffer);
+        let r = slf._parse()?;
+        Ok((r, slf.consumed()))
     }
 }
 
 #[test]
-fn test_typed_str_array() {
-    let typed_array_packet = "*1\n@+3\n3\nthe\n3\ncat\n6\nmeowed\n".as_bytes();
-    let (parsed, forward) = Parser::new(typed_array_packet).parse().unwrap();
-    assert_eq!(forward, typed_array_packet.len());
+fn set_resp() {
+    let setresp = b"*!0\n".to_vec();
+    let (ret, skip) = Parser::parse(&setresp).unwrap();
+    assert_eq!(skip, setresp.len());
     assert_eq!(
-        parsed,
+        ret,
+        RawResponse::SimpleQuery(Element::RespCode(RespCode::Okay))
+    );
+}
+
+#[test]
+fn mget_resp() {
+    let mgetresp = b"*@+4\n5\nsayan2\nis8\nthinking\0".to_vec();
+    let (ret, skip) = Parser::parse(&mgetresp).unwrap();
+    assert_eq!(
+        ret,
         RawResponse::SimpleQuery(Element::Array(Array::Str(vec![
-            Some("the".to_owned()),
-            Some("cat".to_owned()),
-            Some("meowed".to_owned())
-        ])))
-    );
-}
-
-#[test]
-fn test_typed_bin_array() {
-    let typed_array_packet = "*1\n@?3\n3\nthe\n3\ncat\n6\nmeowed\n".as_bytes();
-    let (parsed, forward) = Parser::new(typed_array_packet).parse().unwrap();
-    assert_eq!(forward, typed_array_packet.len());
-    assert_eq!(
-        parsed,
-        RawResponse::SimpleQuery(Element::Array(Array::Bin(vec![
-            Some(Vec::from("the")),
-            Some(Vec::from("cat")),
-            Some(Vec::from("meowed"))
-        ])))
-    );
-}
-
-#[test]
-fn test_typed_bin_array_null() {
-    let typed_array_packet = "*1\n@?3\n3\nthe\n3\ncat\n\0\n".as_bytes();
-    let (parsed, forward) = Parser::new(typed_array_packet).parse().unwrap();
-    assert_eq!(forward, typed_array_packet.len());
-    assert_eq!(
-        parsed,
-        RawResponse::SimpleQuery(Element::Array(Array::Bin(vec![
-            Some(Vec::from("the")),
-            Some(Vec::from("cat")),
+            Some("sayan".to_owned()),
+            Some("is".to_owned()),
+            Some("thinking".to_owned()),
             None
         ])))
     );
+    assert_eq!(skip, mgetresp.len());
 }
 
 #[test]
-fn test_typed_str_array_null() {
-    let typed_array_packet = "*1\n@+3\n3\nthe\n3\ncat\n\0\n".as_bytes();
-    let (parsed, forward) = Parser::new(typed_array_packet).parse().unwrap();
-    assert_eq!(forward, typed_array_packet.len());
+fn pipe_resp() {
+    let resp = b"$2\n!0\n@+4\n5\nsayan2\nis8\nthinking\0".to_vec();
+    let (ret, skip) = Parser::parse(&resp).unwrap();
     assert_eq!(
-        parsed,
-        RawResponse::SimpleQuery(Element::Array(Array::Str(vec![
-            Some("the".to_owned()),
-            Some("cat".to_owned()),
-            None
-        ])))
+        ret,
+        RawResponse::PipelinedQuery(vec![
+            Element::RespCode(RespCode::Okay),
+            Element::Array(Array::Str(vec![
+                Some("sayan".to_owned()),
+                Some("is".to_owned()),
+                Some("thinking".to_owned()),
+                None
+            ]))
+        ])
     );
+    assert_eq!(skip, resp.len());
 }
 
 #[test]
-fn test_parse_float() {
-    let packet = b"*1\n%3\n1.1\n";
-    let (parsed, forward) = Parser::new(packet).parse().unwrap();
-    assert_eq!(forward, packet.len());
-    assert_eq!(parsed, RawResponse::SimpleQuery(Element::Float(1.1)))
-}
-
-#[test]
-fn test_parse_nonnull_str() {
-    let packet = b"*1\n^+2\n2\nhi\n5\nthere\n";
-    let (parsed, forward) = Parser::new(packet).parse().unwrap();
-    assert_eq!(forward, packet.len());
+fn lskeys_resp() {
+    let resp = b"*^+3\n5\nsayan2\nis8\nthinking".to_vec();
+    let (ret, skip) = Parser::parse(&resp).unwrap();
     assert_eq!(
-        parsed,
+        ret,
         RawResponse::SimpleQuery(Element::Array(Array::NonNullStr(vec![
-            "hi".to_owned(),
-            "there".to_owned()
+            "sayan".to_string(),
+            "is".to_string(),
+            "thinking".to_string()
         ])))
-    )
-}
-
-#[test]
-fn test_parse_nonnull_bin() {
-    let packet = b"*1\n^?2\n2\nhi\n5\nthere\n";
-    let (parsed, forward) = Parser::new(packet).parse().unwrap();
-    assert_eq!(forward, packet.len());
-    assert_eq!(
-        parsed,
-        RawResponse::SimpleQuery(Element::Array(Array::NonNullBin(vec![
-            "hi".as_bytes().to_owned(),
-            "there".as_bytes().to_owned()
-        ])))
-    )
+    );
+    assert_eq!(skip, resp.len());
 }

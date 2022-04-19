@@ -94,15 +94,12 @@ macro_rules! impl_sync_methods {
                         }
                         Err(e) => match e {
                             ParseError::NotEnough => (),
-                            ParseError::BadPacket | ParseError::UnexpectedByte => {
+                            ParseError::BadPacket => {
                                 self.buffer.clear();
                                 return Err(SkyhashError::InvalidResponse.into());
                             }
                             ParseError::DataTypeError => {
                                 return Err(SkyhashError::ParseError.into())
-                            }
-                            ParseError::Empty => {
-                                return Err(IoError::from(ErrorKind::ConnectionReset).into())
                             }
                             ParseError::UnknownDatatype => {
                                 return Err(SkyhashError::UnknownDataType.into())
@@ -112,11 +109,7 @@ macro_rules! impl_sync_methods {
                 }
             }
             fn try_response(&mut self) -> Result<(RawResponse, usize), ParseError> {
-                if self.buffer.is_empty() {
-                    // The connection was possibly reset
-                    return Err(ParseError::Empty);
-                }
-                Parser::new(&self.buffer).parse()
+                Parser::parse(&self.buffer)
             }
         }
         impl crate::actions::SyncSocket for $ty {

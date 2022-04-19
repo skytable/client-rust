@@ -2,6 +2,12 @@
 
 All changes in this project will be noted in this file.
 
+## Unreleased
+
+### New features
+
+- Support for Skyhash 2.0
+
 ## 0.7.0
 
 ### New features

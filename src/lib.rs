@@ -391,12 +391,11 @@ cfg_sync! {
     impl WriteQuerySync for Query {
         fn write_sync(&self, stream: &mut impl std::io::Write) -> IoResult<()> {
             // Write the metaframe
-            stream.write_all(b"*1\n")?;
-            // Add the dataframe
+            stream.write_all(b"*")?;
             let number_of_items_in_datagroup = self.len().to_string().into_bytes();
-            stream.write_all(&[b'~'])?;
             stream.write_all(&number_of_items_in_datagroup)?;
             stream.write_all(&[b'\n'])?;
+            // Add the dataframe
             stream.write_all(self.get_holding_buffer())?;
             stream.flush()?;
             Ok(())
@@ -406,7 +405,7 @@ cfg_sync! {
     impl WriteQuerySync for Pipeline {
         fn write_sync(&self, stream: &mut impl std::io::Write) -> IoResult<()> {
             let len = self.len.to_string().into_bytes();
-            stream.write_all(b"*")?;
+            stream.write_all(b"$")?;
             stream.write_all(&len)?;
             stream.write_all(b"\n")?;
             stream.write_all(&self.chain)
@@ -424,10 +423,9 @@ cfg_async! {
         fn write_async<'s>(&'s self, stream: &'s mut T) -> FutureRet {
             Box::pin(async move {
                 // Write the metaframe
-                stream.write_all(b"*1\n").await?;
+                stream.write_all(b"*").await?;
                 // Add the dataframe
                 let number_of_items_in_datagroup = self.len().to_string().into_bytes();
-                stream.write_all(&[b'~']).await?;
                 stream.write_all(&number_of_items_in_datagroup).await?;
                 stream.write_all(&[b'\n']).await?;
                 stream.write_all(self.get_holding_buffer()).await?;
@@ -440,7 +438,7 @@ cfg_async! {
         fn write_async<'s>(&'s self, stream: &'s mut T) -> FutureRet {
             Box::pin(async move {
                 let len = self.len.to_string().into_bytes();
-                stream.write_all(b"*").await?;
+                stream.write_all(b"$").await?;
                 stream.write_all(&len).await?;
                 stream.write_all(b"\n").await?;
                 stream.write_all(&self.chain).await
@@ -544,7 +542,6 @@ impl Query {
         self.data.push(b'\n');
         // Add the data itself, which is `arg`
         self.data.extend(arg);
-        self.data.push(b'\n'); // add the LF char
         self.size_count += 1;
     }
     /// Add an argument to a query taking a reference to it
@@ -587,7 +584,6 @@ impl Query {
         assert!(!self.is_empty(), "Query cannot be empty");
         // Add the dataframe element
         let number_of_items_in_datagroup = self.len().to_string().into_bytes();
-        buffer.extend([b'~']);
         buffer.extend(&number_of_items_in_datagroup);
         buffer.extend([b'\n']);
         buffer.extend(self.get_holding_buffer());
@@ -601,7 +597,7 @@ impl Query {
         /// return the raw query that would be written to the stream, serialized using the Skyhash serialization protocol
         pub fn into_raw_query(self) -> Vec<u8> {
             let mut v = Vec::with_capacity(self.data.len());
-            v.extend(b"*1\n~");
+            v.extend(b"*");
             v.extend(self.len().to_string().into_bytes());
             v.extend(b"\n");
             v.extend(self.get_holding_buffer());
@@ -613,8 +609,8 @@ impl Query {
         pub fn array_packet_size_hint(element_lengths: impl AsRef<[usize]>) -> usize {
             let element_lengths = element_lengths.as_ref();
             let mut len = 0_usize;
-            // *1\n_
-            len += 4;
+            // *
+            len += 1;
             let dig_count = |dig| -> usize {
                 let dig_count = (dig as f32).log(10.0_f32).floor() + 1_f32;
                 dig_count as usize
@@ -630,8 +626,6 @@ impl Query {
                 len += 1;
                 // the element's own length
                 len += elem;
-                // the final newline
-                len += 1;
             });
             len
         }
@@ -747,7 +741,7 @@ impl Pipeline {
                 panic!("The pipeline is empty")
             } else {
                 let mut v = Vec::with_capacity(self.chain.len() + 4);
-                v.push(b'*');
+                v.push(b'$');
                 v.extend(self.len.to_string().as_bytes());
                 v.push(b'\n');
                 v.extend(self.chain);
@@ -758,10 +752,16 @@ impl Pipeline {
 }
 
 cfg_dbg! {
-#[test]
+    #[test]
     fn test_pipeline_dbg() {
-        let bytes = b"*2\n~1\n5\nhello\n~1\n5\nworld\n";
-        let pipe = Pipeline::new().append(query!("hello")).append(query!("world"));
-        assert_eq!(pipe.into_raw_query(), bytes);
+        let bytes = b"$2\n1\n5\nhello1\n5\nworld";
+        let pipe = Pipeline::new().append(query!("hello")).append(query!("world")).into_raw_query();
+        println!("{}", String::from_utf8_lossy(&pipe));
+        assert_eq!(pipe, bytes);
+    }
+    #[test]
+    fn test_query_dbg() {
+        let expected = b"*3\n3\nSET1\nx3\n100";
+        assert_eq!(Query::from(["SET", "x", "100"]).into_raw_query(), expected);
     }
 }

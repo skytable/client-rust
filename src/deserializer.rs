@@ -91,21 +91,6 @@ impl Element {
         T::from_element(self)
     }
 }
-/*
- * Copyright 2022, Sayan Nandan <nandansayan@outlook.com>
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
-*/
 
 /// A generic result to indicate parsing errors thorugh the [`ParseError`] enum
 pub type ParseResult<T> = Result<T, ParseError>;
@@ -161,29 +146,36 @@ pub enum RawResponse {
 }
 
 impl<'a> Parser<'a> {
+    #[inline(always)]
     pub fn new(slice: &'a [u8]) -> Self {
         Self {
             slice,
             cursor: 0usize,
         }
     }
+    #[inline(always)]
     fn remaining(&self) -> usize {
         self.slice.len() - self.cursor
     }
+    #[inline(always)]
     fn has_remaining(&self, c: usize) -> bool {
         self.remaining() >= c
     }
+    #[inline(always)]
     fn not_exhausted(&self) -> bool {
         self.cursor < self.slice.len()
     }
+    #[inline(always)]
     unsafe fn direct_read(&self, s: usize, c: usize) -> &[u8] {
         slice::from_raw_parts(self.slice.as_ptr().add(s), c)
     }
     // mut refs
+    #[inline(always)]
     fn incr_cursor_by(&mut self, by: usize) {
         debug_assert!(self.has_remaining(by), "Buffer overflow");
         self.cursor += by;
     }
+    #[inline(always)]
     fn decr_cursor_by(&mut self, by: usize) {
         debug_assert!(
             self.cursor != 0 && self.cursor.checked_sub(by).is_some(),
@@ -191,16 +183,20 @@ impl<'a> Parser<'a> {
         );
         self.cursor -= 1;
     }
+    #[inline(always)]
     fn decr_cursor(&mut self) {
         self.decr_cursor_by(1)
     }
+    #[inline(always)]
     fn incr_cursor(&mut self) {
         self.incr_cursor_by(1)
     }
+    #[inline(always)]
     unsafe fn get_byte_at_cursor(&self) -> u8 {
         debug_assert!(self.not_exhausted(), "Buffer overflow");
         *self.slice.as_ptr().add(self.cursor)
     }
+    #[inline(always)]
     fn read_until(&mut self, c: usize) -> ParseResult<&[u8]> {
         if self.has_remaining(c) {
             let cursor = self.cursor;
@@ -214,6 +210,7 @@ impl<'a> Parser<'a> {
             Err(ParseError::NotEnough)
         }
     }
+    #[inline(always)]
     fn read_line(&mut self) -> ParseResult<&[u8]> {
         let cursor = self.cursor;
         while self.not_exhausted()
@@ -242,6 +239,7 @@ impl<'a> Parser<'a> {
             Err(ParseError::NotEnough)
         }
     }
+    #[inline(always)]
     fn read_line_pedantic(&mut self) -> ParseResult<&[u8]> {
         let cursor = self.cursor;
         while self.not_exhausted()
@@ -275,6 +273,7 @@ impl<'a> Parser<'a> {
             Err(r)
         }
     }
+    #[inline(always)]
     fn try_read_cursor(&mut self) -> ParseResult<u8> {
         if self.not_exhausted() {
             let r = unsafe {
@@ -291,16 +290,19 @@ impl<'a> Parser<'a> {
 
 // higher level abstractions
 impl<'a> Parser<'a> {
+    #[inline(always)]
     fn read_u64(&mut self) -> ParseResult<u64> {
         let line = self.read_line_pedantic()?;
         let r = str::from_utf8(line)?.parse()?;
         Ok(r)
     }
+    #[inline(always)]
     fn read_usize(&mut self) -> ParseResult<usize> {
         let line = self.read_line_pedantic()?;
         let r = str::from_utf8(line)?.parse()?;
         Ok(r)
     }
+    #[inline(always)]
     fn read_usize_nullck(&mut self) -> ParseResult<Option<usize>> {
         match self.try_read_cursor()? {
             b'\0' => {
@@ -314,12 +316,14 @@ impl<'a> Parser<'a> {
             }
         }
     }
+    #[inline(always)]
     fn read_string(&mut self) -> ParseResult<String> {
         let size = self.read_usize()?;
         let line = self.read_until(size)?;
         let r = str::from_utf8(line)?.to_owned();
         Ok(r)
     }
+    #[inline(always)]
     fn read_string_nullck(&mut self) -> ParseResult<Option<String>> {
         if let Some(size) = self.read_usize_nullck()? {
             Ok(Some(str::from_utf8(self.read_until(size)?)?.to_owned()))
@@ -327,6 +331,7 @@ impl<'a> Parser<'a> {
             Ok(None)
         }
     }
+    #[inline(always)]
     fn read_binary_nullck(&mut self) -> ParseResult<Option<Vec<u8>>> {
         if let Some(size) = self.read_usize_nullck()? {
             Ok(Some(self.read_until(size)?.to_owned()))
@@ -334,20 +339,24 @@ impl<'a> Parser<'a> {
             Ok(None)
         }
     }
+    #[inline(always)]
     fn read_binary(&mut self) -> ParseResult<Vec<u8>> {
         let size = self.read_usize()?;
         Ok(self.read_until(size)?.to_owned())
     }
+    #[inline(always)]
     fn read_respcode(&mut self) -> ParseResult<RespCode> {
         let line = self.read_line()?;
         let st = str::from_utf8(line)?;
         Ok(RespCode::from_str(st))
     }
+    #[inline(always)]
     fn read_float(&mut self) -> ParseResult<f32> {
         let line = self.read_line()?;
         let st = str::from_utf8(line)?;
         Ok(st.parse()?)
     }
+    #[inline(always)]
     fn read_flat_array(&mut self) -> ParseResult<Vec<FlatElement>> {
         let array_len = self.read_usize()?;
         let mut data = Vec::with_capacity(array_len);
@@ -363,6 +372,7 @@ impl<'a> Parser<'a> {
         }
         Ok(data)
     }
+    #[inline(always)]
     fn read_typed_array_string(&mut self) -> ParseResult<Vec<Option<String>>> {
         let size = self.read_usize()?;
         let mut data = Vec::with_capacity(size);
@@ -371,6 +381,7 @@ impl<'a> Parser<'a> {
         }
         Ok(data)
     }
+    #[inline(always)]
     fn read_typed_array_binary(&mut self) -> ParseResult<Vec<Option<Vec<u8>>>> {
         let size = self.read_usize()?;
         let mut data = Vec::with_capacity(size);
@@ -379,6 +390,7 @@ impl<'a> Parser<'a> {
         }
         Ok(data)
     }
+    #[inline(always)]
     fn read_typed_array(&mut self) -> ParseResult<Element> {
         let r = match self.try_read_cursor()? {
             b'+' => Element::Array(Array::Str(self.read_typed_array_string()?)),
@@ -387,6 +399,7 @@ impl<'a> Parser<'a> {
         };
         Ok(r)
     }
+    #[inline(always)]
     fn read_typed_nonnull_array_string(&mut self) -> ParseResult<Vec<String>> {
         let size = self.read_usize()?;
         let mut data = Vec::with_capacity(size);
@@ -395,6 +408,7 @@ impl<'a> Parser<'a> {
         }
         Ok(data)
     }
+    #[inline(always)]
     fn read_typed_nonnull_array_binary(&mut self) -> ParseResult<Vec<Vec<u8>>> {
         let size = self.read_usize()?;
         let mut data = Vec::with_capacity(size);
@@ -403,6 +417,7 @@ impl<'a> Parser<'a> {
         }
         Ok(data)
     }
+    #[inline(always)]
     fn read_typed_nonnull_array(&mut self) -> ParseResult<Element> {
         let r = match self.try_read_cursor()? {
             b'+' => Element::Array(Array::NonNullStr(self.read_typed_nonnull_array_string()?)),
@@ -411,6 +426,7 @@ impl<'a> Parser<'a> {
         };
         Ok(r)
     }
+    #[inline(always)]
     fn consumed(&self) -> usize {
         self.cursor
     }
@@ -418,6 +434,7 @@ impl<'a> Parser<'a> {
 
 // response methods
 impl<'a> Parser<'a> {
+    #[inline(always)]
     fn _read_simple_resp(&mut self) -> ParseResult<Element> {
         let r = match self.try_read_cursor()? {
             b'+' => Element::String(self.read_string()?),
@@ -432,9 +449,11 @@ impl<'a> Parser<'a> {
         };
         Ok(r)
     }
+    #[inline(always)]
     fn read_simple_resp(&mut self) -> ParseResult<Element> {
         self._read_simple_resp()
     }
+    #[inline(always)]
     fn read_pipeline_resp(&mut self) -> ParseResult<Vec<Element>> {
         let size = self.read_usize()?;
         let mut resps = Vec::with_capacity(size);
@@ -443,6 +462,7 @@ impl<'a> Parser<'a> {
         }
         Ok(resps)
     }
+    #[inline(always)]
     fn _parse(&mut self) -> ParseResult<RawResponse> {
         let r = match self.try_read_cursor()? {
             b'*' => RawResponse::SimpleQuery(self.read_simple_resp()?),
@@ -451,6 +471,7 @@ impl<'a> Parser<'a> {
         };
         Ok(r)
     }
+    #[inline(always)]
     pub fn parse(buffer: &'a [u8]) -> ParseResult<(RawResponse, usize)> {
         let mut slf = Self::new(buffer);
         let r = slf._parse()?;

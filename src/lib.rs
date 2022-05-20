@@ -311,7 +311,11 @@ impl Default for ConnectionBuilder {
 impl ConnectionBuilder {
     /// Create an empty connection builder
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            port: DEFAULT_PORT,
+            host: DEFAULT_HOSTADDR.to_owned(),
+            entity: DEFAULT_ENTITY.to_owned(),
+        }
     }
     /// Set the port (defaults to `2003`)
     pub fn set_port(mut self, port: u16) -> Self {

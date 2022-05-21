@@ -14,7 +14,8 @@ fn main() {
 
     // now let's switch to the table
     con.switch("default:mytbl").unwrap();
-
+    // switch back to the default entity because we can't drop an entity while it's in use
+    con.switch("default:default").unwrap();
     // now let's drop the table
     con.drop_table("default:mytbl").unwrap();
 }

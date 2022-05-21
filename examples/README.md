@@ -19,7 +19,7 @@ All the examples are part of a workspace and can be simply built by running `car
 > **Important note:** You should **change** the version of the dependency **from this**:
 >
 > ```toml
-> skytable = { git="https://github.com/skytable/client-rust.git", features = ["const-gen"] }
+> skytable = { version="0.7.1", features = ["const-gen"] }
 > ```
 >
 > **to this**:

@@ -8,4 +8,4 @@ edition = "2018"
 
 [dependencies]
 # We use the `const-gen` feature to work with arrays; you can choose to leave it out
-skytable = { git="https://github.com/skytable/client-rust.git", features = ["const-gen"] }
+skytable = { version = "0.7.1", features = ["const-gen"] }

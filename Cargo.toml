@@ -30,20 +30,20 @@ const-gen = []
 dbg = []
 
 [dependencies]
-bytes = { version = "1.1.0", optional = true }
-openssl = { version = "0.10.40", optional = true }
-tokio = { version = "1.19.2", features = [
+bytes = { version = "1.2.0", optional = true }
+openssl = { version = "0.10.41", optional = true }
+tokio = { version = "1.20.1", features = [
     "net",
     "io-util",
     "io-std",
 ], optional = true, default-features = false }
 tokio-openssl = { version = "0.6.3", optional = true }
-r2d2 = { version = "0.8.9", optional = true }
+r2d2 = { version = "0.8.10", optional = true }
 bb8 = { version = "0.8.0", optional = true }
 async-trait = { version = "0.1.56", optional = true }
 
 [dev-dependencies]
-tokio = { version = "1.19.2", features = [
+tokio = { version = "1.20.1", features = [
     "test-util",
     "macros",
 ], default-features = false }

@@ -16,21 +16,13 @@
 */
 
 //! # Actions
-//!
-//! This module contains traits for running actions. To run actions:
-//! - For the `sync` feature, add this import:
-//!     ```
-//!     use skytable::actions::Actions;
-//!     ```
-//! - For the `async` feature, add this import:
-//!     ```
-//!     use skytable::actions::AsyncActions;
-//!     ```
-//! ## Running actions
-//!
-//! Once you have imported the required traits, you can now run the actions! For example:
+//! 
+//! All connection types give you implementations for actions
+//! 
+//! For example:
+//! 
 //! ```no_run
-//! use skytable::{actions::Actions, Connection};
+//! use skytable::Connection;
 //! let mut con = Connection::new("127.0.0.1", 2003).unwrap();
 //! con.set("x", "100").unwrap();
 //! let ret: String = con.get("x").unwrap();
@@ -48,83 +40,100 @@ use crate::IntoSkyhashAction;
 use crate::IntoSkyhashBytes;
 use crate::Query;
 use crate::RespCode;
-use crate::SkyQueryResult;
 use crate::SkyResult;
 
-cfg_async!(
-    use crate::AsyncResult;
-);
-
-cfg_async!(
-    #[doc(hidden)]
-    /// A raw async connection to the database server
-    pub trait AsyncSocket: Send + Sync {
-        /// Run the query
-        fn run(&mut self, q: Query) -> AsyncResult<SkyQueryResult>;
-    }
-    impl<T> AsyncActions for T where T: AsyncSocket {}
-);
-
-cfg_sync!(
-    #[doc(hidden)]
-    /// A raw synchronous connection to the database server
-    pub trait SyncSocket {
-        /// Run the query
-        fn run(&mut self, q: Query) -> SkyQueryResult;
-    }
-    impl<T> Actions for T where T: SyncSocket {}
-);
-
-macro_rules! implement_actions {
+macro_rules! impls {
     (
-        $(
-            $(#[$attr:meta])+
-            fn $name:ident$(<$($tyargs:ident $(: $ty:ident $(+$tye:lifetime)?)?),*>)?(
-                $($argname:ident: $argty:ty),*) -> $ret:ty {
-                    $($block:block)?
-                    $($($mtch:pat)|+ => $expect:expr),+
-                }
-        )*
+        (
+            sync => {
+                $($(#[$sync_cfg_attr:meta])+ $ty:ident),*
+            },
+            async => {
+                $($(#[$async_cfg_attr:meta])+ $asyncty:ident),*
+            }
+        ) => $args:tt
     ) => {
-        #[cfg(feature = "sync")]
-        #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
-        /// Actions that can be run on a [`SyncSocket`] connection
-        ///
-        /// ## Example
-        /// ```no_run
-        /// use skytable::actions::Actions;
-        /// use skytable::sync::Connection;
-        ///
-        /// let mut con = Connection::new("127.0.0.1", 2003).unwrap();
-        /// con.set("x", "100").unwrap();
-        /// let x: String = con.get("x").unwrap();
-        /// assert_eq!(x, "100");
-        /// ```
-        pub trait Actions: SyncSocket {
+        $(
+            impls!(@impl $(#[$sync_cfg_attr])+ $ty $args);
+        )*
+        $(
+            impls!(@async impl $(#[$async_cfg_attr])+ $asyncty $args);
+        )*
+    };
+    (@impl $(#[$sync_cfg_attr:meta])+ $tyimpl:ident ($(
+        $(#[$attr:meta])+
+        fn $name:ident$(<$($tyargs:ident $(: $ty:ident)?),*>)?(
+            $($argname:ident: $argty:ty),*) -> $ret:ty
+        {
+                $($block:block)?
+                $($($mtch:pat)|+ => $expect:expr),+
+        }
+    )*)) => {
+        $(#[$sync_cfg_attr])+
+        impl $tyimpl {
             $(
                 $(#[$attr])*
                 #[inline]
-                fn $name<'s, $($($tyargs$(: $ty $(+$tye)*,)* )*)?>(&'s mut self $(, $argname: $argty)*) -> SkyResult<$ret> {
-                    gen_match!(self.run($($block)?), $($($mtch)+, $expect),*)
+                pub fn $name<$($($tyargs$(: $ty,)* )*)?>(&mut self $(, $argname: $argty)*) -> SkyResult<$ret> {
+                    gen_match!(self.run_query($($block)?), $($($mtch)+, $expect),*)
                 }
             )*
         }
-        #[cfg(feature = "aio")]
-        #[cfg_attr(docsrs, doc(cfg(feature = "aio")))]
-        /// Actions that can be run on an [`AsyncSocket`] connection
-        pub trait AsyncActions: AsyncSocket {
+    };
+    (@async impl $(#[$async_cfg_attr:meta])+ $tyimpl:ident ($(
+        $(#[$attr:meta])+
+        fn $name:ident$(<$($tyargs:ident $(: $ty:ident)?),*>)?(
+            $($argname:ident: $argty:ty),*) -> $ret:ty
+        {
+                $($block:block)?
+                $($($mtch:pat)|+ => $expect:expr),+
+        }
+    )*)) => {
+        $(#[$async_cfg_attr])+
+        impl $tyimpl {
             $(
                 $(#[$attr])*
                 #[inline]
-                fn $name<'s, $($($tyargs$(: $ty $(+$tye)*,)* )*)?>(&'s mut self $(, $argname: $argty)*) -> AsyncResult<SkyResult<$ret>> {
-                    Box::pin(async move {gen_match!(self.run($($block)?).await, $($($mtch)+, $expect),*)})
+                pub async fn $name<$($($tyargs$(: $ty,)* )*)?>(&mut self $(, $argname: $argty)*) -> SkyResult<$ret> {
+                    gen_match!(self.run_query($($block)?).await, $($($mtch)+, $expect),*)
                 }
             )*
         }
     };
 }
 
-implement_actions! {
+cfg_sync!(
+    use crate::sync::Connection;
+);
+cfg_sync_ssl_any!(
+    use crate::sync::TlsConnection;
+);
+cfg_async!(
+    use crate::aio::Connection as AsyncConnection;
+);
+cfg_async_ssl_any!(
+    use crate::aio::TlsConnection as AsyncTlsConnection;
+);
+
+impls!(
+    (
+        sync => {
+            #[cfg(feature = "sync")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+            Connection,
+            #[cfg(all(feature = "sync", any(feature = "ssl", feature = "sslv")))]
+            #[cfg_attr(docsrs, doc(cfg(all(feature="sync", any(feature = "ssl", feature = "sslv")))))]
+            TlsConnection
+        },
+        async => {
+            #[cfg(feature = "aio")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "aio")))]
+            AsyncConnection,
+            #[cfg(all(feature = "aio", any(feature = "aio-ssl", feature = "aio-sslv")))]
+            #[cfg_attr(docsrs, doc(cfg(all(feature="aio", any(feature = "aio-ssl", feature = "aio-sslv")))))]
+            AsyncTlsConnection
+        }
+    ) => (
     /// Get the number of keys present in the database
     fn dbsize() -> u64 {
         { Query::from("dbsize") }
@@ -139,7 +148,7 @@ implement_actions! {
     ///
     /// This will return the number of keys that were deleted
     ///
-    fn del(key: impl IntoSkyhashAction + 's) -> u64 {
+    fn del(key: impl IntoSkyhashAction) -> u64 {
         { Query::from("del").arg(key) }
         Element::UnsignedInt(int) => int as u64
     }
@@ -152,7 +161,7 @@ implement_actions! {
     ///
     /// This will return the number of keys that do exist
     ///
-    fn exists(key: impl IntoSkyhashAction + 's) -> u64 {
+    fn exists(key: impl IntoSkyhashAction) -> u64 {
         { Query::from("exists").arg(key) }
         Element::UnsignedInt(int) => int as u64
     }
@@ -167,7 +176,7 @@ implement_actions! {
     /// ```text
     /// GET <key>
     /// ```
-    fn get<T: FromSkyhashBytes>(key: impl IntoSkyhashBytes + 's) -> T {
+    fn get<T: FromSkyhashBytes>(key: impl IntoSkyhashBytes) -> T {
         { Query::from("get").arg(key)}
         x @ Element::String(_) | x @ Element::Binstr(_) => T::from_element(x)?
     }
@@ -177,7 +186,7 @@ implement_actions! {
     /// ```text
     /// KEYLEN <key>
     /// ```
-    fn keylen(key: impl IntoSkyhashBytes + 's) -> u64 {
+    fn keylen(key: impl IntoSkyhashBytes) -> u64 {
         { Query::from("keylen").arg(key)}
         Element::UnsignedInt(int) => int as u64
     }
@@ -201,7 +210,7 @@ implement_actions! {
     /// ```
     ///
     /// **This method expects either:** `[T; N]`, `&[T; N]` or anything that derefs to `&[T]`
-    fn mget<T: FromSkyhashBytes>(keys: impl IntoSkyhashAction+ 's) -> T {
+    fn mget<T: FromSkyhashBytes>(keys: impl IntoSkyhashAction) -> T {
         { Query::from("mget").arg(keys)}
         x @ Element::Array(Array::Bin(_)) | x @ Element::Array(Array::Str(_)) => T::from_element(x)?
     }
@@ -235,10 +244,10 @@ implement_actions! {
     /// This method will panic if the number of keys and values are not equal
     ///
     /// **This method expects either:** `[T; N]`, `&[T; N]` or anything that derefs to `&[T]`
-    fn mset<T: IntoSkyhashBytes + 's , U: IntoSkyhashBytes + 's>
+    fn mset<T: IntoSkyhashBytes, U: IntoSkyhashBytes>
     (
-        keys: impl GetIterator<T> + 's,
-        values: impl GetIterator<U> + 's
+        keys: impl GetIterator<T>,
+        values: impl GetIterator<U>
     ) -> u64 {
         {
             assert!(keys.incr_len_by() == values.incr_len_by(), "The number of keys and values for mset must be equal");
@@ -259,10 +268,10 @@ implement_actions! {
     /// This method will panic if the number of keys and values are not equal
     ///
     /// **This method expects either:** `[T; N]`, `&[T; N]` or anything that derefs to `&[T]`
-    fn mupdate<T: IntoSkyhashBytes + 's , U: IntoSkyhashBytes + 's>
+    fn mupdate<T: IntoSkyhashBytes, U: IntoSkyhashBytes>
     (
-        keys: impl GetIterator<T> + 's,
-        values: impl GetIterator<U> + 's
+        keys: impl GetIterator<T>,
+        values: impl GetIterator<U>
     ) -> u64 {
         {
             assert!(keys.incr_len_by() == values.incr_len_by(), "The number of keys and values for mupdate must be equal");
@@ -279,7 +288,7 @@ implement_actions! {
     /// ```text
     /// POP <key>
     /// ```
-    fn pop<T: FromSkyhashBytes>(keys: impl IntoSkyhashBytes + 's) -> T {
+    fn pop<T: FromSkyhashBytes>(keys: impl IntoSkyhashBytes) -> T {
         { Query::from("POP").arg(keys) }
         x @ Element::String(_) | x @ Element::Binstr(_) => T::from_element(x)?
     }
@@ -289,7 +298,7 @@ implement_actions! {
     /// ```text
     /// MPOP <k1> <k2> <k3>
     /// ```
-    fn mpop<T: FromSkyhashBytes>(keys: impl IntoSkyhashAction + 's) -> T {
+    fn mpop<T: FromSkyhashBytes>(keys: impl IntoSkyhashAction) -> T {
         { Query::from("mpop").arg(keys)}
         x @ Element::Array(Array::Bin(_)) | x @ Element::Array(Array::Str(_)) => T::from_element(x)?
     }
@@ -302,7 +311,7 @@ implement_actions! {
     /// ```
     /// with the only difference that you have to pass in the keys and values as separate
     /// objects
-    fn sdel(keys: impl IntoSkyhashAction + 's) -> bool {
+    fn sdel(keys: impl IntoSkyhashAction) -> bool {
         { Query::from("sdel").arg(keys) }
         Element::RespCode(RespCode::Okay) => true,
         Element::RespCode(RespCode::NotFound) => false
@@ -314,7 +323,7 @@ implement_actions! {
     /// SET <k> <v>
     /// ```
     ///
-    fn set(key: impl IntoSkyhashBytes + 's, value: impl IntoSkyhashBytes + 's) -> bool {
+    fn set(key: impl IntoSkyhashBytes, value: impl IntoSkyhashBytes) -> bool {
         { Query::from("set").arg(key).arg(value) }
         Element::RespCode(RespCode::Okay) => true,
         Element::RespCode(RespCode::OverwriteError) => false
@@ -333,10 +342,10 @@ implement_actions! {
     /// This method will panic if the number of keys and values are not equal
     ///
     /// **This method expects either:** `[T; N]`, `&[T; N]` or anything that derefs to `&[T]`
-    fn sset<T: IntoSkyhashBytes + 's , U: IntoSkyhashBytes + 's>
+    fn sset<T: IntoSkyhashBytes, U: IntoSkyhashBytes>
     (
-        keys: impl GetIterator<T> + 's,
-        values: impl GetIterator<U> + 's
+        keys: impl GetIterator<T>,
+        values: impl GetIterator<U>
     ) -> bool {
         {
             assert!(
@@ -362,10 +371,10 @@ implement_actions! {
     /// This method will panic if the number of keys and values are not equal
     ///
     /// **This method expects either:** `[T; N]`, `&[T; N]` or anything that derefs to `&[T]`
-    fn supdate<T: IntoSkyhashBytes + 's , U: IntoSkyhashBytes + 's>
+    fn supdate<T: IntoSkyhashBytes, U: IntoSkyhashBytes>
     (
-        keys: impl GetIterator<T> + 's,
-        values: impl GetIterator<U> + 's
+        keys: impl GetIterator<T>,
+        values: impl GetIterator<U>
     ) -> bool {
         {
             assert!(
@@ -383,7 +392,7 @@ implement_actions! {
     /// ```text
     /// UPDATE <key> <value>
     /// ```
-    fn update(key: impl IntoSkyhashBytes + 's, value: impl IntoSkyhashBytes + 's) -> () {
+    fn update(key: impl IntoSkyhashBytes, value: impl IntoSkyhashBytes) -> () {
         { Query::from("update").arg(key).arg(value) }
         Element::RespCode(RespCode::Okay) => {}
     }
@@ -400,10 +409,10 @@ implement_actions! {
     /// This method will panic if the number of keys is not equal to the number of values
     ///
     /// **This method expects either:** `[T; N]`, `&[T; N]` or anything that derefs to `&[T]`
-    fn uset<T: IntoSkyhashBytes + 's , U: IntoSkyhashBytes + 's>
+    fn uset<T: IntoSkyhashBytes, U: IntoSkyhashBytes>
     (
-        keys: impl GetIterator<T> + 's,
-        values: impl GetIterator<U> + 's
+        keys: impl GetIterator<T>,
+        values: impl GetIterator<U>
     ) -> u64 {
         {
             assert!(
@@ -414,4 +423,5 @@ implement_actions! {
         }
         Element::UnsignedInt(int) => int as u64
     }
-}
+    )
+);

@@ -73,7 +73,6 @@
 //! ### `SET`ting a key
 //!
 //! ```no_run
-//! use skytable::actions::Actions;
 //! use skytable::sync::Connection;
 //!
 //! let mut con = Connection::new("127.0.0.1", 2003).unwrap();
@@ -85,7 +84,6 @@
 //! ### `GET`ting a key
 //!
 //! ```no_run
-//! use skytable::actions::Actions;
 //! use skytable::sync::Connection;
 //!
 //! let mut con = Connection::new("127.0.0.1", 2003).unwrap();
@@ -108,7 +106,6 @@
 //! in a `Vec<u8>`. You can achieve this with the `RawString` type:
 //!
 //! ```no_run
-//! use skytable::actions::Actions;
 //! use skytable::sync::Connection;
 //! use skytable::types::RawString;
 //!
@@ -124,7 +121,6 @@
 //! - the [`Pipeline`] documentation for using pipelines
 //! - the [`pool`] module documentation for using sync/async connection pools
 //! - the [`types`] module documentation for implementing your own Skyhash serializable types.
-//! - the [`ddl`] module for DDL queries like `create` and `drop`
 //!
 //! You can also find some [examples here](https://github.com/skytable/client-rust/tree/v0.7.0-alpha.4/examples).
 //!
@@ -225,7 +221,6 @@ mod util;
 // endof macro mods
 // public mods
 pub mod actions;
-pub mod ddl;
 pub mod error;
 pub mod pool;
 pub mod types;
@@ -253,8 +248,6 @@ cfg_async!(
     pub mod aio;
     pub use aio::Connection as AsyncConnection;
     use tokio::io::AsyncWriteExt;
-    /// A special result that is returned when running actions (async)
-    pub type AsyncResult<'s, T> = Pin<Box<dyn Future<Output = T> + Send + Sync + 's>>;
 );
 
 cfg_sync!(
@@ -331,59 +324,6 @@ impl ConnectionBuilder {
     pub fn set_entity(mut self, entity: String) -> Self {
         self.entity = entity;
         self
-    }
-    cfg_sync! {
-        /// Get a [sync connection](sync::Connection) to the database
-        pub fn get_connection(&self) -> SkyResult<sync::Connection> {
-            use crate::ddl::Ddl;
-            let mut con =
-                sync::Connection::new(&self.host, self.port)?;
-            con.switch(&self.entity)?;
-            Ok(con)
-        }
-        cfg_sync_ssl_any! {
-            /// Get a [sync TLS connection](sync::TlsConnection) to the database
-            pub fn get_tls_connection(
-                &self,
-                sslcert: String,
-            ) -> SkyResult<sync::TlsConnection> {
-                use crate::ddl::Ddl;
-                let mut con = sync::TlsConnection::new(
-                    &self.host,
-                    self.port,
-                    &sslcert,
-                )?;
-                con.switch(&self.entity)?;
-                Ok(con)
-            }
-        }
-    }
-    cfg_async! {
-        /// Get an [async connection](aio::Connection) to the database
-        pub async fn get_async_connection(&self) -> SkyResult<aio::Connection> {
-            use crate::ddl::AsyncDdl;
-            let mut con = aio::Connection::new(&self.host, self.port)
-                .await?;
-            con.switch(&self.entity).await?;
-            Ok(con)
-        }
-        cfg_async_ssl_any! {
-            /// Get an [async TLS connection](aio::TlsConnection) to the database
-            pub async fn get_async_tls_connection(
-                &self,
-                sslcert: String,
-            ) -> SkyResult<aio::TlsConnection> {
-                use crate::ddl::AsyncDdl;
-                let mut con = aio::TlsConnection::new(
-                    &self.host,
-                    self.port,
-                    &sslcert,
-                )
-                .await?;
-                con.switch(&self.entity).await?;
-                Ok(con)
-            }
-        }
     }
 }
 

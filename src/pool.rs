@@ -39,7 +39,7 @@
 //! ### Sync Usage
 //!
 //! ```no_run
-//! use skytable::{pool, actions::Actions};
+//! use skytable::pool;
 //!
 //! let notls_pool = pool::get("127.0.0.1", 2003, 10).unwrap();
 //! notls_pool.get().unwrap().set("x", "100").unwrap();
@@ -54,7 +54,6 @@
 //!
 //! ```no_run
 //! use skytable::pool;
-//! use skytable::actions::AsyncActions;
 //!
 //! async fn run() {
 //!     let notls_pool = pool::get_async("127.0.0.1", 2003, 10).await.unwrap();

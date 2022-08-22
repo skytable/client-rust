@@ -21,8 +21,6 @@
 //! - The [`Connection`]: a connection to the database over Skyhash/TCP
 //! - The [`TlsConnection`]: a connection to the database over Skyhash/TLS
 //!
-//! All the [async actions][crate::actions::AsyncActions] can be used on both the connection types
-//!
 
 use crate::deserializer::{ParseError, Parser, RawResponse};
 use crate::error::SkyhashError;
@@ -111,11 +109,6 @@ macro_rules! impl_async_methods {
             /// This function is a subroutine of `run_query` used to parse the response packet
             fn try_response(&mut self) -> Result<(RawResponse, usize), ParseError> {
                 Parser::parse(&self.buffer)
-            }
-        }
-        impl crate::actions::AsyncSocket for $ty {
-            fn run(&mut self, q: Query) -> crate::AsyncResult<SkyQueryResult> {
-                Box::pin(async move { self.run_query_raw(&q).await })
             }
         }
     };

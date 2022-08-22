@@ -27,7 +27,6 @@
 //!
 //! Here is a simple example:
 //! ```
-//! use skytable::actions::Actions;
 //! use skytable::types::{IntoSkyhashAction, IntoSkyhashBytes, GetIterator, RawString};
 //! use skytable::Query;
 //!
@@ -440,7 +439,6 @@ impl<'a> IntoSkyhashBytes for &'a RawString {
 ///
 /// // Now use it with actions!
 /// use skytable::sync::Connection;
-/// use skytable::actions::Actions;
 ///
 /// let mut con = Connection::new("127.0.0.1", 2003).unwrap();
 /// let mycsv: MyCSV = con.get("mycsv").unwrap();

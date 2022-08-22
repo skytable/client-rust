@@ -21,8 +21,6 @@
 //! - The [`Connection`]: a connection to the database over Skyhash/TCP
 //! - The [`TlsConnection`]: a connection to the database over Skyhash/TLS
 //!
-//! All the [actions][crate::actions::Actions] can be used on both the connection types
-//!
 
 use crate::deserializer::{ParseError, Parser, RawResponse};
 use crate::error::SkyhashError;
@@ -110,11 +108,6 @@ macro_rules! impl_sync_methods {
             }
             fn try_response(&mut self) -> Result<(RawResponse, usize), ParseError> {
                 Parser::parse(&self.buffer)
-            }
-        }
-        impl crate::actions::SyncSocket for $ty {
-            fn run(&mut self, q: Query) -> SkyQueryResult {
-                self.run_query_raw(&q)
             }
         }
     };

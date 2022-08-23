@@ -266,6 +266,8 @@ cfg_sync!(
 pub type SkyResult<T> = Result<T, self::error::Error>;
 /// A result type for queries
 pub type SkyQueryResult = SkyResult<Element>;
+/// The origin key is used for first-time authentication and restoration of tokens
+pub type OriginKey = [u8; 40];
 
 /// A connection builder for easily building connections
 ///
@@ -300,6 +302,7 @@ pub struct ConnectionBuilder {
     port: u16,
     host: String,
     entity: String,
+    auth: Option<(String, String)>,
 }
 
 impl Default for ConnectionBuilder {
@@ -308,6 +311,7 @@ impl Default for ConnectionBuilder {
             port: 2004,
             host: "127.0.0.1".to_owned(),
             entity: "default:default".to_owned(),
+            auth: None,
         }
     }
 }
@@ -332,12 +336,20 @@ impl ConnectionBuilder {
         self.entity = entity;
         self
     }
+    /// Set the username and authentication token (defaults to no authentication)
+    pub fn set_auth(mut self, user: String, token: String) -> Self {
+        self.auth = Some((user, token));
+        self
+    }
     cfg_sync! {
         /// Get a [sync connection](sync::Connection) to the database
         pub fn get_connection(&self) -> SkyResult<sync::Connection> {
-            use crate::ddl::Ddl;
+            use crate::{ddl::Ddl, actions::Actions};
             let mut con =
                 sync::Connection::new(&self.host, self.port)?;
+            if let Some((ref user, ref token)) = self.auth {
+                con.auth_login(user, token)?;
+            }
             con.switch(&self.entity)?;
             Ok(con)
         }
@@ -347,12 +359,15 @@ impl ConnectionBuilder {
                 &self,
                 sslcert: String,
             ) -> SkyResult<sync::TlsConnection> {
-                use crate::ddl::Ddl;
+                use crate::{ddl::Ddl, actions::Actions};
                 let mut con = sync::TlsConnection::new(
                     &self.host,
                     self.port,
                     &sslcert,
                 )?;
+                if let Some((ref user, ref token)) = self.auth {
+                    con.auth_login(user, token)?;
+                }
                 con.switch(&self.entity)?;
                 Ok(con)
             }
@@ -361,9 +376,12 @@ impl ConnectionBuilder {
     cfg_async! {
         /// Get an [async connection](aio::Connection) to the database
         pub async fn get_async_connection(&self) -> SkyResult<aio::Connection> {
-            use crate::ddl::AsyncDdl;
+            use crate::{ddl::AsyncDdl, actions::AsyncActions};
             let mut con = aio::Connection::new(&self.host, self.port)
                 .await?;
+            if let Some((ref user, ref token)) = self.auth {
+                con.auth_login(user, token).await?;
+            }
             con.switch(&self.entity).await?;
             Ok(con)
         }
@@ -373,13 +391,16 @@ impl ConnectionBuilder {
                 &self,
                 sslcert: String,
             ) -> SkyResult<aio::TlsConnection> {
-                use crate::ddl::AsyncDdl;
+                use crate::{ddl::AsyncDdl, actions::AsyncActions};
                 let mut con = aio::TlsConnection::new(
                     &self.host,
                     self.port,
                     &sslcert,
                 )
                 .await?;
+                if let Some((ref user, ref token)) = self.auth {
+                    con.auth_login(user, token).await?;
+                }
                 con.switch(&self.entity).await?;
                 Ok(con)
             }

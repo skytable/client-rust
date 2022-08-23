@@ -38,18 +38,12 @@
 //! ```
 //!
 
-use crate::error::{errorstring, SkyhashError};
-use crate::types::Array;
-use crate::types::FromSkyhashBytes;
-use crate::types::SnapshotResult;
-use crate::Element;
-use crate::GetIterator;
-use crate::IntoSkyhashAction;
-use crate::IntoSkyhashBytes;
-use crate::Query;
-use crate::RespCode;
-use crate::SkyQueryResult;
-use crate::SkyResult;
+use crate::{
+    error::{errorstring, SkyhashError},
+    types::{Array, FromSkyhashBytes, RawString, SnapshotResult},
+    Element, GetIterator, IntoSkyhashAction, IntoSkyhashBytes, OriginKey, Query, RespCode,
+    SkyQueryResult, SkyResult,
+};
 
 cfg_async!(
     use crate::AsyncResult;
@@ -413,5 +407,29 @@ implement_actions! {
             Query::from("uset")._push_alt_iter(keys, values)
         }
         Element::UnsignedInt(int) => int as u64
+    }
+
+    // auth
+    /// Attempt to claim the root account using the given `origin_key`. This will return the
+    /// root user token
+    fn auth_claim(origin_key: OriginKey) -> String {
+        { Query::from("auth").arg("claim").arg(RawString::from(origin_key.to_vec())) }
+        Element::String(code) => code
+    }
+    /// Attempt to authenticate using the given `user` and `token`
+    fn auth_login(user: &'s str, token: &'s str) -> () {
+        { Query::from("auth").arg("login").arg(user).arg(token) }
+        Element::RespCode(RespCode::Okay) => ()
+    }
+    /// Attempt to log out
+    fn auth_logout() -> () {
+        { Query::from("auth").arg("logout") }
+        Element::RespCode(RespCode::Okay) => ()
+    }
+    /// Attempt to restore the `user` account using the `origin_key`. This will return the new
+    /// token for the given user
+    fn auth_restore(origin_key: OriginKey, user: &'s str) -> String {
+        { Query::from("auth").arg("restore").arg(user).arg(RawString::from(origin_key.to_vec())) }
+        Element::String(tok) => tok
     }
 }

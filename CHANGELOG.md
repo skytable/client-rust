@@ -2,6 +2,23 @@
 
 All changes in this project will be noted in this file.
 
+## 0.7.2
+
+### New features
+
+- Support for authn in `ConnectionBuilder`
+- Support for `auth` actions in `Actions` and `AsyncActions`
+
+### Fixes
+
+- Ensure auth setup is done before DDL in `ConnectionBuilder`
+
+## 0.7.1
+
+### Fixes
+
+- Fixed infinite loop due to bad `Default` impl for `ConnectionBuilder`
+
 ## 0.7.0
 
 ### New features

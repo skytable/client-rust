@@ -304,7 +304,11 @@ pub struct ConnectionBuilder {
 
 impl Default for ConnectionBuilder {
     fn default() -> Self {
-        Self::new()
+        Self {
+            port: 2004,
+            host: "127.0.0.1".to_owned(),
+            entity: "default:default".to_owned(),
+        }
     }
 }
 
@@ -535,7 +539,7 @@ impl Query {
         arg.push_into_query(&mut self);
         self
     }
-    pub(in crate) fn _push_arg(&mut self, arg: Vec<u8>) {
+    pub(crate) fn _push_arg(&mut self, arg: Vec<u8>) {
         // A data element will look like:
         // `<bytes_in_next_line>\n<data>`
         let bytes_in_next_line = arg.len().to_string().into_bytes();
@@ -557,7 +561,7 @@ impl Query {
     pub fn push(&mut self, arg: impl IntoSkyhashAction) {
         arg.push_into_query(self);
     }
-    pub(in crate) fn _push_alt_iter<T, U>(
+    pub(crate) fn _push_alt_iter<T, U>(
         mut self,
         v1: impl GetIterator<T>,
         v2: impl GetIterator<U>,

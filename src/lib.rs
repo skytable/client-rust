@@ -301,7 +301,7 @@ pub type OriginKey = [u8; 40];
 pub struct ConnectionBuilder {
     port: u16,
     host: String,
-    entity: String,
+    entity: Option<String>,
     auth: Option<(String, String)>,
 }
 
@@ -310,7 +310,7 @@ impl Default for ConnectionBuilder {
         Self {
             port: 2004,
             host: "127.0.0.1".to_owned(),
-            entity: "default:default".to_owned(),
+            entity: None,
             auth: None,
         }
     }
@@ -332,8 +332,13 @@ impl ConnectionBuilder {
         self
     }
     /// Set the entity (defaults to `default:default`)
+    ///
+    /// ## Warning
+    ///
+    /// If you're using authn/authz on the server side, make sure
+    /// you set up authentication too using [`ConnectionBuilder::set_auth`]
     pub fn set_entity(mut self, entity: String) -> Self {
-        self.entity = entity;
+        self.entity = Some(entity);
         self
     }
     /// Set the username and authentication token (defaults to no authentication)
@@ -350,7 +355,9 @@ impl ConnectionBuilder {
             if let Some((ref user, ref token)) = self.auth {
                 con.auth_login(user, token)?;
             }
-            con.switch(&self.entity)?;
+            if let Some(ref entity) = self.entity {
+                con.switch(entity)?;
+            }
             Ok(con)
         }
         cfg_sync_ssl_any! {
@@ -368,7 +375,9 @@ impl ConnectionBuilder {
                 if let Some((ref user, ref token)) = self.auth {
                     con.auth_login(user, token)?;
                 }
-                con.switch(&self.entity)?;
+                if let Some(ref entity) = self.entity {
+                    con.switch(entity)?;
+                }
                 Ok(con)
             }
         }
@@ -382,7 +391,9 @@ impl ConnectionBuilder {
             if let Some((ref user, ref token)) = self.auth {
                 con.auth_login(user, token).await?;
             }
-            con.switch(&self.entity).await?;
+            if let Some(ref entity) = self.entity {
+                con.switch(entity).await?;
+            }
             Ok(con)
         }
         cfg_async_ssl_any! {
@@ -401,7 +412,9 @@ impl ConnectionBuilder {
                 if let Some((ref user, ref token)) = self.auth {
                     con.auth_login(user, token).await?;
                 }
-                con.switch(&self.entity).await?;
+                if let Some(ref entity) = self.entity {
+                    con.switch(entity).await?;
+                }
                 Ok(con)
             }
         }

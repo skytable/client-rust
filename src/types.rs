@@ -562,6 +562,28 @@ impl FromSkyhashBytes for Element {
     }
 }
 
+macro_rules! impl_fsb {
+    ($($for:ty: $eval:pat => $ret:expr),* $(,)?) => {
+        $(impl FromSkyhashBytes for $for {
+            fn from_element(element: Element) -> SkyResult<Self> {
+                match element {
+                    $eval => Ok($ret),
+                    x => Err(Error::ParseError(format!(
+                        "expected `{}`, found {:?}",
+                        stringify!($for),
+                        x
+                    ))),
+                }
+            }
+        })*
+    };
+}
+
+impl_fsb!(
+    RespCode: Element::RespCode(rc) => rc,
+    Array: Element::Array(ar) => ar,
+);
+
 #[test]
 fn test_arr_from_str_to_vecstr() {
     let arr = Element::Array(Array::Str(vec![

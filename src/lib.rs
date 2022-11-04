@@ -469,7 +469,7 @@ macro_rules! query {
     };
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 /// This struct represents a single simple query as defined by the Skyhash protocol
 ///
 /// A simple query is serialized into a flat string array which is nothing but a Skyhash serialized equivalent

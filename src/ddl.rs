@@ -52,7 +52,7 @@ cfg_sync! {
 }
 
 #[non_exhaustive]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 /// Data types for the Keymap data model
 pub enum KeymapType {
     /// An unicode string
@@ -95,7 +95,7 @@ impl KeymapType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 /// A Keymap Model Table
 ///
 pub struct Keymap {

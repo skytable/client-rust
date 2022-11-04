@@ -95,7 +95,7 @@ impl Element {
 /// A generic result to indicate parsing errors thorugh the [`ParseError`] enum
 pub type ParseResult<T> = Result<T, ParseError>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 #[non_exhaustive]
 #[repr(u8)]
 /// # Parser Errors

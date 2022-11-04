@@ -22,7 +22,7 @@
 use crate::RespCode;
 use core::fmt;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 #[non_exhaustive]
 /// An error originating from the Skyhash protocol
 pub enum SkyhashError {

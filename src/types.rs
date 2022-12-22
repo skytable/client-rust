@@ -399,6 +399,16 @@ impl<'a> IntoSkyhashBytes for &'a RawString {
     }
 }
 
+impl FromSkyhashBytes for RawString {
+    fn from_element(element: Element) -> SkyResult<RawString> {
+        let e = match element {
+            Element::Binstr(bstr) => bstr.into(),
+            _ => return Err(Error::ParseError(BAD_ELEMENT.to_owned())),
+        };
+        Ok(e)
+    }
+}
+
 /// Implementing this trait enables Skyhash [elements](crate::Element) to be converted
 /// into Rust types. This trait is already implemented for most primitive types, but for
 /// your own custom types, you'll need to implement it yourself.
@@ -459,6 +469,9 @@ macro_rules! impl_from_skyhash {
         $(impl FromSkyhashBytes for $ty {
             fn from_element(element: Element) -> SkyResult<$ty> {
                 let ret = match element {
+                    // Note: We're assuming primitive types are internally
+                    // represented as strings, which we then parse.
+                    // TODO: Represent primitives more efficiently.
                     Element::Binstr(bstr) => String::from_utf8_lossy(&bstr).parse::<$ty>()?,
                     Element::String(st) => st.parse::<$ty>()?,
                     Element::UnsignedInt(int) => int.try_into()?,

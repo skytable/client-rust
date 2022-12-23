@@ -42,8 +42,8 @@ Now open up your `src/main.rs` file and establish a connection to the server whi
 imports:
 
 ```rust
-use skytable::{Connection, Query, Element};
-fn main() -> std::io::Result<()> {
+use skytable::{Connection, Query, Element, SkyResult};
+fn main() -> SkyResult<()> {
     let mut con = Connection::new("127.0.0.1", 2003)?;
     Ok(())
 }

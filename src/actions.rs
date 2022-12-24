@@ -135,7 +135,7 @@ implement_actions! {
     ///
     fn del(key: impl IntoSkyhashAction + 's) -> u64 {
         { Query::from("del").arg(key) }
-        Element::UnsignedInt(int) => int as u64
+        Element::UnsignedInt(int) => int
     }
     /// Checks if a key (or keys) exist(s)
     ///
@@ -148,7 +148,7 @@ implement_actions! {
     ///
     fn exists(key: impl IntoSkyhashAction + 's) -> u64 {
         { Query::from("exists").arg(key) }
-        Element::UnsignedInt(int) => int as u64
+        Element::UnsignedInt(int) => int
     }
     /// Removes all the keys present in the database
     fn flushdb() -> () {
@@ -173,7 +173,7 @@ implement_actions! {
     /// ```
     fn keylen(key: impl IntoSkyhashBytes + 's) -> u64 {
         { Query::from("keylen").arg(key)}
-        Element::UnsignedInt(int) => int as u64
+        Element::UnsignedInt(int) => int
     }
     /// Returns a vector of keys
     ///
@@ -238,7 +238,7 @@ implement_actions! {
             assert!(keys.incr_len_by() == values.incr_len_by(), "The number of keys and values for mset must be equal");
             Query::from("mset")._push_alt_iter(keys, values)
         }
-        Element::UnsignedInt(int) => int as u64
+        Element::UnsignedInt(int) => int
     }
     /// Updates the value of multiple keys and values and returns the number of keys that were updated
     ///
@@ -262,7 +262,7 @@ implement_actions! {
             assert!(keys.incr_len_by() == values.incr_len_by(), "The number of keys and values for mupdate must be equal");
             Query::from("mset")._push_alt_iter(keys, values)
         }
-        Element::UnsignedInt(int) => int as u64
+        Element::UnsignedInt(int) => int
     }
     /// Consumes a key if it exists
     ///
@@ -406,7 +406,7 @@ implement_actions! {
             );
             Query::from("uset")._push_alt_iter(keys, values)
         }
-        Element::UnsignedInt(int) => int as u64
+        Element::UnsignedInt(int) => int
     }
 
     // auth

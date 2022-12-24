@@ -1,6 +1,7 @@
 /target
 Cargo.lock
 .vscode
+.devcontainer
 .DS_Store
 examples/target
 scripts

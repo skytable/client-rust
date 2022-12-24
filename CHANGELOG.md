@@ -2,6 +2,10 @@
 
 All changes in this project will be noted in this file.
 
+## 0.7.3
+
+Upgraded dependencies
+
 ## 0.7.2
 
 ### New features

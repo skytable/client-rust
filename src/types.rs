@@ -356,6 +356,10 @@ impl RawString {
     pub fn new() -> Self {
         Self(Vec::new())
     }
+    /// Returns the [`Vec<u8>`] stored inside the [`RawString`]
+    pub fn into_inner(self) -> Vec<u8> {
+        self.0
+    }
 }
 
 impl Deref for RawString {
@@ -528,6 +532,12 @@ impl FromSkyhashBytes for Vec<u8> {
             Element::Binstr(b) => Ok(b),
             _ => Err(Error::ParseError(BAD_ELEMENT.to_owned())),
         }
+    }
+}
+
+impl FromSkyhashBytes for RawString {
+    fn from_element(element: Element) -> SkyResult<Self> {
+        <_ as FromSkyhashBytes>::from_element(element).map(RawString)
     }
 }
 

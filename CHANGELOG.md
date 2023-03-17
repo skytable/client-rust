@@ -2,6 +2,14 @@
 
 All changes in this project will be noted in this file.
 
+## 0.7.4
+
+- Additions:
+  - FromSkyhashBytes impls for `Vec<u8>` and `RawString`
+  - Added `RawString::into_inner` so that the `Vec<u8>` can be obtained from the `RawString`
+- Maintenance:
+  - Upgraded deps
+
 ## 0.7.3
 
 Upgraded dependencies

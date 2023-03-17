@@ -35,7 +35,7 @@ cargo new skyapp
 First add this to your `Cargo.toml` file:
 
 ```toml
-skytable = "0.7.2"
+skytable = "0.7.4"
 ```
 
 Now open up your `src/main.rs` file and establish a connection to the server while also adding some

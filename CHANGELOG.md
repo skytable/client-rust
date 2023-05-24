@@ -2,6 +2,13 @@
 
 All changes in this project will be noted in this file.
 
+## 0.7.5
+
+- Fixes:
+  - Fixed bug with `whereami` action response
+- Maintenance:
+  - Upgraded deps
+
 ## 0.7.4
 
 - Additions:

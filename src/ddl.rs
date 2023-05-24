@@ -34,13 +34,11 @@
 //! ```
 //!
 
-use crate::error::{errorstring, SkyhashError};
-use crate::types::{Array, FlatElement};
-use crate::Element;
-use crate::IntoSkyhashBytes;
-use crate::Query;
-use crate::RespCode;
-use crate::SkyResult;
+use crate::{
+    error::{errorstring, SkyhashError},
+    types::Array,
+    Element, IntoSkyhashBytes, Query, RespCode, SkyResult,
+};
 
 cfg_async! {
     use crate::AsyncResult;
@@ -64,6 +62,7 @@ pub enum KeymapType {
 }
 
 /// A convenient representation for the `whereami` action
+#[derive(Debug, PartialEq)]
 pub enum WhereAmI {
     /// The ID of the keyspace
     Keyspace(String),
@@ -283,29 +282,13 @@ implement_ddl! {
         {
             Query::from("whereami")
         }
-        Element::Array(
-            Array::Flat(mut frr)
-        ) => {
-            if frr.iter().all(|v| matches!(v, FlatElement::String(_))) {
-                return Err(SkyhashError::InvalidResponse.into());
-            }
-            match frr.len() {
-                1 => WhereAmI::Keyspace(match frr.swap_remove(0) {
-                    FlatElement::String(st) => st,
-                    _ => unsafe {
-                        core::hint::unreachable_unchecked()
-                    }
-                }),
-                2 => {
-                    let (ks, tbl) = match (frr.swap_remove(0), frr.swap_remove(1)) {
-                        (FlatElement::String(ks),FlatElement::String(tbl)) => (ks, tbl),
-                        _ => unsafe {
-                            core::hint::unreachable_unchecked()
-                        }
-                    };
-                    WhereAmI::Table(ks, tbl)
+        Element::Array(Array::NonNullStr(mut a)) => {
+            unsafe {
+                match a.len() {
+                    1 => WhereAmI::Keyspace(a.pop().unwrap_unchecked()),
+                    2 => WhereAmI::Table(a.pop().unwrap_unchecked(), a.pop().unwrap_unchecked()),
+                    _ => return Err(SkyhashError::ParseError.into()),
                 }
-                _ => return Err(SkyhashError::InvalidResponse.into()),
             }
         }
     }

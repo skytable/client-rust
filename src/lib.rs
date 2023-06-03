@@ -502,7 +502,7 @@ macro_rules! query {
 /// }
 /// ```
 ///
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Query {
     size_count: usize,
     data: Vec<u8>,

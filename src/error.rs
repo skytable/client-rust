@@ -1,227 +1,76 @@
 /*
- * Created on Wed Aug 18 2021
- *
- * Copyright (c) 2021 Sayan Nandan <nandansayan@outlook.com>
+ * Copyright 2023, Sayan Nandan <nandansayan@outlook.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
 */
 
-//! # Errors
-//!
-//! This module contains error types that the client returns in different cases
+use crate::protocol::ProtocolError;
 
-use crate::RespCode;
-use core::fmt;
-
-#[derive(Debug, PartialEq, Eq)]
-#[non_exhaustive]
-/// An error originating from the Skyhash protocol
-pub enum SkyhashError {
-    /// The server sent data but we failed to parse it
-    ParseError,
-    /// The server sent an unexpected data type for this action
-    UnexpectedDataType,
-    /// The server sent data, that is valid, however, for this specific query, it
-    /// was unexpected. This indicates a bug in the server
-    UnexpectedResponse,
-    /// The server sent an unknown data type that we cannot parse
-    UnknownDataType,
-    /// The server sent an invalid response
-    InvalidResponse,
-    /// The server returned a response code **other than the one that should have been returned
-    /// for this action** (if any)
-    Code(RespCode),
-}
-
-pub mod errorstring {
-    //! # Error strings
-    //!
-    //! This module contains a collection of constants that represent [error strings](https://docs.skytable.io/protocol/errors)
-    //! returned by the server
-    //!
-    /// The default container was not set
-    pub const DEFAULT_CONTAINER_UNSET: &str = "default-container-unset";
-    /// The container was not found
-    pub const CONTAINER_NOT_FOUND: &str = "container-not-found";
-    /// The container is still in use
-    pub const STILL_IN_USE: &str = "still-in-use";
-    /// The object is a protected object and is not user accessible
-    pub const ERR_PROTECTED_OBJECT: &str = "err-protected-object";
-    /// The container already exists
-    pub const ERR_ALREADY_EXISTS: &str = "err-already-exists";
-    /// The container is not ready
-    pub const ERR_NOT_READY: &str = "not-ready";
-    /// The error string returned when the snapshot engine is busy
-    pub const ERR_SNAPSHOT_BUSY: &str = "err-snapshot-busy";
-    /// The error string returned when periodic snapshots are busy
-    pub const ERR_SNAPSHOT_DISABLED: &str = "err-snapshot-disabled";
-}
+pub type ClientResult<T> = Result<T, Error>;
 
 #[derive(Debug)]
-#[non_exhaustive]
-/// A standard error type for the client driver
+/// Client driver errors
+///
+/// This is a broad classification for all kinds of possible client driver errors, across I/O, server errors and application level parse errors
 pub enum Error {
     /// An I/O error occurred
     IoError(std::io::Error),
-    #[cfg(any(
-        feature = "ssl",
-        feature = "sslv",
-        feature = "aio-ssl",
-        feature = "aio-sslv"
-    ))]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(any(
-            feature = "ssl",
-            feature = "sslv",
-            feature = "aio-ssl",
-            feature = "aio-sslv"
-        )))
-    )]
-    /// An SSL error occurred
-    SslError(openssl::ssl::Error),
-    /// A Skyhash error occurred
-    SkyError(SkyhashError),
-    /// An application level parse error occurred
-    ParseError(String),
-    /// A configuration error
-    ConfigurationError(&'static str),
+    /// A bad [`Config`](crate::config::Config) throws this error
+    ConnectionSetupErr(ConnectionSetupError),
+    /// When running a query, a protocol error was thrown
+    ProtocolError(ProtocolError),
+    /// A server error code was received
+    ServerError(u16),
+    /// An application level parse error
+    ParseError(ParseError),
 }
 
-impl PartialEq for Error {
-    fn eq(&self, oth: &Error) -> bool {
-        use Error::*;
-        match (self, oth) {
-            (IoError(a), IoError(b)) => a.kind().eq(&b.kind()),
-            (SkyError(a), SkyError(b)) => a == b,
-            (ParseError(a), ParseError(b)) => a == b,
-            #[cfg(any(
-                feature = "ssl",
-                feature = "sslv",
-                feature = "aio-ssl",
-                feature = "aio-sslv"
-            ))]
-            #[cfg_attr(
-                docsrs,
-                doc(cfg(any(
-                    feature = "ssl",
-                    feature = "sslv",
-                    feature = "aio-ssl",
-                    feature = "aio-sslv"
-                )))
-            )]
-            (SslError(a), SslError(b)) => a.to_string() == b.to_string(),
-            (ConfigurationError(a), ConfigurationError(b)) => a == b,
-            _ => false,
-        }
-    }
+#[derive(Debug, PartialEq)]
+pub enum ParseError {
+    /// The response is non-erroring, but the type is not what was expected
+    TypeMismatch,
+    /// The response is non-erroring, but not of the kind we were looking for (for example, if you try to parse a single value from a Row, it won't work!)
+    ResponseMismatch,
+    /// Some other parse error occurred
+    Other(String),
 }
 
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::IoError(eio) => write!(f, "{}", eio),
-            #[cfg(any(
-                feature = "ssl",
-                feature = "sslv",
-                feature = "aio-ssl",
-                feature = "aio-sslv"
-            ))]
-            #[cfg_attr(
-                docsrs,
-                doc(cfg(any(
-                    feature = "ssl",
-                    feature = "sslv",
-                    feature = "aio-ssl",
-                    feature = "aio-sslv"
-                )))
-            )]
-            Self::SslError(essl) => write!(f, "{}", essl),
-            Self::ParseError(apperr) => {
-                write!(f, "custom type parse error: {}", apperr)
-            }
-            Self::SkyError(eproto) => match eproto {
-                SkyhashError::Code(rcode) => write!(f, "{}", rcode),
-                SkyhashError::InvalidResponse => {
-                    write!(f, "Invalid Skyhash response received from server")
-                }
-                SkyhashError::UnexpectedResponse => {
-                    write!(f, "Unexpected response from server")
-                }
-                SkyhashError::ParseError => write!(f, "Client-side datatype parse error"),
-                SkyhashError::UnexpectedDataType => write!(f, "Wrong type sent by server"),
-                SkyhashError::UnknownDataType => {
-                    write!(f, "Server sent unknown data type for this client version")
-                }
-            },
-            Self::ConfigurationError(e) => write!(f, "Configuration error: {}", e),
-        }
-    }
+#[derive(Debug, PartialEq)]
+/// An error specifically returned during connection setup. This is returned usually when there is a bad configuration
+pub enum ConnectionSetupError {
+    Other(String),
+    HandshakeError(u8),
+    InvalidServerHandshake,
 }
 
-cfg_ssl_any! {
-    impl From<openssl::ssl::Error> for Error {
-        fn from(err: openssl::ssl::Error) -> Self {
-            Self::SslError(err)
-        }
-    }
-    impl From<openssl::error::ErrorStack> for Error {
-        fn from(e: openssl::error::ErrorStack) -> Self {
-            let e: openssl::ssl::Error = e.into();
-            Self::SslError(e)
-        }
-    }
-}
+/*
+    from impls
+*/
 
 impl From<std::io::Error> for Error {
-    fn from(err: std::io::Error) -> Self {
-        Self::IoError(err)
+    fn from(e: std::io::Error) -> Self {
+        Self::IoError(e)
     }
 }
 
-impl From<SkyhashError> for Error {
-    fn from(err: SkyhashError) -> Self {
-        Self::SkyError(err)
+impl From<ProtocolError> for Error {
+    fn from(e: ProtocolError) -> Self {
+        Self::ProtocolError(e)
     }
 }
 
-impl From<std::num::ParseIntError> for Error {
-    fn from(e: std::num::ParseIntError) -> Self {
-        Self::ParseError(e.to_string())
+impl From<ConnectionSetupError> for Error {
+    fn from(e: ConnectionSetupError) -> Self {
+        Self::ConnectionSetupErr(e)
     }
 }
-
-impl From<std::num::ParseFloatError> for Error {
-    fn from(e: std::num::ParseFloatError) -> Self {
-        Self::ParseError(e.to_string())
-    }
-}
-
-impl From<std::num::TryFromIntError> for Error {
-    fn from(e: std::num::TryFromIntError) -> Self {
-        Self::ParseError(e.to_string())
-    }
-}
-
-impl From<std::convert::Infallible> for Error {
-    fn from(_: std::convert::Infallible) -> Self {
-        unsafe { core::hint::unreachable_unchecked() }
-    }
-}
-
-impl From<std::string::FromUtf8Error> for Error {
-    fn from(e: std::string::FromUtf8Error) -> Self {
-        Self::ParseError(e.to_string())
-    }
-}
-
-impl std::error::Error for Error {}

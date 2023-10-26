@@ -14,24 +14,10 @@
  * limitations under the License.
 */
 
-// internal modules
-#[macro_use]
-mod macros;
-mod protocol;
-// public modules
-pub mod aio;
-pub mod config;
-pub mod error;
-pub mod query;
-pub mod response;
-pub mod sync;
-// re-exports
-pub use {
-    aio::{ConnectionAsync, ConnectionTlsAsync},
-    config::Config,
-    query::Query,
-    sync::{Connection, ConnectionTls},
-};
-
-/// we use a 4KB read buffer by default; allow this to be changed
-const BUFSIZE: usize = 4 * 1024;
+#[macro_export]
+macro_rules! query {
+    ($query_str:expr) => { $crate::Query::new($query_str) };
+    ($query_str:expr$(, $($query_param:expr),* $(,)?)?) => {{
+        let mut q = $crate::Query::new($query_str); $($(q.push_param($query_param);)*)*q
+    }};
+}

@@ -136,7 +136,7 @@ skytable = { version = "0.7.0-alpha.4", features=["aio"], default-features = fal
 ```
 
 You can now establish a connection by using `skytable::AsyncConnection::new()`, adding `.await`s wherever
-necessary. Do note that you'll the [Tokio runtime](https://tokio.rs).
+necessary. Do note that you'll use the [Tokio runtime](https://tokio.rs).
 
 ## Using both `sync` and `async` APIs
 

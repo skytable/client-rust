@@ -22,6 +22,7 @@ mod protocol;
 pub mod aio;
 pub mod config;
 pub mod error;
+pub mod pool;
 pub mod query;
 pub mod response;
 pub mod sync;

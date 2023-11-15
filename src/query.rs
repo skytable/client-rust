@@ -106,7 +106,7 @@ impl SQParam for bool {
 }
 macro_rules! imp_number {
     ($($code:literal => $($ty:ty),*),* $(,)?) => {
-        $($(impl SQParam for $ty { fn push(self, buf: &mut Vec<u8>) { buf.push($code); buf.extend(self.to_string().as_bytes()); } })*)*
+        $($(impl SQParam for $ty { fn push(self, buf: &mut Vec<u8>) { buf.push($code); buf.extend(self.to_string().as_bytes()); buf.push(b'\n'); } })*)*
     }
 }
 // uint, sint, float

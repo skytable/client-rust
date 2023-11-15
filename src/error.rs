@@ -14,7 +14,7 @@
  * limitations under the License.
 */
 
-use crate::protocol::ProtocolError;
+use {crate::protocol::ProtocolError, core::fmt};
 
 pub type ClientResult<T> = Result<T, Error>;
 
@@ -35,6 +35,19 @@ pub enum Error {
     ParseError(ParseError),
 }
 
+impl std::error::Error for Error {}
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::IoError(e) => write!(f, "io error: {e}"),
+            Self::ConnectionSetupErr(e) => write!(f, "connection setup error: {e}"),
+            Self::ProtocolError(e) => write!(f, "protocol error: {e}"),
+            Self::ServerError(e) => write!(f, "server error: {e}"),
+            Self::ParseError(e) => write!(f, "application parse error: {e}"),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum ParseError {
     /// The response is non-erroring, but the type is not what was expected
@@ -45,12 +58,46 @@ pub enum ParseError {
     Other(String),
 }
 
+impl std::error::Error for ParseError {}
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::TypeMismatch => write!(f, "data type mismatch"),
+            Self::ResponseMismatch => write!(f, "response type mismatch"),
+            Self::Other(e) => write!(f, "{e}"),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 /// An error specifically returned during connection setup. This is returned usually when there is a bad configuration
 pub enum ConnectionSetupError {
     Other(String),
     HandshakeError(u8),
     InvalidServerHandshake,
+}
+
+impl std::error::Error for ConnectionSetupError {}
+impl fmt::Display for ConnectionSetupError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Other(e) => write!(f, "{e}"),
+            Self::HandshakeError(e) => write!(f, "handshake error code {e}"),
+            Self::InvalidServerHandshake => write!(f, "server sent invalid handshake"),
+        }
+    }
+}
+
+impl std::error::Error for ProtocolError {}
+impl fmt::Display for ProtocolError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidServerResponseForData => write!(f, "invalid data received from server"),
+            Self::InvalidServerResponseUnknownDataType => {
+                write!(f, "new or unknown data type received from server")
+            }
+        }
+    }
 }
 
 /*

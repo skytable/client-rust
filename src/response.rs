@@ -79,6 +79,16 @@ pub trait FromResponse: Sized {
     fn from_response(resp: Response) -> ClientResult<Self>;
 }
 
+impl FromResponse for () {
+    fn from_response(resp: Response) -> ClientResult<Self> {
+        match resp {
+            Response::Empty => Ok(()),
+            Response::Error(e) => Err(Error::ServerError(e)),
+            _ => Err(Error::ParseError(ParseError::ResponseMismatch)),
+        }
+    }
+}
+
 pub trait FromValue: Sized {
     fn from_value(v: Value) -> ClientResult<Self>;
 }

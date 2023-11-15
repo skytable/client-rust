@@ -2,11 +2,16 @@
 
 All changes in this project will be noted in this file.
 
-## Unreleased
+## 0.8.0
 
-### New features
+#### New features
+- Completely up to date for Skyhash 2.0
+- New query API interface for Skytable Octave (completely breaking!)
+- No longer depends on OpenSSL
 
-- Support for Skyhash 2.0
+#### Breaking changes
+The enter query interface as changed and is incompatible with previous driver versions. Please consider reading the Skytable
+Octave upgrade guide.
 
 ## 0.7.0
 

@@ -23,7 +23,7 @@ use crate::{
 pub type ProtocolResult<T> = Result<T, ProtocolError>;
 
 /// Errors that can happen when handling protocol level encoding and decoding
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ProtocolError {
     /// The server returned an invalid response for the data item
     InvalidServerResponseForData,

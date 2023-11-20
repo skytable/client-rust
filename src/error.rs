@@ -48,7 +48,7 @@ impl fmt::Display for Error {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ParseError {
     /// The response is non-erroring, but the type is not what was expected
     TypeMismatch,
@@ -69,7 +69,7 @@ impl fmt::Display for ParseError {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 /// An error specifically returned during connection setup. This is returned usually when there is a bad configuration
 pub enum ConnectionSetupError {
     Other(String),

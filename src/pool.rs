@@ -60,7 +60,7 @@ pub async fn get_tls_async(
     bb8::Pool::builder().max_size(pool_size).build(mgr).await
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 /// A connection manager for Skyhash/TCP connections
 pub struct ConnectionMgrTcp {
     config: Config,
@@ -102,7 +102,7 @@ impl bb8::ManageConnection for ConnectionMgrTcp {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 /// A connection manager for Skyhash/TLS connections
 pub struct ConnectionMgrTls {
     config: Config,

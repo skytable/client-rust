@@ -21,7 +21,7 @@
 use crate::error::{ClientResult, Error, ParseError};
 
 /// The value directly returned by the server without any additional type parsing and/or casting
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Value {
     Null,
     Bool(bool),
@@ -40,14 +40,14 @@ pub enum Value {
     List(Vec<Self>),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 /// A row returned by the server
 pub struct Row {
     values: Vec<Value>,
 }
 
 impl Row {
-    pub(crate) fn new(values: Vec<Value>) -> Self {
+    pub fn new(values: Vec<Value>) -> Self {
         Self { values }
     }
     pub fn values(&self) -> &[Value] {
@@ -58,7 +58,7 @@ impl Row {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 /// A response returned by the server
 pub enum Response {
     /// The server returned an empty response, which usually suggests that the query was executed successfully but the server had nothing appropriate to return

@@ -33,6 +33,7 @@ use std::{
 pub struct Query {
     dataframe_q: Box<[u8]>,
     dataframe_p: Vec<u8>,
+    param_cnt: usize,
 }
 
 impl Query {
@@ -40,11 +41,19 @@ impl Query {
         Self {
             dataframe_q: query.as_bytes().to_owned().into_boxed_slice(),
             dataframe_p: vec![],
+            param_cnt: 0,
         }
+    }
+    pub fn query_str(&self) -> &str {
+        unsafe { core::str::from_utf8_unchecked(&self.dataframe_q) }
     }
     pub fn push_param(&mut self, param: impl SQParam) -> &mut Self {
         param.push(&mut self.dataframe_p);
+        self.param_cnt += 1;
         self
+    }
+    pub fn param_cnt(&self) -> usize {
+        self.param_cnt
     }
     #[inline(always)]
     pub(crate) fn write_packet(&self, buf: &mut impl Write) -> io::Result<()> {

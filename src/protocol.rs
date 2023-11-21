@@ -590,10 +590,8 @@ impl ClientHandshake {
     pub(crate) fn new(cfg: &Config) -> Self {
         let mut v = Vec::with_capacity(6 + cfg.username().len() + cfg.password().len() + 5);
         v.extend(b"H\x00\x00\x00\x00\x00");
-        v.extend(cfg.username().len().to_string().as_bytes());
-        v.push(b'\n');
-        v.extend(cfg.password().len().to_string().as_bytes());
-        v.push(b'\n');
+        pushlen!(v, cfg.username().len());
+        pushlen!(v, cfg.password().len());
         v.extend(cfg.username().as_bytes());
         v.extend(cfg.password().as_bytes());
         Self(v.into_boxed_slice())

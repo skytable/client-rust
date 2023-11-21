@@ -16,8 +16,17 @@
 
 #[macro_export]
 macro_rules! query {
-    ($query_str:expr) => { $crate::Query::new($query_str) };
+    ($query_str:expr) => { $crate::Query::from($query_str) };
     ($query_str:expr$(, $($query_param:expr),* $(,)?)?) => {{
-        let mut q = $crate::Query::new($query_str); $($(q.push_param($query_param);)*)*q
+        let mut q = $crate::Query::from($query_str); $($(q.push_param($query_param);)*)*q
+    }};
+}
+
+macro_rules! pushlen {
+    ($buf:expr, $len:expr) => {{
+        let mut buf = ::itoa::Buffer::new();
+        let r = ::itoa::Buffer::format(&mut buf, $len);
+        $buf.extend(str::as_bytes(r));
+        $buf.push(b'\n');
     }};
 }

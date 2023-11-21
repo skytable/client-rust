@@ -22,41 +22,34 @@ use {
 const QUERY_SYSCTL_STATUS: &str = "sysctl report status";
 
 /// Returns a TCP (skyhash/TCP) connection pool using [`r2d2`]'s default settings and the given maximum pool size
-pub fn get(
-    pool_size: u32,
-    username: &str,
-    password: &str,
-) -> Result<r2d2::Pool<ConnectionMgrTcp>, r2d2::Error> {
-    let mgr = ConnectionMgrTcp::new(Config::new_default(username, password));
+pub fn get(pool_size: u32, config: Config) -> Result<r2d2::Pool<ConnectionMgrTcp>, r2d2::Error> {
+    let mgr = ConnectionMgrTcp::new(config);
     r2d2::Pool::builder().max_size(pool_size).build(mgr)
 }
 /// Returns an async TCP (skyhash/TCP) connection pool using [`bb8`]'s default settings and the given maximum pool size
 pub async fn get_async(
     pool_size: u32,
-    username: &str,
-    password: &str,
+    config: Config,
 ) -> Result<bb8::Pool<ConnectionMgrTcp>, Error> {
-    let mgr = ConnectionMgrTcp::new(Config::new_default(username, password));
+    let mgr = ConnectionMgrTcp::new(config);
     bb8::Pool::builder().max_size(pool_size).build(mgr).await
 }
 /// Returns a TLS (skyhash/TLS) connection pool using [`r2d2`]'s default settings and the given maximum pool size
 pub fn get_tls(
     pool_size: u32,
-    username: &str,
-    password: &str,
+    config: Config,
     pem_cert: &str,
 ) -> Result<r2d2::Pool<ConnectionMgrTls>, r2d2::Error> {
-    let mgr = ConnectionMgrTls::new(Config::new_default(username, password), pem_cert.into());
+    let mgr = ConnectionMgrTls::new(config, pem_cert.into());
     r2d2::Pool::builder().max_size(pool_size).build(mgr)
 }
 /// Returns an async TLS (skyhash/TCP) connection pool using [`bb8`]'s default settings and the given maximum pool size
 pub async fn get_tls_async(
     pool_size: u32,
-    username: &str,
-    password: &str,
+    config: Config,
     pem_cert: &str,
 ) -> Result<bb8::Pool<ConnectionMgrTls>, Error> {
-    let mgr = ConnectionMgrTls::new(Config::new_default(username, password), pem_cert.into());
+    let mgr = ConnectionMgrTls::new(config, pem_cert.into());
     bb8::Pool::builder().max_size(pool_size).build(mgr).await
 }
 

@@ -129,6 +129,12 @@ where
         }
     }
 }
+pub struct Null;
+impl SQParam for Null {
+    fn append_param(self, buf: &mut Vec<u8>) {
+        buf.push(0);
+    }
+}
 // bool
 impl SQParam for bool {
     fn append_param(self, buf: &mut Vec<u8>) {

@@ -67,6 +67,8 @@ pub enum Response {
     Value(Value),
     /// The server returned a row
     Row(Row),
+    /// A list of rows
+    Rows(Vec<Row>),
     /// The server returned an error code
     Error(u16),
 }
@@ -97,7 +99,7 @@ impl<V: FromValue> FromResponse for V {
     fn from_response(resp: Response) -> ClientResult<Self> {
         match resp {
             Response::Value(v) => V::from_value(v),
-            Response::Row(_) | Response::Empty => {
+            Response::Row(_) | Response::Empty | Response::Rows(_) => {
                 Err(Error::ParseError(ParseError::ResponseMismatch))
             }
             Response::Error(e) => Err(Error::ServerError(e)),
@@ -144,7 +146,7 @@ macro_rules! from_response_row {
                 fn from_response(resp: Response) -> ClientResult<Self> {
                     let row = match resp {
                         Response::Row(r) => r.into_values(),
-                        Response::Empty | Response::Value(_) => return Err(Error::ParseError(ParseError::ResponseMismatch)),
+                        Response::Empty | Response::Value(_) | Response::Rows(_) => return Err(Error::ParseError(ParseError::ResponseMismatch)),
                         Response::Error(e) => return Err(Error::ServerError(e)),
                     };
                     if row.len() != $size {

@@ -5,9 +5,9 @@
 This library is the official client for the free and open-source NoSQL database
 [Skytable](https://github.com/skytable/skytable). First, go ahead and install Skytable by
 following the instructions [here](https://docs.skytable.io/getting-started). This library supports
-all Skytable versions that work with the [Skyhash 1.1 Protocol](https://docs.skytable.io/protocol/skyhash).
+all Skytable versions that work with the [Skyhash 2 Protocol](https://docs.skytable.io/protocol/overview).
 This version of the library was tested with the latest Skytable release
-(release [0.7.5](https://github.com/skytable/skytable/releases/v0.7.5)).
+(release [0.8.0-beta](https://github.com/skytable/skytable/releases/v0.8.0-beta)).
 
 ## Features
 

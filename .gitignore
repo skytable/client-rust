@@ -4,3 +4,4 @@ Cargo.lock
 .DS_Store
 examples/target
 scripts
+src/bin

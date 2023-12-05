@@ -14,25 +14,19 @@
  * limitations under the License.
 */
 
-// internal modules
-#[macro_use]
-mod macros;
-mod protocol;
-// public modules
-pub mod aio;
-pub mod config;
-pub mod error;
-pub mod pool;
-pub mod query;
-pub mod response;
-pub mod sync;
-// re-exports
-pub use {
-    aio::{ConnectionAsync, ConnectionTlsAsync},
-    config::Config,
-    query::Query,
-    sync::{Connection, ConnectionTls},
-};
+#[macro_export]
+macro_rules! query {
+    ($query_str:expr) => { $crate::Query::from($query_str) };
+    ($query_str:expr$(, $($query_param:expr),* $(,)?)?) => {{
+        let mut q = $crate::Query::from($query_str); $($(q.push_param($query_param);)*)*q
+    }};
+}
 
-/// we use a 4KB read buffer by default; allow this to be changed
-const BUFSIZE: usize = 4 * 1024;
+macro_rules! pushlen {
+    ($buf:expr, $len:expr) => {{
+        let mut buf = ::itoa::Buffer::new();
+        let r = ::itoa::Buffer::format(&mut buf, $len);
+        $buf.extend(str::as_bytes(r));
+        $buf.push(b'\n');
+    }};
+}

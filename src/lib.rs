@@ -53,7 +53,7 @@
 //! db.query_parse::<()>(&insert_query).unwrap(); // insert will return empty on success
 //! 
 //! let select_query = query!("select password, followers FROM myspace.mymodel WHERE username = ?", "sayan");
-//! let (pass, followers): (String, u64) = db.query_parse::<()>(&select_query).unwrap();
+//! let (pass, followers): (String, u64) = db.query_parse(&select_query).unwrap();
 //! assert_eq!(pass, "pass123");
 //! assert_eq!(followers, 1_500_000_u64);
 //! 

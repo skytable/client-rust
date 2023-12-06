@@ -2,6 +2,10 @@
 
 All changes in this project will be noted in this file.
 
+### 0.8.2
+
+Support deriving queries and responses.
+
 ### 0.8.1
 
 Fixed issues with documentation

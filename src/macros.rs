@@ -15,7 +15,7 @@
 */
 
 #[macro_export]
-/// This macro can be used to create a [`Query`](crate::Query), almost like a variadic function
+/// This macro can be used to create a [`Query`](struct@crate::Query), almost like a variadic function
 /// 
 /// ## Examples
 /// ```

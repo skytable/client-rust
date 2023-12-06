@@ -21,6 +21,34 @@
 //! The client-driver is distributed under the liberal [Apache-2.0 License](https://www.apache.org/licenses/LICENSE-2.0) and hence
 //! you can use it in your applications without any licensing issues.
 //!
+//! ## Definitive example
+//!
+//! ```no_run
+//! use skytable::{Query, Response, Config, query};
+//!
+//! #[derive(Query, Response)]
+//! #[derive(Clone, PartialEq, Debug)] // we just do these for the assert (they are not needed)
+//! struct User {
+//!     userid: String,
+//!     pass: String,
+//!     followers: u64,
+//!     email: Option<String>
+//! }
+//!
+//! let our_user = User { userid: "user".into(), pass: "pass".into(), followers: 120, email: None };
+//!
+//! let mut db = Config::new_default("username", "password").connect().unwrap();
+//!
+//! // insert data
+//! let q = query!("insert into myspace.mymodel(?, ?, ?, ?)", our_user.clone());
+//! db.query_parse::<()>(&q).unwrap();
+//!
+//! // select data
+//! let user: User = db.query_parse(&query!("select * from myspace.mymodel where username = ?", &our_user.userid)).unwrap();
+//! assert_eq!(user, our_user);
+//!
+//! ```
+//!
 //! ## Getting started
 //!
 //! Make sure you have Skytable set up. If not, follow the [official installation guide here](https://docs.skytable.io/installation)
@@ -65,6 +93,9 @@
 //!
 //! ## Going advanced
 //!
+//! You can use the [`macro@Query`] and [`macro@Response`] derive macros to directly pass complex types as parameters
+//! and read as responses. This should cover most of the general use-cases (otherwise you can manually implement them).
+//!
 //! - Custom [`mod@query`] generation
 //! - Custom [`response`] parsing
 //! - [`Connection pooling`](pool)
@@ -88,6 +119,10 @@ pub mod query;
 pub mod response;
 pub mod syncio;
 // re-exports
+/// The `Query` derive macro enables you to directly pass complex types as parameters into queries
+pub use sky_derive::Query;
+/// The `Response` derive macro enables you to directly pass complex types as parameters into queries
+pub use sky_derive::Response;
 pub use {
     aio::{ConnectionAsync, ConnectionTlsAsync},
     config::Config,

@@ -14,6 +14,13 @@
  * limitations under the License.
 */
 
+//! # Asynchronous database I/O
+//!
+//! This module provides the necessary items to establish an asynchronous connection to the database server. If you need
+//! to use connection pooling, consider checking the [`pool`](crate::pool) module.
+//!
+//! See the [`crate`] root documentation for help on establishing and using database connections.
+
 use {
     crate::{
         error::{ClientResult, ConnectionSetupError, Error},
@@ -71,6 +78,7 @@ impl DerefMut for ConnectionTlsAsync {
 }
 
 impl Config {
+    /// Establish an async connection to the database using the current configuration
     pub async fn connect_async(&self) -> ClientResult<ConnectionAsync> {
         let mut tcpstream = TcpStream::connect((self.host(), self.port())).await?;
         let handshake = ClientHandshake::new(self);
@@ -84,6 +92,8 @@ impl Config {
             }
         }
     }
+    /// Establish an async TLS connection to the database using the current configuration.
+    /// Pass the certificate in PEM format.
     pub async fn connect_tls_async(&self, cert: &str) -> ClientResult<ConnectionTlsAsync> {
         let stream = TcpStream::connect((self.host(), self.port())).await?;
         // set up acceptor
@@ -119,8 +129,8 @@ impl Config {
     }
 }
 
-#[doc(hidden)]
 #[derive(Debug)]
+/// The underlying socket type
 pub struct TcpConnection<C: AsyncWriteExt + AsyncReadExt + Unpin> {
     con: C,
     buf: Vec<u8>,
@@ -133,6 +143,7 @@ impl<C: AsyncWriteExt + AsyncReadExt + Unpin> TcpConnection<C> {
             buf: Vec::with_capacity(crate::BUFSIZE),
         }
     }
+    /// Run a query and return a raw [`Response`]
     pub async fn query(&mut self, q: &Query) -> ClientResult<Response> {
         self.buf.clear();
         q.write_packet(&mut self.buf).unwrap();
@@ -163,7 +174,13 @@ impl<C: AsyncWriteExt + AsyncReadExt + Unpin> TcpConnection<C> {
             }
         }
     }
+    /// Run and parse a query into the indicated type. The type must implement [`FromResponse`]
     pub async fn query_parse<T: FromResponse>(&mut self, q: &Query) -> ClientResult<T> {
         self.query(q).await.and_then(FromResponse::from_response)
+    }
+    /// Call this if the internally allocated buffer is growing too large and impacting your performance. However, normally
+    /// you will not need to call this
+    pub fn reset_buffer(&mut self) {
+        self.buf.shrink_to_fit()
     }
 }

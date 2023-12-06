@@ -14,6 +14,14 @@
  * limitations under the License.
 */
 
+//! # Client errors
+//!
+//! This module provides various enumerations and types used to represent client errors at any stage of the connect/query/response
+//! process.
+//!
+//! You might find Skytable's documentation on error codes helpful: [https://docs.skytable.io/protocol/errors](https://docs.skytable.io/protocol/errors)
+//!
+
 use {crate::protocol::ProtocolError, core::fmt};
 
 pub type ClientResult<T> = Result<T, Error>;
@@ -49,6 +57,7 @@ impl fmt::Display for Error {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+/// An application level parse error, usually raised by [`FromResponse`](crate::response::FromResponse)
 pub enum ParseError {
     /// The response is non-erroring, but the type is not what was expected
     TypeMismatch,
@@ -72,8 +81,11 @@ impl fmt::Display for ParseError {
 #[derive(Debug, PartialEq, Clone)]
 /// An error specifically returned during connection setup. This is returned usually when there is a bad configuration
 pub enum ConnectionSetupError {
+    /// Some error occurred while setting up a connection
     Other(String),
+    /// Handshake failed while establishing a connection
     HandshakeError(u8),
+    /// The server responded with an invalid handshake
     InvalidServerHandshake,
 }
 

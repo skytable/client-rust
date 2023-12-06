@@ -14,6 +14,37 @@
  * limitations under the License.
 */
 
+//! # Connection pooling
+//!
+//! This module provides ways to create connection pools. For async connections we use [`bb8`] while for sync
+//! connections we used [`r2d2`].
+//!
+//! ## Examples
+//! ### Creating an async pool
+//! ```no_run
+//! use skytable::{pool, Config};
+//!
+//! const POOL_SIZE: u32 = 32; // we'll have atmost 32 connections in the pool
+//! async fn pool() {
+//!     let pool = pool::get_async(POOL_SIZE, Config::new_default("username", "password")).await.unwrap();
+//!     let mut db = pool.get().await.unwrap();
+//! }
+//! ```
+//! ### Creating a async pool
+//! ```no_run
+//! use skytable::{pool, Config};
+//!
+//! const POOL_SIZE: u32 = 32; // we'll have atmost 32 connections in the pool
+//! fn pool() {
+//!     let pool = pool::get(POOL_SIZE, Config::new_default("username", "password")).unwrap();
+//!     let mut db = pool.get().unwrap();
+//! }
+//! ```
+//!
+//! To create a pool of TLS connections you can use the [`get_tls`] and [`get_tls_async`] methods, passing a PEM certificate
+//! as a string.
+//!
+
 use {
     crate::{error::Error, Config, Connection, ConnectionAsync, ConnectionTls, ConnectionTlsAsync},
     r2d2::ManageConnection,

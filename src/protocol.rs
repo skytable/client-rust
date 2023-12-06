@@ -20,7 +20,7 @@ use crate::{
     response::{Response, Row, Value},
 };
 
-pub type ProtocolResult<T> = Result<T, ProtocolError>;
+pub(crate) type ProtocolResult<T> = Result<T, ProtocolError>;
 
 /// Errors that can happen when handling protocol level encoding and decoding
 #[derive(Debug, PartialEq, Clone)]

@@ -14,29 +14,58 @@
  * limitations under the License.
 */
 
-/*
-    Raw response handling
-*/
+//! # Responses
+//!
+//! This module provides everything that you need to handle responses from the server.
+//!
+//! ## Example
+//!
+//! This example shows how you can directly use tuples to get data from the server. Assume that the model is declared as
+//! `create model myspace.mymodel(username: string, password: string, null email: string)`
+//!
+//! ```no_run
+//! use skytable::{Config, query};
+//!
+//! let mut db = Config::new_default("username", "password").connect().unwrap();
+//! let q = query!("select username, password, email FROM myspace.mymodel WHERE username = ?", "some_user");
+//! let (username, password, email): (String, String, Option<String>) = db.query_parse(&q).unwrap();
+//! ```
+//!
 
 use crate::error::{ClientResult, Error, ParseError};
 
 /// The value directly returned by the server without any additional type parsing and/or casting
 #[derive(Debug, PartialEq, Clone)]
 pub enum Value {
+    /// A null value
     Null,
+    /// A [`bool`]
     Bool(bool),
+    /// An [`u8`]
     UInt8(u8),
+    /// An [`u16`]
     UInt16(u16),
+    /// An [`u32`]
     UInt32(u32),
+    /// An [`u64`]
     UInt64(u64),
+    /// An [`i8`]
     SInt8(i8),
+    /// An [`i16`]
     SInt16(i16),
+    /// An [`i32`]
     SInt32(i32),
+    /// An [`i64`]
     SInt64(i64),
+    /// A [`f32`]
     Float32(f32),
+    /// A [`f64`]
     Float64(f64),
+    /// A [`Vec<u8>`]
     Binary(Vec<u8>),
+    /// A [`String`]
     String(String),
+    /// A nested list
     List(Vec<Self>),
 }
 
@@ -47,12 +76,14 @@ pub struct Row {
 }
 
 impl Row {
-    pub fn new(values: Vec<Value>) -> Self {
+    pub(crate) fn new(values: Vec<Value>) -> Self {
         Self { values }
     }
+    /// Get a slice of the values in this [`Row`]
     pub fn values(&self) -> &[Value] {
         &self.values
     }
+    /// Consume the [`Row`], returning a vector of the [`Value`]s in this row
     pub fn into_values(self) -> Vec<Value> {
         self.values
     }
@@ -77,6 +108,38 @@ pub enum Response {
     Response traits
 */
 
+/// Types that can be parsed from a [`Response`]
+///
+/// ## Example implementation
+///
+/// Assume that our schema looks like `create model mymodel(username: string, password: string, null email: string)`. Here's
+/// how we can directly get this without any fuss:
+///
+/// ```no_run
+/// use skytable::{
+///     ClientResult, Config, query,
+///     response::{FromResponse, Response}
+/// };
+///
+/// struct User {
+///     username: String,
+///     password: String,
+///     email: Option<String>,
+/// }
+///
+/// impl FromResponse for User {
+///     fn from_response(resp: Response) -> ClientResult<Self> {
+///         let (username, password, email): (String, String, Option<String>) = FromResponse::from_response(resp)?;
+///         Ok(Self { username, password, email })
+///     }
+/// }
+///
+/// let mut db = Config::new_default("username", "password").connect().unwrap();
+/// let myuser: User = db.query_parse(
+///     &query!("select username, password, email FROM myspace.mymodel WHERE username = ?", "username")
+/// ).unwrap();
+/// assert_eq!(myuser.username, "bob");
+/// ```
 pub trait FromResponse: Sized {
     fn from_response(resp: Response) -> ClientResult<Self>;
 }
@@ -91,7 +154,9 @@ impl FromResponse for () {
     }
 }
 
+/// Any type that can be parsed from a [`Value`]. This is generally meant for use with [`FromResponse`].
 pub trait FromValue: Sized {
+    /// Attempt to use the value to create an instance of `Self` or throw an error
     fn from_value(v: Value) -> ClientResult<Self>;
 }
 
@@ -103,6 +168,15 @@ impl<V: FromValue> FromResponse for V {
                 Err(Error::ParseError(ParseError::ResponseMismatch))
             }
             Response::Error(e) => Err(Error::ServerError(e)),
+        }
+    }
+}
+
+impl<V: FromValue> FromValue for Option<V> {
+    fn from_value(v: Value) -> ClientResult<Self> {
+        match v {
+            Value::Null => Ok(None),
+            v => FromValue::from_value(v),
         }
     }
 }

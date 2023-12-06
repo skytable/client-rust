@@ -14,6 +14,22 @@
  * limitations under the License.
 */
 
+//! # Queries
+//!
+//! This module provides the basic tools needed to create and run queries.
+//!
+//! ## Example
+//! ```no_run
+//! use skytable::{Config, Query};
+//!
+//! let mut db = Config::new_default("username", "password").connect().unwrap();
+//! let mut query = Query::new("select * from myspace where username = ?");
+//! query.push_param(".... get user name from somewhere ...");
+//!
+//! let ret = db.query(&query).unwrap();
+//! ```
+//!
+
 use std::{
     io::{self, Write},
     num::{
@@ -49,9 +65,11 @@ impl<'a> From<&'a str> for Query {
 }
 
 impl Query {
+    /// Create a new query from a [`str`]
     pub fn new(query: &str) -> Self {
         Self::_new(query.to_owned())
     }
+    /// Create a new query from a [`String`]
     pub fn new_string(query: String) -> Self {
         Self::_new(query)
     }
@@ -62,14 +80,16 @@ impl Query {
             param_cnt: 0,
         }
     }
+    /// Returns a reference to the query string
     pub fn query_str(&self) -> &str {
         unsafe { core::str::from_utf8_unchecked(&self.dataframe_q) }
     }
+    /// Add a new parameter to the query
     pub fn push_param(&mut self, param: impl SQParam) -> &mut Self {
-        param.append_param(&mut self.dataframe_p);
-        self.param_cnt += 1;
+        self.param_cnt += param.append_param(&mut self.dataframe_p);
         self
     }
+    /// Get the number of parameters
     pub fn param_cnt(&self) -> usize {
         self.param_cnt
     }
@@ -101,6 +121,7 @@ impl Query {
         Ok(())
     }
     #[inline(always)]
+    /// Encodes the packet using Skyhash and returns a raw packet for debugging purposes
     pub fn debug_encode_packet(&self) -> Vec<u8> {
         let mut v = vec![];
         self.write_packet(&mut v).unwrap();
@@ -113,48 +134,95 @@ impl Query {
 */
 
 /// An [`SQParam`] should be implemented by any type that is expected to be used as a parameter
+///
+/// ## Example implementation
+///
+/// Say you have a custom type which has to store `<username>-<id>` in your database and your database schema looks like
+/// `create model myspace.mymodel(username: string, id: uint64, password: string)`. You can do that directly:
+///
+/// ```
+/// use skytable::{query, query::SQParam};
+///
+/// struct MyType {
+///     username: String,
+///     id: u64,
+///     password: String,
+/// }
+///
+/// impl MyType {
+///     fn new(username: String, id: u64, password: String) -> Self {
+///         Self { username, id, password }
+///     }
+/// }
+///
+/// impl SQParam for MyType {
+///     fn append_param(&self, buf: &mut Vec<u8>) -> usize {
+///         self.username.append_param(buf) +
+///         self.id.append_param(buf) +
+///         self.password.append_param(buf)
+///     }
+/// }
+///
+/// // You can now directly do this!
+/// let query = query!("insert into myspace.mymodel(?, ?, ?)", MyType::new("sayan".to_owned(), 0, "pass123".to_owned()));
+/// assert_eq!(query.param_cnt(), 3);
+/// // You can also used it beside normal params
+/// // assume schema is `create model mymomdel2(uname: string, id: uint64, pass: string, age: uint8)`
+/// let query = query!("insert into myspace.mymodel(?, ?, ?, ?)", MyType::new("sayan".to_owned(), 0, "pass123".to_owned()), 101);
+/// assert_eq!(query.param_cnt(), 4);
+/// ```
 pub trait SQParam {
     /// Append this element to the raw parameter buffer
-    fn append_param(self, buf: &mut Vec<u8>);
+    ///
+    /// Return the number of parameters appended (see example above)
+    fn append_param(&self, q: &mut Vec<u8>) -> usize;
 }
 // null
 impl<T> SQParam for Option<T>
 where
     T: SQParam,
 {
-    fn append_param(self, buf: &mut Vec<u8>) {
+    fn append_param(&self, buf: &mut Vec<u8>) -> usize {
         match self {
-            None => buf.push(0),
+            None => {
+                buf.push(0);
+                1
+            }
             Some(e) => e.append_param(buf),
         }
     }
 }
+
+/// Use this when you need to use `null`
 pub struct Null;
 impl SQParam for Null {
-    fn append_param(self, buf: &mut Vec<u8>) {
+    fn append_param(&self, buf: &mut Vec<u8>) -> usize {
         buf.push(0);
+        1
     }
 }
 // bool
 impl SQParam for bool {
-    fn append_param(self, buf: &mut Vec<u8>) {
-        let a = [1, self as u8];
-        buf.extend(a)
+    fn append_param(&self, buf: &mut Vec<u8>) -> usize {
+        let a = [1, *self as u8];
+        buf.extend(a);
+        1
     }
 }
 macro_rules! imp_number {
     ($($code:literal => $($ty:ty as $base:ty),*),* $(,)?) => {
-        $($(impl SQParam for $ty { fn append_param(self, b: &mut Vec<u8>) {
+        $($(impl SQParam for $ty { fn append_param(&self, b: &mut Vec<u8>) -> usize {
             let mut buf = ::itoa::Buffer::new();
-            let str = buf.format(<$base>::from(self));
+            let str = buf.format(<$base>::from(*self));
             b.push($code); b.extend(str.as_bytes()); b.push(b'\n');
+            1
         } })*)*
     }
 }
 
 macro_rules! imp_terminated_str_type {
     ($($code:literal => $($ty:ty),*),* $(,)?) => {
-        $($(impl SQParam for $ty { fn append_param(self, buf: &mut Vec<u8>) { buf.push($code); buf.extend(self.to_string().as_bytes()); buf.push(b'\n'); } })*)*
+        $($(impl SQParam for $ty { fn append_param(&self, buf: &mut Vec<u8>) -> usize { buf.push($code); buf.extend(self.to_string().as_bytes()); buf.push(b'\n'); 1} })*)*
     }
 }
 
@@ -170,43 +238,48 @@ imp_terminated_str_type!(
 
 // bin
 impl<'a> SQParam for &'a [u8] {
-    fn append_param(self, buf: &mut Vec<u8>) {
+    fn append_param(&self, buf: &mut Vec<u8>) -> usize {
         buf.push(5);
         pushlen!(buf, self.len());
-        buf.extend(self);
+        buf.extend(*self);
+        1
     }
 }
 impl<const N: usize> SQParam for [u8; N] {
-    fn append_param(self, buf: &mut Vec<u8>) {
+    fn append_param(&self, buf: &mut Vec<u8>) -> usize {
         buf.push(5);
         pushlen!(buf, self.len());
         buf.extend(self);
+        1
     }
 }
 impl<'a, const N: usize> SQParam for &'a [u8; N] {
-    fn append_param(self, buf: &mut Vec<u8>) {
+    fn append_param(&self, buf: &mut Vec<u8>) -> usize {
         buf.push(5);
         pushlen!(buf, self.len());
-        buf.extend(self);
+        buf.extend(*self);
+        1
     }
 }
 impl SQParam for Vec<u8> {
-    fn append_param(self, buf: &mut Vec<u8>) {
+    fn append_param(&self, buf: &mut Vec<u8>) -> usize {
         buf.push(5);
         pushlen!(buf, self.len());
         buf.extend(self);
+        1
     }
 }
 // str
 impl<'a> SQParam for &'a str {
-    fn append_param(self, buf: &mut Vec<u8>) {
+    fn append_param(&self, buf: &mut Vec<u8>) -> usize {
         buf.push(6);
         pushlen!(buf, self.len());
         buf.extend(self.as_bytes());
+        1
     }
 }
 impl SQParam for String {
-    fn append_param(self, buf: &mut Vec<u8>) {
+    fn append_param(&self, buf: &mut Vec<u8>) -> usize {
         self.as_str().append_param(buf)
     }
 }

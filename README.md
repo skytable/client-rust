@@ -35,7 +35,7 @@ cargo new skyapp
 First add this to your `Cargo.toml` file:
 
 ```toml
-skytable = "0.8.0-beta.1"
+skytable = "0.8"
 ```
 
 You're ready to go!

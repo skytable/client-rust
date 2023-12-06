@@ -14,6 +14,14 @@
  * limitations under the License.
 */
 
+//! # Synchronous database I/O
+//!
+//! This module provides the necessary items to establish a synchronous connection to the database server. If you need
+//! to use connection pooling, consider checking the [`pool`](crate::pool) module.
+//!
+//! See the [`crate`] root documentation for help on establishing and using database connections.
+//!
+
 use {
     crate::{
         config::Config,
@@ -71,6 +79,7 @@ impl DerefMut for ConnectionTls {
 }
 
 impl Config {
+    /// Establish a connection to the database using the current configuration
     pub fn connect(&self) -> ClientResult<Connection> {
         let mut tcpstream = TcpStream::connect((self.host(), self.port()))?;
         let handshake = ClientHandshake::new(self);
@@ -84,6 +93,8 @@ impl Config {
             }
         }
     }
+    /// Establish a TLS connection to the database using the current configuration.
+    /// Pass the certificate in PEM format.
     pub fn connect_tls(&self, cert: &str) -> ClientResult<ConnectionTls> {
         let stream = TcpStream::connect((self.host(), self.port()))?;
         let mut stream = TlsConnector::builder()
@@ -110,8 +121,10 @@ impl Config {
     }
 }
 
-#[doc(hidden)]
 #[derive(Debug)]
+/// The underlying connection type
+///
+/// This can't be constructed directly!
 pub struct TcpConnection<C: Write + Read> {
     con: C,
     buffer: Vec<u8>,
@@ -124,6 +137,7 @@ impl<C: Write + Read> TcpConnection<C> {
             buffer: Vec::with_capacity(crate::BUFSIZE),
         }
     }
+    /// Run a query and return a raw [`Response`]
     pub fn query(&mut self, q: &Query) -> ClientResult<Response> {
         self.buffer.clear();
         q.write_packet(&mut self.buffer).unwrap();
@@ -150,6 +164,7 @@ impl<C: Write + Read> TcpConnection<C> {
             }
         }
     }
+    /// Run and parse a query into the indicated type. The type must implement [`FromResponse`]
     pub fn query_parse<T: FromResponse>(&mut self, q: &Query) -> ClientResult<T> {
         self.query(q).and_then(FromResponse::from_response)
     }

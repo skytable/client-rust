@@ -118,11 +118,11 @@ pub mod pool;
 pub mod query;
 pub mod response;
 pub mod syncio;
-// re-exports
 /// The `Query` derive macro enables you to directly pass complex types as parameters into queries
 pub use sky_derive::Query;
 /// The `Response` derive macro enables you to directly pass complex types as parameters into queries
 pub use sky_derive::Response;
+// re-exports
 pub use {
     aio::{ConnectionAsync, ConnectionTlsAsync},
     config::Config,

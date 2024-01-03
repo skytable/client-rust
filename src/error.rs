@@ -24,6 +24,7 @@
 
 use {crate::protocol::ProtocolError, core::fmt};
 
+/// A [`Result`] type alias for the client driver
 pub type ClientResult<T> = Result<T, Error>;
 
 #[derive(Debug)]

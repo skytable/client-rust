@@ -69,6 +69,23 @@ pub enum Value {
     List(Vec<Self>),
 }
 
+impl FromValue for Value {
+    fn from_value(v: Value) -> ClientResult<Self> {
+        Ok(v)
+    }
+}
+
+impl Value {
+    /// Attempt to parse this value into a different type
+    pub fn parse<T: FromValue>(self) -> ClientResult<T> {
+        T::from_value(self)
+    }
+    /// Attempt to parse this value into a different type, by cloning the value first
+    pub fn parse_cloned<T: FromValue>(&self) -> ClientResult<T> {
+        T::from_value(self.clone())
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 /// A row returned by the server
 pub struct Row {
@@ -86,6 +103,18 @@ impl Row {
     /// Consume the [`Row`], returning a vector of the [`Value`]s in this row
     pub fn into_values(self) -> Vec<Value> {
         self.values
+    }
+    /// Returns the first [`Value`] in the [`Row`] if present
+    pub fn into_first(mut self) -> ClientResult<Value> {
+        if self.values.is_empty() {
+            Err(Error::ParseError(ParseError::ResponseMismatch))
+        } else {
+            Ok(self.values.remove(0))
+        }
+    }
+    /// Returns the first [`Value`] in the [`Row`] if present, as the given type
+    pub fn into_first_as<T: FromValue>(self) -> ClientResult<T> {
+        self.into_first().and_then(FromValue::from_value)
     }
 }
 
@@ -141,6 +170,7 @@ pub enum Response {
 /// assert_eq!(myuser.username, "bob");
 /// ```
 pub trait FromResponse: Sized {
+    /// Decode the target type from the [`Response`]
     fn from_response(resp: Response) -> ClientResult<Self>;
 }
 
@@ -268,3 +298,12 @@ from_response_row!(
     (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y) as 25,
     (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z) as 26,
 );
+
+impl FromResponse for Row {
+    fn from_response(resp: Response) -> ClientResult<Self> {
+        match resp {
+            Response::Row(r) => Ok(r),
+            _ => Err(Error::ParseError(ParseError::ResponseMismatch)),
+        }
+    }
+}

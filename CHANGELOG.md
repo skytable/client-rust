@@ -2,6 +2,14 @@
 
 All changes in this project will be noted in this file.
 
+### 0.8.3
+
+Added the following implementations:
+- `FromResponse` for `Row`
+- `FromValue` for `Value` (this was erroneously missing)
+- Added the `Value::parse` and `Value::parse_cloned` member methods
+- Added `Row::into_first` and `Row::into_first_as` member methods
+
 ### 0.8.2
 
 Support deriving queries and responses.

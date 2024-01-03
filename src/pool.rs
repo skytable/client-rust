@@ -45,10 +45,7 @@
 //! as a string.
 //!
 
-use {
-    crate::{error::Error, Config, Connection, ConnectionAsync, ConnectionTls, ConnectionTlsAsync},
-    r2d2::ManageConnection,
-};
+use crate::{error::Error, Config, Connection, ConnectionAsync, ConnectionTls, ConnectionTlsAsync};
 
 const QUERY_SYSCTL_STATUS: &str = "sysctl report status";
 
@@ -97,7 +94,7 @@ impl ConnectionMgrTcp {
     }
 }
 
-impl ManageConnection for ConnectionMgrTcp {
+impl r2d2::ManageConnection for ConnectionMgrTcp {
     type Connection = Connection;
     type Error = Error;
     fn connect(&self) -> Result<Self::Connection, Self::Error> {
@@ -143,7 +140,7 @@ impl ConnectionMgrTls {
     }
 }
 
-impl ManageConnection for ConnectionMgrTls {
+impl r2d2::ManageConnection for ConnectionMgrTls {
     type Connection = ConnectionTls;
     type Error = Error;
     fn connect(&self) -> Result<Self::Connection, Self::Error> {

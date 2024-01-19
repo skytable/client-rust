@@ -9,12 +9,12 @@ license = "Apache-2.0"
 name = "skytable"
 readme = "README.md"
 repository = "https://github.com/skytable/client-rust"
-version = "0.8.3"
+version = "0.8.4"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
 # internal deps
-sky-derive = "0.2.0"
+sky-derive = "0.2.1"
 # external deps
 tokio = { version = "1.35.1", features = ["full"] }
 native-tls = "0.2.11"

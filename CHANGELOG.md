@@ -2,6 +2,10 @@
 
 All changes in this project will be noted in this file.
 
+### 0.8.4
+
+Fixed an issue with single-item struct derives when using the `Response` macro.
+
 ### 0.8.3
 
 Added the following implementations:

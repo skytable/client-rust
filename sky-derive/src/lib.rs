@@ -42,7 +42,7 @@ pub fn derive_response(input: TokenStream) -> TokenStream {
                 let field_names: Vec<_> = fields.named.iter().map(|f| &f.ident).collect();
                 assert!(!field_names.is_empty(), "can't derive on empty field");
                 let tuple_pattern = if field_names.len() == 1 {
-                    quote! { quote! { (#(#field_names),*,) } }
+                    quote! { (#(#field_names),*,) }
                 } else {
                     quote! { (#(#field_names),*) }
                 };

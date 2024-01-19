@@ -2,7 +2,13 @@
 
 All changes in this project will be noted in this file.
 
+### 0.8.5
+
+Fixed bugs with the derive macros.
+
 ### 0.8.4
+
+> **Yanked version**
 
 Fixed an issue with single-item struct derives when using the `Response` macro.
 

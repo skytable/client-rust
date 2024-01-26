@@ -2,6 +2,10 @@
 
 All changes in this project will be noted in this file.
 
+### 0.8.6
+
+Reduced allocations in `Query`.
+
 ### 0.8.5
 
 Fixed bugs with the derive macros.

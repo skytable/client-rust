@@ -47,9 +47,9 @@ use std::{
 ///
 /// Specification: `QTDEX-A/BQL-S1`
 pub struct Query {
-    dataframe_q: Box<[u8]>,
-    dataframe_p: Vec<u8>,
+    buf: Vec<u8>,
     param_cnt: usize,
+    q_window: usize,
 }
 
 impl From<String> for Query {
@@ -74,19 +74,20 @@ impl Query {
         Self::_new(query)
     }
     fn _new(query: String) -> Self {
+        let l = query.len();
         Self {
-            dataframe_q: query.into_bytes().into_boxed_slice(),
-            dataframe_p: vec![],
+            buf: query.into_bytes(),
             param_cnt: 0,
+            q_window: l,
         }
     }
     /// Returns a reference to the query string
     pub fn query_str(&self) -> &str {
-        unsafe { core::str::from_utf8_unchecked(&self.dataframe_q) }
+        unsafe { core::str::from_utf8_unchecked(&self.buf[..self.q_window]) }
     }
     /// Add a new parameter to the query
     pub fn push_param(&mut self, param: impl SQParam) -> &mut Self {
-        self.param_cnt += param.append_param(&mut self.dataframe_p);
+        self.param_cnt += param.append_param(&mut self.buf);
         self
     }
     /// Get the number of parameters
@@ -102,10 +103,9 @@ impl Query {
         // compute the total packet size
         // q window
         let mut query_window_buffer = itoa::Buffer::new();
-        let query_window_str = query_window_buffer.format(self.dataframe_q.len());
+        let query_window_str = query_window_buffer.format(self.q_window);
         // full packet
-        let total_packet_size =
-            query_window_str.len() + 1 + self.dataframe_q.len() + self.dataframe_p.len();
+        let total_packet_size = query_window_str.len() + 1 + self.buf.len();
         let mut total_packet_size_buffer = itoa::Buffer::new();
         let total_packet_size_str = total_packet_size_buffer.format(total_packet_size);
         // segment 1: meta
@@ -116,8 +116,7 @@ impl Query {
         buf.write_all(query_window_str.as_bytes())?;
         buf.write_all(b"\n")?;
         // segment 3: payload
-        buf.write_all(&self.dataframe_q)?;
-        buf.write_all(&self.dataframe_p)?;
+        buf.write_all(&self.buf)?;
         Ok(())
     }
     #[inline(always)]

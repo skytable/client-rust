@@ -106,6 +106,8 @@
 //! users help each other out.
 //!
 
+#![deny(missing_docs)]
+
 // internal modules
 #[macro_use]
 mod macros;

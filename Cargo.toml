@@ -16,11 +16,11 @@ version = "0.8.6"
 # internal deps
 sky-derive = "0.2.2"
 # external deps
-tokio = { version = "1.35.1", features = ["full"] }
+tokio = { version = "1.36.0", features = ["full"] }
 native-tls = "0.2.11"
 tokio-native-tls = "0.3.1"
 rand = "0.8.5"
 r2d2 = "0.8.10"
 async-trait = "0.1.77"
-bb8 = "0.8.1"
+bb8 = "0.8.3"
 itoa = "1.0.10"

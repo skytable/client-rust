@@ -32,6 +32,7 @@
 
 use std::{
     io::{self, Write},
+    iter::FromIterator,
     num::{
         NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroIsize, NonZeroU16, NonZeroU32,
         NonZeroU64, NonZeroU8, NonZeroUsize,
@@ -125,6 +126,72 @@ impl Query {
         let mut v = vec![];
         self.write_packet(&mut v).unwrap();
         v
+    }
+}
+
+/// # Pipeline
+///
+/// A pipeline can be used to send multiple queries at once to the server. Queries in a pipeline are executed independently
+/// of one another, but they are executed serially unless otherwise configured
+pub struct Pipeline {
+    cnt: usize,
+    buf: Vec<u8>,
+}
+
+impl Pipeline {
+    /// Create a new pipeline
+    pub const fn new() -> Self {
+        Self {
+            cnt: 0,
+            buf: Vec::new(),
+        }
+    }
+    /// Returns the number of queries that were appended to this pipeline
+    pub fn query_cnt(&self) -> usize {
+        self.cnt
+    }
+    /// Add a query to this pipeline
+    ///
+    /// Note: It's not possible to get the query back from the pipeline since it's not indexed (and doing so would be an unnecessary
+    /// waste of space and time). That's why we take a reference which allows the caller to continue owning the [`Query`] item
+    pub fn add_query(&mut self, q: &Query) {
+        self.buf
+            .extend(itoa::Buffer::new().format(q.q_window).as_bytes());
+        self.buf.push(b'\n');
+        self.buf.extend(&q.buf);
+        self.cnt += 1;
+    }
+}
+
+impl<Q: AsRef<Query>, I> From<I> for Pipeline
+where
+    I: Iterator<Item = Q>,
+{
+    fn from(iter: I) -> Self {
+        let mut pipeline = Pipeline::new();
+        iter.into_iter()
+            .for_each(|q| pipeline.add_query(q.as_ref()));
+        pipeline
+    }
+}
+
+impl<Q: AsRef<Query>> Extend<Q> for Pipeline {
+    fn extend<T: IntoIterator<Item = Q>>(&mut self, iter: T) {
+        iter.into_iter().for_each(|q| self.add_query(q.as_ref()))
+    }
+}
+
+impl<Q: AsRef<Query>> FromIterator<Q> for Pipeline {
+    fn from_iter<T: IntoIterator<Item = Q>>(iter: T) -> Self {
+        let mut pipe = Pipeline::new();
+        iter.into_iter().for_each(|q| pipe.add_query(q.as_ref()));
+        pipe
+    }
+}
+
+impl AsRef<Query> for Query {
+    fn as_ref(&self) -> &Query {
+        self
     }
 }
 

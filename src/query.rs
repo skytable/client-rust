@@ -155,9 +155,18 @@ impl Pipeline {
     /// Note: It's not possible to get the query back from the pipeline since it's not indexed (and doing so would be an unnecessary
     /// waste of space and time). That's why we take a reference which allows the caller to continue owning the [`Query`] item
     pub fn add_query(&mut self, q: &Query) {
+        // qlen
         self.buf
             .extend(itoa::Buffer::new().format(q.q_window).as_bytes());
         self.buf.push(b'\n');
+        // plen
+        self.buf.extend(
+            itoa::Buffer::new()
+                .format(q.buf.len() - q.q_window)
+                .as_bytes(),
+        );
+        self.buf.push(b'\n');
+        // body
         self.buf.extend(&q.buf);
         self.cnt += 1;
     }

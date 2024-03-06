@@ -113,25 +113,27 @@
 mod macros;
 mod protocol;
 // public modules
-pub mod aio;
 pub mod config;
 pub mod error;
 pub mod pool;
 pub mod query;
 pub mod response;
-pub mod syncio;
 /// The `Query` derive macro enables you to directly pass complex types as parameters into queries
 pub use sky_derive::Query;
 /// The `Response` derive macro enables you to directly pass complex types as parameters into queries
 pub use sky_derive::Response;
 // re-exports
 pub use {
-    aio::{ConnectionAsync, ConnectionTlsAsync},
     config::Config,
     error::ClientResult,
+    io::{
+        aio::{self, ConnectionAsync, ConnectionTlsAsync},
+        sync::{self as syncio, Connection, ConnectionTls},
+    },
     query::Query,
-    syncio::{Connection, ConnectionTls},
 };
+// private
+mod io;
 
 /// we use a 8KB read buffer by default; allow this to be changed
 const BUFSIZE: usize = 8 * 1024;

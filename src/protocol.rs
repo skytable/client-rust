@@ -30,6 +30,7 @@ pub enum ProtocolError {
     /// The server possibly returned an unknown data type and we can't decode it. Note that this might happen when you use an older client version with
     /// a newer version of Skytable
     InvalidServerResponseUnknownDataType,
+    InvalidPacket,
 }
 
 impl Value {
@@ -733,6 +734,55 @@ impl ServerHandshake {
     }
 }
 
+#[derive(Debug, PartialEq, Default)]
+pub(crate) struct MRespState {
+    processed: Vec<Response>,
+    pending: Option<ResponseState>,
+    expected: MetaState,
+}
+
+#[derive(Debug, PartialEq)]
+pub(crate) enum PipelineResult {
+    Completed(Vec<Response>),
+    Pending(MRespState),
+    Error(ProtocolError),
+}
+
+impl MRespState {
+    fn step(mut self, decoder: &mut Decoder) -> PipelineResult {
+        match self.expected.finished(decoder) {
+            Ok(true) => {}
+            Ok(false) => return PipelineResult::Pending(self),
+            Err(e) => return PipelineResult::Error(e),
+        }
+        loop {
+            if self.processed.len() as u64 == self.expected.val() {
+                return PipelineResult::Completed(self.processed);
+            }
+            match decoder.validate_response(RState(
+                self.pending.take().unwrap_or(ResponseState::Initial),
+            )) {
+                DecodeState::ChangeState(RState(s)) => {
+                    self.pending = Some(s);
+                    return PipelineResult::Pending(self);
+                }
+                DecodeState::Completed(c) => self.processed.push(c),
+                DecodeState::Error(e) => return PipelineResult::Error(e),
+            }
+        }
+    }
+}
+
+impl<'a> Decoder<'a> {
+    pub fn validate_pipe(&mut self, first: bool, state: MRespState) -> PipelineResult {
+        if first && self._cursor_next() != b'P' {
+            PipelineResult::Error(ProtocolError::InvalidPacket)
+        } else {
+            state.step(self)
+        }
+    }
+}
+
 #[test]
 fn t_row() {
     let mut decoder = Decoder::new(b"\x115\n\x00\x01\x01\x0D5\nsayan\x0220\n\x0E0\n", 0);
@@ -776,5 +826,38 @@ fn t_mrow() {
                 Value::List(vec![])
             ])
         ]))
+    );
+}
+
+#[test]
+fn t_pipe() {
+    let mut decoder = Decoder::new(b"P5\n\x12\x10\xFF\xFF\x115\n\x00\x01\x01\x0D5\nsayan\x0220\n\x0E0\n\x115\n\x00\x01\x01\x0D5\nelana\x0221\n\x0E0\n\x115\n\x00\x01\x01\x0D5\nemily\x0222\n\x0E0\n", 0);
+    assert_eq!(
+        decoder.validate_pipe(true, MRespState::default()),
+        PipelineResult::Completed(vec![
+            Response::Empty,
+            Response::Error(u16::MAX),
+            Response::Row(Row::new(vec![
+                Value::Null,
+                Value::Bool(true),
+                Value::String("sayan".into()),
+                Value::UInt8(20),
+                Value::List(vec![])
+            ])),
+            Response::Row(Row::new(vec![
+                Value::Null,
+                Value::Bool(true),
+                Value::String("elana".into()),
+                Value::UInt8(21),
+                Value::List(vec![])
+            ])),
+            Response::Row(Row::new(vec![
+                Value::Null,
+                Value::Bool(true),
+                Value::String("emily".into()),
+                Value::UInt8(22),
+                Value::List(vec![])
+            ]))
+        ])
     );
 }

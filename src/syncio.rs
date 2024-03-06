@@ -26,7 +26,11 @@ use {
     crate::{
         config::Config,
         error::{ClientResult, ConnectionSetupError, Error},
-        protocol::{ClientHandshake, DecodeState, Decoder, RState, ServerHandshake},
+        protocol::{
+            ClientHandshake, DecodeState, Decoder, MRespState, PipelineResult, RState,
+            ServerHandshake,
+        },
+        query::Pipeline,
         response::{FromResponse, Response},
         Query,
     },
@@ -127,22 +131,67 @@ impl Config {
 /// This can't be constructed directly!
 pub struct TcpConnection<C: Write + Read> {
     con: C,
-    buffer: Vec<u8>,
+    buf: Vec<u8>,
 }
 
 impl<C: Write + Read> TcpConnection<C> {
     fn new(con: C) -> Self {
         Self {
             con,
-            buffer: Vec::with_capacity(crate::BUFSIZE),
+            buf: Vec::with_capacity(crate::BUFSIZE),
+        }
+    }
+    /// Execute a pipeline. The server returns the queries in the order they were sent (unless otherwise set).
+    pub fn execute_pipeline(&mut self, pipeline: &Pipeline) -> ClientResult<Vec<Response>> {
+        self.buf.clear();
+        self.buf.push(b'P');
+        // query count
+        self.buf.extend(
+            itoa::Buffer::new()
+                .format(pipeline.query_count())
+                .as_bytes(),
+        );
+        self.buf.push(b'\n');
+        // packet size
+        self.buf
+            .extend(itoa::Buffer::new().format(pipeline.buf().len()).as_bytes());
+        self.buf.push(b'\n');
+        // write
+        self.con.write_all(&self.buf)?;
+        self.con.write_all(pipeline.buf())?;
+        self.buf.clear();
+        // read
+        let mut expected = Decoder::MIN_READBACK;
+        let mut cursor = 0;
+        let mut state = MRespState::default();
+        loop {
+            let mut buf = [0u8; crate::BUFSIZE];
+            let n = self.con.read(&mut buf)?;
+            if n == 0 {
+                return Err(Error::IoError(std::io::ErrorKind::ConnectionReset.into()));
+            }
+            if n < expected {
+                continue;
+            }
+            self.buf.extend_from_slice(&buf[..n]);
+            let mut decoder = Decoder::new(&self.buf, cursor);
+            match decoder.validate_pipe(cursor == 0, state) {
+                PipelineResult::Completed(r) => return Ok(r),
+                PipelineResult::Pending(_state) => {
+                    expected = 1;
+                    cursor = decoder.position();
+                    state = _state;
+                }
+                PipelineResult::Error(e) => return Err(e.into()),
+            }
         }
     }
     /// Run a query and return a raw [`Response`]
     pub fn query(&mut self, q: &Query) -> ClientResult<Response> {
-        self.buffer.clear();
-        q.write_packet(&mut self.buffer).unwrap();
-        self.con.write_all(&self.buffer)?;
-        self.buffer.clear();
+        self.buf.clear();
+        q.write_packet(&mut self.buf).unwrap();
+        self.con.write_all(&self.buf)?;
+        self.buf.clear();
         let mut state = RState::default();
         let mut cursor = 0;
         loop {
@@ -151,8 +200,8 @@ impl<C: Write + Read> TcpConnection<C> {
             if n == 0 {
                 return Err(Error::IoError(std::io::ErrorKind::ConnectionReset.into()));
             }
-            self.buffer.extend_from_slice(&buf[..n]);
-            let mut decoder = Decoder::new(&self.buffer, cursor);
+            self.buf.extend_from_slice(&buf[..n]);
+            let mut decoder = Decoder::new(&self.buf, cursor);
             match decoder.validate_response(state) {
                 DecodeState::ChangeState(new_state) => {
                     state = new_state;
@@ -171,6 +220,6 @@ impl<C: Write + Read> TcpConnection<C> {
     /// Call this if the internally allocated buffer is growing too large and impacting your performance. However, normally
     /// you will not need to call this
     pub fn reset_buffer(&mut self) {
-        self.buffer.shrink_to_fit()
+        self.buf.shrink_to_fit()
     }
 }

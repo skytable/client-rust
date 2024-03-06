@@ -146,8 +146,11 @@ impl Pipeline {
             buf: Vec::new(),
         }
     }
+    pub(crate) fn buf(&self) -> &[u8] {
+        &self.buf
+    }
     /// Returns the number of queries that were appended to this pipeline
-    pub fn query_cnt(&self) -> usize {
+    pub fn query_count(&self) -> usize {
         self.cnt
     }
     /// Add a query to this pipeline

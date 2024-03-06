@@ -24,7 +24,11 @@
 use {
     crate::{
         error::{ClientResult, ConnectionSetupError, Error},
-        protocol::{ClientHandshake, DecodeState, Decoder, RState, ServerHandshake},
+        protocol::{
+            ClientHandshake, DecodeState, Decoder, MRespState, PipelineResult, RState,
+            ServerHandshake,
+        },
+        query::Pipeline,
         response::{FromResponse, Response},
         Config, Query,
     },
@@ -141,6 +145,51 @@ impl<C: AsyncWriteExt + AsyncReadExt + Unpin> TcpConnection<C> {
         Self {
             con,
             buf: Vec::with_capacity(crate::BUFSIZE),
+        }
+    }
+    /// Execute a pipeline. The server returns the queries in the order they were sent (unless otherwise set).
+    pub async fn execute_pipeline(&mut self, pipeline: &Pipeline) -> ClientResult<Vec<Response>> {
+        self.buf.clear();
+        self.buf.push(b'P');
+        // query count
+        self.buf.extend(
+            itoa::Buffer::new()
+                .format(pipeline.query_count())
+                .as_bytes(),
+        );
+        self.buf.push(b'\n');
+        // packet size
+        self.buf
+            .extend(itoa::Buffer::new().format(pipeline.buf().len()).as_bytes());
+        self.buf.push(b'\n');
+        // write
+        self.con.write_all(&self.buf).await?;
+        self.con.write_all(pipeline.buf()).await?;
+        self.buf.clear();
+        // read
+        let mut expected = Decoder::MIN_READBACK;
+        let mut cursor = 0;
+        let mut state = MRespState::default();
+        loop {
+            let mut buf = [0u8; crate::BUFSIZE];
+            let n = self.con.read(&mut buf).await?;
+            if n == 0 {
+                return Err(Error::IoError(std::io::ErrorKind::ConnectionReset.into()));
+            }
+            if n < expected {
+                continue;
+            }
+            self.buf.extend_from_slice(&buf[..n]);
+            let mut decoder = Decoder::new(&self.buf, cursor);
+            match decoder.validate_pipe(cursor == 0, state) {
+                PipelineResult::Completed(r) => return Ok(r),
+                PipelineResult::Pending(_state) => {
+                    expected = 1;
+                    cursor = decoder.position();
+                    state = _state;
+                }
+                PipelineResult::Error(e) => return Err(e.into()),
+            }
         }
     }
     /// Run a query and return a raw [`Response`]

@@ -109,6 +109,7 @@ impl fmt::Display for ProtocolError {
             Self::InvalidServerResponseUnknownDataType => {
                 write!(f, "new or unknown data type received from server")
             }
+            Self::InvalidPacket => write!(f, "invalid packet received from server"),
         }
     }
 }

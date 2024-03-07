@@ -14,11 +14,24 @@
  * limitations under the License.
 */
 
-use crate::{
-    config::Config,
-    error::{ClientResult, ConnectionSetupError, Error},
-    response::{Response, Row, Value},
+pub mod handshake;
+mod pipe;
+mod state;
+
+use {
+    self::state::{
+        DecodeState, MetaState, MultiRowState, PendingValue, RState, ResponseState, RowState,
+        ValueDecodeState, ValueDecodeStateAny, ValueDecodeStateRaw, ValueState, ValueStateMeta,
+    },
+    crate::response::{Response, Row, Value},
 };
+
+pub mod state_init {
+    pub(crate) use super::{
+        pipe::{MRespState, PipelineResult},
+        state::{DecodeState, RState},
+    };
+}
 
 pub(crate) type ProtocolResult<T> = Result<T, ProtocolError>;
 
@@ -39,191 +52,6 @@ impl Value {
             Self::UInt64(u) => u,
             _ => unreachable!(),
         }
-    }
-}
-
-/*
-    Decode state management
-*/
-
-type ValueDecodeStateRaw = ValueDecodeStateAny<ValueState>;
-type ValueDecodeState = ValueDecodeStateAny<PendingValue>;
-
-#[derive(Debug, Default, PartialEq)]
-struct MetaState {
-    completed: bool,
-    val: u64,
-}
-
-impl MetaState {
-    fn new(completed: bool, val: u64) -> Self {
-        Self { completed, val }
-    }
-    #[inline(always)]
-    fn finished(&mut self, decoder: &mut Decoder) -> ProtocolResult<bool> {
-        self.finish_or_continue(decoder, || Ok(true), || Ok(false), |e| Err(e))
-    }
-    #[inline(always)]
-    fn finish_or_continue<T>(
-        &mut self,
-        decoder: &mut Decoder,
-        if_completed: impl FnOnce() -> T,
-        if_pending: impl FnOnce() -> T,
-        if_err: impl FnOnce(ProtocolError) -> T,
-    ) -> T {
-        Self::try_finish_or_continue(
-            self.completed,
-            &mut self.val,
-            decoder,
-            if_completed,
-            if_pending,
-            if_err,
-        )
-    }
-    #[inline(always)]
-    fn try_finish(decoder: &mut Decoder, completed: bool, val: &mut u64) -> ProtocolResult<bool> {
-        Self::try_finish_or_continue(
-            completed,
-            val,
-            decoder,
-            || Ok(true),
-            || Ok(false),
-            |e| Err(e),
-        )
-    }
-    #[inline(always)]
-    fn try_finish_or_continue<T>(
-        completed: bool,
-        val: &mut u64,
-        decoder: &mut Decoder,
-        if_completed: impl FnOnce() -> T,
-        if_pending: impl FnOnce() -> T,
-        if_err: impl FnOnce(ProtocolError) -> T,
-    ) -> T {
-        if completed {
-            if_completed()
-        } else {
-            match decoder.__resume_decode(*val, ValueStateMeta::zero()) {
-                Ok(vs) => match vs {
-                    ValueDecodeStateAny::Pending(ValueState { v, .. }) => {
-                        *val = v.u64();
-                        if_pending()
-                    }
-                    ValueDecodeStateAny::Decoded(v) => {
-                        *val = v.u64();
-                        if_completed()
-                    }
-                },
-                Err(e) => if_err(e),
-            }
-        }
-    }
-    #[inline(always)]
-    fn val(&self) -> u64 {
-        self.val
-    }
-}
-
-#[derive(Debug, PartialEq)]
-enum ValueDecodeStateAny<P, V = Value> {
-    Pending(P),
-    Decoded(V),
-}
-
-#[derive(Debug, PartialEq)]
-struct ValueState {
-    v: Value,
-    meta: ValueStateMeta,
-}
-
-impl ValueState {
-    fn new(v: Value, meta: ValueStateMeta) -> Self {
-        Self { v, meta }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-struct ValueStateMeta {
-    start: usize,
-    md: MetaState,
-}
-
-impl ValueStateMeta {
-    fn zero() -> Self {
-        Self {
-            start: 0,
-            md: MetaState::default(),
-        }
-    }
-    fn new(start: usize, md1: u64, md1_flag: bool) -> Self {
-        Self {
-            start,
-            md: MetaState::new(md1_flag, md1),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-struct RowState {
-    meta: ValueStateMeta,
-    row: Vec<Value>,
-    tmp: Option<PendingValue>,
-}
-
-impl RowState {
-    fn new(meta: ValueStateMeta, row: Vec<Value>, tmp: Option<PendingValue>) -> Self {
-        Self { meta, row, tmp }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-struct MultiRowState {
-    c_row: Option<RowState>,
-    rows: Vec<Row>,
-    md_state: u8,
-    md1_target: u64,
-    md2_col_cnt: u64,
-}
-
-impl Default for MultiRowState {
-    fn default() -> Self {
-        Self::new(None, vec![], 0, 0, 0)
-    }
-}
-
-impl MultiRowState {
-    fn new(c_row: Option<RowState>, rows: Vec<Row>, md_s: u8, md_cnt: u64, md_target: u64) -> Self {
-        Self {
-            c_row,
-            rows,
-            md_state: md_s,
-            md1_target: md_target,
-            md2_col_cnt: md_cnt,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-enum ResponseState {
-    Initial,
-    PValue(PendingValue),
-    PError,
-    PRow(RowState),
-    PMultiRow(MultiRowState),
-}
-
-#[derive(Debug, PartialEq)]
-pub enum DecodeState {
-    ChangeState(RState),
-    Completed(Response),
-    Error(ProtocolError),
-}
-
-#[derive(Debug, PartialEq)]
-pub struct RState(ResponseState);
-impl Default for RState {
-    fn default() -> Self {
-        RState(ResponseState::Initial)
     }
 }
 
@@ -516,23 +344,6 @@ impl_fstr!(
     f64 as Float64
 );
 
-#[derive(Debug, PartialEq)]
-struct PendingValue {
-    state: ValueState,
-    tmp: Option<ValueState>,
-    stack: Vec<(Vec<Value>, ValueStateMeta)>,
-}
-
-impl PendingValue {
-    fn new(
-        state: ValueState,
-        tmp: Option<ValueState>,
-        stack: Vec<(Vec<Value>, ValueStateMeta)>,
-    ) -> Self {
-        Self { state, tmp, stack }
-    }
-}
-
 impl<'a> Decoder<'a> {
     fn parse_list(
         &mut self,
@@ -699,90 +510,6 @@ impl<'a> Decoder<'a> {
     }
 }
 
-pub struct ClientHandshake(Box<[u8]>);
-impl ClientHandshake {
-    pub(crate) fn new(cfg: &Config) -> Self {
-        let mut v = Vec::with_capacity(6 + cfg.username().len() + cfg.password().len() + 5);
-        v.extend(b"H\x00\x00\x00\x00\x00");
-        pushlen!(v, cfg.username().len());
-        pushlen!(v, cfg.password().len());
-        v.extend(cfg.username().as_bytes());
-        v.extend(cfg.password().as_bytes());
-        Self(v.into_boxed_slice())
-    }
-    pub(crate) fn inner(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-#[derive(Debug)]
-pub enum ServerHandshake {
-    Okay(u8),
-    Error(u8),
-}
-impl ServerHandshake {
-    pub fn parse(v: [u8; 4]) -> ClientResult<Self> {
-        Ok(match v {
-            [b'H', 0, 0, msg] => Self::Okay(msg),
-            [b'H', 0, 1, msg] => Self::Error(msg),
-            _ => {
-                return Err(Error::ConnectionSetupErr(
-                    ConnectionSetupError::InvalidServerHandshake,
-                ))
-            }
-        })
-    }
-}
-
-#[derive(Debug, PartialEq, Default)]
-pub(crate) struct MRespState {
-    processed: Vec<Response>,
-    pending: Option<ResponseState>,
-    expected: MetaState,
-}
-
-#[derive(Debug, PartialEq)]
-pub(crate) enum PipelineResult {
-    Completed(Vec<Response>),
-    Pending(MRespState),
-    Error(ProtocolError),
-}
-
-impl MRespState {
-    fn step(mut self, decoder: &mut Decoder) -> PipelineResult {
-        match self.expected.finished(decoder) {
-            Ok(true) => {}
-            Ok(false) => return PipelineResult::Pending(self),
-            Err(e) => return PipelineResult::Error(e),
-        }
-        loop {
-            if self.processed.len() as u64 == self.expected.val() {
-                return PipelineResult::Completed(self.processed);
-            }
-            match decoder.validate_response(RState(
-                self.pending.take().unwrap_or(ResponseState::Initial),
-            )) {
-                DecodeState::ChangeState(RState(s)) => {
-                    self.pending = Some(s);
-                    return PipelineResult::Pending(self);
-                }
-                DecodeState::Completed(c) => self.processed.push(c),
-                DecodeState::Error(e) => return PipelineResult::Error(e),
-            }
-        }
-    }
-}
-
-impl<'a> Decoder<'a> {
-    pub fn validate_pipe(&mut self, first: bool, state: MRespState) -> PipelineResult {
-        if first && self._cursor_next() != b'P' {
-            PipelineResult::Error(ProtocolError::InvalidPacket)
-        } else {
-            state.step(self)
-        }
-    }
-}
-
 #[test]
 fn t_row() {
     let mut decoder = Decoder::new(b"\x115\n\x00\x01\x01\x0D5\nsayan\x0220\n\x0E0\n", 0);
@@ -826,38 +553,5 @@ fn t_mrow() {
                 Value::List(vec![])
             ])
         ]))
-    );
-}
-
-#[test]
-fn t_pipe() {
-    let mut decoder = Decoder::new(b"P5\n\x12\x10\xFF\xFF\x115\n\x00\x01\x01\x0D5\nsayan\x0220\n\x0E0\n\x115\n\x00\x01\x01\x0D5\nelana\x0221\n\x0E0\n\x115\n\x00\x01\x01\x0D5\nemily\x0222\n\x0E0\n", 0);
-    assert_eq!(
-        decoder.validate_pipe(true, MRespState::default()),
-        PipelineResult::Completed(vec![
-            Response::Empty,
-            Response::Error(u16::MAX),
-            Response::Row(Row::new(vec![
-                Value::Null,
-                Value::Bool(true),
-                Value::String("sayan".into()),
-                Value::UInt8(20),
-                Value::List(vec![])
-            ])),
-            Response::Row(Row::new(vec![
-                Value::Null,
-                Value::Bool(true),
-                Value::String("elana".into()),
-                Value::UInt8(21),
-                Value::List(vec![])
-            ])),
-            Response::Row(Row::new(vec![
-                Value::Null,
-                Value::Bool(true),
-                Value::String("emily".into()),
-                Value::UInt8(22),
-                Value::List(vec![])
-            ]))
-        ])
     );
 }

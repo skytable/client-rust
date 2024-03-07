@@ -25,8 +25,9 @@ use {
     crate::{
         error::{ClientResult, ConnectionSetupError, Error},
         protocol::{
-            ClientHandshake, DecodeState, Decoder, MRespState, PipelineResult, RState,
-            ServerHandshake,
+            handshake::{ClientHandshake, ServerHandshake},
+            state_init::{DecodeState, MRespState, PipelineResult, RState},
+            Decoder,
         },
         query::Pipeline,
         response::{FromResponse, Response},

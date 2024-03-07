@@ -47,6 +47,9 @@ impl MRespState {
             if self.processed.len() as u64 == self.expected.val() {
                 return PipelineResult::Completed(self.processed);
             }
+            if decoder._cursor_eof() {
+                return PipelineResult::Pending(self);
+            }
             match decoder.validate_response(RState(
                 self.pending.take().unwrap_or(ResponseState::Initial),
             )) {
@@ -71,10 +74,13 @@ impl<'a> Decoder<'a> {
     }
 }
 
+#[cfg(test)]
+const QUERY: &[u8] = b"P5\n\x12\x10\xFF\xFF\x115\n\x00\x01\x01\x0D5\nsayan\x0220\n\x0E0\n\x115\n\x00\x01\x01\x0D5\nelana\x0221\n\x0E0\n\x115\n\x00\x01\x01\x0D5\nemily\x0222\n\x0E0\n";
+
 #[test]
 fn t_pipe() {
     use crate::response::{Response, Row, Value};
-    let mut decoder = Decoder::new(b"P5\n\x12\x10\xFF\xFF\x115\n\x00\x01\x01\x0D5\nsayan\x0220\n\x0E0\n\x115\n\x00\x01\x01\x0D5\nelana\x0221\n\x0E0\n\x115\n\x00\x01\x01\x0D5\nemily\x0222\n\x0E0\n", 0);
+    let mut decoder = Decoder::new(QUERY, 0);
     assert_eq!(
         decoder.validate_pipe(true, MRespState::default()),
         PipelineResult::Completed(vec![
@@ -103,4 +109,22 @@ fn t_pipe() {
             ]))
         ])
     );
+}
+
+#[test]
+fn t_pipe_staged() {
+    for i in Decoder::MIN_READBACK..QUERY.len() {
+        let mut dec = Decoder::new(&QUERY[..i], 0);
+        if i < 3 {
+            assert!(matches!(
+                dec.validate_pipe(true, MRespState::default()),
+                PipelineResult::Pending(_)
+            ));
+        } else {
+            assert!(matches!(
+                dec.validate_pipe(true, MRespState::default()),
+                PipelineResult::Pending(p) if p.expected.val() == 5
+            ));
+        }
+    }
 }

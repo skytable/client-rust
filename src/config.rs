@@ -15,17 +15,17 @@
 */
 
 //! # Configuration
-//! 
+//!
 //! This module provides items to help with database connection setup and configuration.
-//! 
+//!
 //! ## Example
-//! 
+//!
 //! ```no_run
 //! use skytable::Config;
-//! 
+//!
 //! // establish a sync connection to 127.0.0.1:2003
 //! let mut db = Config::new_default("username", "password").connect().unwrap();
-//! 
+//!
 //! // establish a connection to a specific host `subnetx2_db1` and port `2008`
 //! let mut db = Config::new("subnetx2_db1", 2008, "username", "password").connect().unwrap();
 //! ```

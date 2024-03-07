@@ -16,14 +16,14 @@
 
 #[macro_export]
 /// This macro can be used to create a [`Query`](struct@crate::Query), almost like a variadic function
-/// 
+///
 /// ## Examples
 /// ```
 /// use skytable::query;
-/// 
+///
 /// fn get_username() -> String { "sayan".to_owned() }
 /// fn get_counter() -> u64 { 100 }
-/// 
+///
 /// let query1 = query!("select * from myspace.mymodel WHERE username = ?", get_username());
 /// assert_eq!(query1.param_cnt(), 1);
 /// let query2 = query!("update myspace.mymodel set counter += ? WHERE username = ?", get_counter(), get_username());

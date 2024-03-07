@@ -272,6 +272,9 @@ impl<'a> Decoder<'a> {
     fn _creq(&self, b: u8) -> bool {
         (self.b[core::cmp::min(self.i, self.b.len() - 1)] == b) & !self._cursor_eof()
     }
+    fn _current(&self) -> &[u8] {
+        &self.b[self.i..]
+    }
 }
 
 trait DecodeDelimited {
@@ -511,23 +514,23 @@ impl<'a> Decoder<'a> {
 }
 
 #[test]
-fn t_row() {
-    let mut decoder = Decoder::new(b"\x115\n\x00\x01\x01\x0D5\nsayan\x0220\n\x0E0\n", 0);
-    assert_eq!(
-        decoder.validate_response(RState::default()),
-        DecodeState::Completed(Response::Row(Row::new(vec![
-            Value::Null,
-            Value::Bool(true),
-            Value::String("sayan".into()),
-            Value::UInt8(20),
-            Value::List(vec![])
-        ])))
-    );
-}
-
-#[test]
 fn t_mrow() {
-    let mut decoder = Decoder::new(b"\x133\n5\n\x00\x01\x01\x0D5\nsayan\x0220\n\x0E0\n\x00\x01\x01\x0D5\nelana\x0221\n\x0E0\n\x00\x01\x01\x0D5\nemily\x0222\n\x0E0\n", 0);
+    const MROW_QUERY: &[u8] = b"\x133\n5\n\x00\x01\x01\x0D5\nsayan\x0220\n\x0E0\n\x00\x01\x01\x0D5\nelana\x0221\n\x0E0\n\x00\x01\x01\x0D5\nemily\x0222\n\x0E0\n";
+    for i in 1..MROW_QUERY.len() {
+        let mut decoder = Decoder::new(&MROW_QUERY[..i], 0);
+        if i == 1 {
+            assert!(matches!(
+                decoder.validate_response(RState::default()),
+                DecodeState::ChangeState(RState(_))
+            ));
+        } else {
+            assert!(matches!(
+                decoder.validate_response(RState::default()),
+                DecodeState::ChangeState(RState(ResponseState::PMultiRow(_)))
+            ));
+        }
+    }
+    let mut decoder = Decoder::new(MROW_QUERY, 0);
     assert_eq!(
         decoder.validate_response(RState::default()),
         DecodeState::Completed(Response::Rows(vec![
@@ -553,5 +556,33 @@ fn t_mrow() {
                 Value::List(vec![])
             ])
         ]))
+    );
+}
+#[test]
+fn t_num() {
+    const NUM: &[u8] = b"1234\n";
+    fn decoder(i: usize) -> Decoder<'static> {
+        Decoder::new(&NUM[..i], 0)
+    }
+    for (i, expected) in [1, 12, 123, 1234u64]
+        .iter()
+        .enumerate()
+        .map(|(a, b)| (a + 1, *b))
+    {
+        assert_eq!(
+            decoder(i)
+                .__resume_decode(0u64, ValueStateMeta::zero())
+                .unwrap(),
+            ValueDecodeStateAny::Pending(ValueState::new(
+                Value::UInt64(expected),
+                ValueStateMeta::zero()
+            ))
+        );
+    }
+    assert_eq!(
+        decoder(NUM.len())
+            .__resume_decode(0u64, ValueStateMeta::zero())
+            .unwrap(),
+        ValueDecodeStateAny::Decoded(Value::UInt64(1234))
     );
 }

@@ -21,9 +21,13 @@ use crate::{
 
 pub struct ClientHandshake(Box<[u8]>);
 impl ClientHandshake {
-    pub(crate) fn new(cfg: &Config) -> Self {
+    const HANDSHAKE_PROTO_V1: [u8; 6] = [b'H', 0, 0, 0, 0, 0];
+    pub(crate) fn new_v1(cfg: &Config) -> Self {
+        Self::_new(Self::HANDSHAKE_PROTO_V1, cfg)
+    }
+    fn _new(hs: [u8; 6], cfg: &Config) -> Self {
         let mut v = Vec::with_capacity(6 + cfg.username().len() + cfg.password().len() + 5);
-        v.extend(b"H\x00\x00\x00\x00\x00");
+        v.extend(hs);
         pushlen!(v, cfg.username().len());
         pushlen!(v, cfg.password().len());
         v.extend(cfg.username().as_bytes());

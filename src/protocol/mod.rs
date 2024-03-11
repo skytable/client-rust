@@ -203,6 +203,7 @@ impl<'a> Decoder<'a> {
         }
         let lf = self._creq(b'\n');
         self._cursor_incr_if(lf);
+        // FIXME(@ohsayan): the below is not exactly necessary and we can actually remove this if it complicates state management
         okay &= !(lf & (self._cursor() == meta.start));
         if okay & lf {
             let start = meta.start;

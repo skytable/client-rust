@@ -86,7 +86,7 @@ impl Config {
     /// Establish an async connection to the database using the current configuration
     pub async fn connect_async(&self) -> ClientResult<ConnectionAsync> {
         let mut tcpstream = TcpStream::connect((self.host(), self.port())).await?;
-        let handshake = ClientHandshake::new(self);
+        let handshake = ClientHandshake::new_v1(self);
         tcpstream.write_all(handshake.inner()).await?;
         let mut resp = [0u8; 4];
         tcpstream.read_exact(&mut resp).await?;
@@ -121,7 +121,7 @@ impl Config {
             .await
             .map_err(|e| ConnectionSetupError::Other(format!("TLS handshake failed: {e}")))?;
         // handshake
-        let handshake = ClientHandshake::new(self);
+        let handshake = ClientHandshake::new_v1(self);
         stream.write_all(handshake.inner()).await?;
         let mut resp = [0u8; 4];
         stream.read_exact(&mut resp).await?;

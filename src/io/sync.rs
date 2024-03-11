@@ -87,7 +87,7 @@ impl Config {
     /// Establish a connection to the database using the current configuration
     pub fn connect(&self) -> ClientResult<Connection> {
         let mut tcpstream = TcpStream::connect((self.host(), self.port()))?;
-        let handshake = ClientHandshake::new(self);
+        let handshake = ClientHandshake::new_v1(self);
         tcpstream.write_all(handshake.inner())?;
         let mut resp = [0u8; 4];
         tcpstream.read_exact(&mut resp)?;
@@ -113,7 +113,7 @@ impl Config {
             })?
             .connect(self.host(), stream)
             .map_err(|e| ConnectionSetupError::Other(format!("TLS handshake failed: {e}")))?;
-        let handshake = ClientHandshake::new(self);
+        let handshake = ClientHandshake::new_v1(self);
         stream.write_all(handshake.inner())?;
         let mut resp = [0u8; 4];
         stream.read_exact(&mut resp)?;

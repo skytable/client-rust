@@ -229,7 +229,7 @@ impl<V: FromValue> FromValue for Option<V> {
     fn from_value(v: Value) -> ClientResult<Self> {
         match v {
             Value::Null => Ok(None),
-            v => FromValue::from_value(v),
+            v => FromValue::from_value(v).map(|v| Some(v)),
         }
     }
 }

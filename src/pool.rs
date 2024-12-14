@@ -108,7 +108,6 @@ impl r2d2::ManageConnection for ConnectionMgrTcp {
     }
 }
 
-#[async_trait::async_trait]
 impl bb8::ManageConnection for ConnectionMgrTcp {
     type Connection = ConnectionAsync;
     type Error = Error;
@@ -154,7 +153,6 @@ impl r2d2::ManageConnection for ConnectionMgrTls {
     }
 }
 
-#[async_trait::async_trait]
 impl bb8::ManageConnection for ConnectionMgrTls {
     type Connection = ConnectionTlsAsync;
     type Error = Error;

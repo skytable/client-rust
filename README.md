@@ -65,7 +65,7 @@ assert_eq!(users[0].userid, "user");
 
 ## Version support
 
-- Minimum Supported Rust Version (MSRV): 1.51.0
+- Minimum Supported Rust Version (MSRV): 1.75.0
 - Minimum Supported Skytable Version: 0.8.0
 
 ## Features

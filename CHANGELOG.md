@@ -2,6 +2,12 @@
 
 All changes in this project will be noted in this file.
 
+## 0.8.12
+
+### Fixes
+
+Fixed stack overflow due to a `FromValue` impl
+
 ## 0.8.11
 
 ### Additions

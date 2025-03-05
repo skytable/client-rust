@@ -30,7 +30,7 @@
 //!     let mut db = pool.get().await.unwrap();
 //! }
 //! ```
-//! ### Creating a async pool
+//! ### Creating a sync pool
 //! ```no_run
 //! use skytable::{pool, Config};
 //!

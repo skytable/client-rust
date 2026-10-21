@@ -44,6 +44,10 @@
 //! To create a pool of TLS connections you can use the [`get_tls`] and [`get_tls_async`] methods, passing a PEM certificate
 //! as a string.
 //!
+//! Cancelling a query or pipeline poisons its connection. The async managers
+//! report the connection as broken, so the pool drops it instead of returning
+//! it to the pool and the next checkout opens a fresh connection.
+//!
 
 use crate::{error::Error, Config, Connection, ConnectionAsync, ConnectionTls, ConnectionTlsAsync};
 
@@ -115,10 +119,16 @@ impl bb8::ManageConnection for ConnectionMgrTcp {
         self.config.connect_async().await
     }
     async fn is_valid(&self, conn: &mut Self::Connection) -> Result<(), Self::Error> {
+        if conn.is_poisoned() {
+            return Err(Error::IoError(std::io::Error::new(
+                std::io::ErrorKind::ConnectionAborted,
+                "skytable: connection poisoned by an incomplete operation",
+            )));
+        }
         conn.query_parse::<()>(&query!(QUERY_SYSCTL_STATUS)).await
     }
-    fn has_broken(&self, _: &mut Self::Connection) -> bool {
-        false
+    fn has_broken(&self, conn: &mut Self::Connection) -> bool {
+        conn.is_poisoned()
     }
 }
 
@@ -160,9 +170,15 @@ impl bb8::ManageConnection for ConnectionMgrTls {
         self.config.connect_tls_async(&self.pem_cert).await
     }
     async fn is_valid(&self, conn: &mut Self::Connection) -> Result<(), Self::Error> {
+        if conn.is_poisoned() {
+            return Err(Error::IoError(std::io::Error::new(
+                std::io::ErrorKind::ConnectionAborted,
+                "skytable: connection poisoned by an incomplete operation",
+            )));
+        }
         conn.query_parse::<()>(&query!(QUERY_SYSCTL_STATUS)).await
     }
-    fn has_broken(&self, _: &mut Self::Connection) -> bool {
-        false
+    fn has_broken(&self, conn: &mut Self::Connection) -> bool {
+        conn.is_poisoned()
     }
 }
